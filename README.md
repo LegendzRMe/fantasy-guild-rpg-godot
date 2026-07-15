@@ -10,13 +10,15 @@ An original Godot 4 prototype combining manual party control, guild management, 
 
 ## Current prototype
 
-- Three guild save slots with deletion confirmation
-- Guild Hall navigation hub
+- Three live guild save slots plus a separate unlocked testing slot, all with deletion confirmation
+- Guild Hall progression hub with chained previews for locked systems
 - Hero roster with equipment, stats, abilities, tooltips, professions, and prestige placeholders
 - Drag-and-drop team builder with named saved teams
 - Full-screen world map and zone encounter paths
 - Multi-wave real-time combat with manual movement and targeting
-- Guardian, Cleric, Ranger, and Mage roles
+- Guardian, Cleric, Rogue, Ranger, Mage, and Warlock roles
+- A data-driven, replayable Ashwood Marches campaign with seven mandatory encounters and a two-encounter optional branch
+- Narrative recruit decisions, objective battles, equipment rewards, and a permanent Special Hero choice
 - Enemy roles, boss telegraphs, and staged victory rewards
 - Command Table foundation for automated hero missions
 - Classic-era profession list and crafting placeholders
@@ -32,3 +34,15 @@ An original Godot 4 prototype combining manual party control, guild management, 
 - Click the pause button to resume or retreat.
 
 The project uses original placeholder systems and artwork. Names, UI, game rules, and assets are subject to change during development.
+
+## Development
+
+Architecture, ownership boundaries, save invariants, and refactoring rules are documented in [`docs/architecture.md`](docs/architecture.md).
+
+Run the complete local validation suite from PowerShell:
+
+```powershell
+.\tools\validate.ps1
+```
+
+The validator uses isolated Godot user data and does not modify normal guild saves.
