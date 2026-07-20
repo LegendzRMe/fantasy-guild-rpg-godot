@@ -1,0 +1,248 @@
+extends "res://scripts/runtime/ability_runtime.gd"
+
+func player_controlled_hero_indices() -> Array:
+	var result:=[]
+	for hero_index in heroes.size():
+		if not bool(heroes[hero_index].get("independent",false)):result.append(hero_index)
+	return result
+
+func cycle_selected_hero(direction:int)->void:
+	if heroes.is_empty():return
+	for offset in heroes.size():
+		var candidate=posmod(selected+direction*(offset+1),heroes.size())
+		if heroes[candidate].hp>0 and not bool(heroes[candidate].get("independent",false)):
+			selected=candidate
+			queue_redraw()
+			return
+
+func cycle_selected_enemy()->void:
+	if heroes.is_empty():return
+	var living_targets:=[]
+	for i in enemies.size():
+		if enemies[i].hp>0:living_targets.append(i)
+	if living_targets.is_empty():
+		focused_enemy_index=-1
+		queue_redraw()
+		return
+	var current_position=living_targets.find(focused_enemy_index)
+	var next_position=0 if current_position<0 else (current_position+1)%living_targets.size()
+	focused_enemy_index=living_targets[next_position]
+	queue_redraw()
+
+func cancel_ability_aim()->void:
+	ability_aiming=false;aimed_ability_slot=-1;aimed_ability_category="";aimed_cast_mode="";ability_button_held=false;queue_redraw()
+
+func clear_selected_combat_target()->void:
+	if selected<0 or selected>=heroes.size():return
+	clear_hero_command(heroes[selected],"player cancelled")
+	focused_enemy_index=-1
+	queue_redraw()
+
+func begin_ability(slot:int,device:String="pc")->void:
+	if selected>=heroes.size() or bool(heroes[selected].get("independent",false)) or slot<0 or slot>=4:return
+	if tutorial_active and (tutorial_step<7 or slot!=0):return
+	if tutorial_active and tutorial_step==7 and heroes[selected]["class"]!="Cleric":return
+	if tutorial_active and tutorial_step==7:use_ability(0,heroes[selected].pos);return
+	var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
+	if not TalentSystem.ability_is_unlocked(hero_level,slot):flash("This ability unlocks at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]));return
+	var category=ABILITY_TARGETING[heroes[selected]["class"]][slot]
+	var mode="instant" if category=="self" else str(state.casting_settings[device].get(category,"cursor"))
+	if mode=="instant" or mode=="cursor" or mode=="facing" or mode=="target":
+		if (category=="enemy" and combat_enemy_target()<0) or (category=="ally" and (heroes[selected].heal_target<0 or heroes[selected].heal_target>=heroes.size())):
+			flash("Choose a valid %s target first."%category);return
+		var cast_point=get_global_mouse_position()
+		if mode=="facing":cast_point=heroes[selected].pos+heroes[selected].facing_direction*ABILITY_RANGES[heroes[selected]["class"]][slot]
+		use_ability(slot,cast_point);return
+	ability_aiming=true;aimed_ability_slot=slot;aimed_ability_category=category;aimed_cast_mode=mode;aimed_from_touch=device=="mobile";ability_button_held=mode=="release";ability_aim_point=get_global_mouse_position();queue_redraw()
+
+func confirm_aim_at(point:Vector2)->bool:
+	if not ability_aiming:return false
+	if aimed_ability_category=="enemy":
+		for i in enemies.size():
+			if enemies[i].hp>0 and enemies[i].pos.distance_to(point)<58:focused_enemy_index=i;var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
+		return false
+	if aimed_ability_category=="ally":
+		for i in heroes.size():
+			if heroes[i].hp>0 and heroes[i].pos.distance_to(point)<58:assign_hero_ally(selected,i);var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
+		return false
+	var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
+
+func tutorial_allows_hero(hero_index:int)->bool:
+
+	match tutorial_step:
+		0,1:return hero_index>=0 and hero_index<heroes.size()
+		2,3:return hero_index==0
+		6:return hero_index==0 or hero_index==1
+		4,7:return hero_index==1
+	return false
+
+func tutorial_pointer_press(point:Vector2,device:String="pc")->void:
+	tutorial_input_device=device
+	if tutorial_step==7:
+		if point.y>575 and point.y<635 and point.x>420 and point.x<875:
+			var portrait_index=clampi(int((point.x-424)/54),0,heroes.size()-1)
+			if portrait_index==1:selected=1;tutorial_record_valid_action();queue_redraw()
+			else:reject_tutorial_action("Only Sera can be selected for this step.")
+			return
+		if point.y>635 and point.x>445 and point.x<523:
+			if selected==1:tutorial_record_valid_action();begin_ability(0,device)
+			else:reject_tutorial_action("Select Sera before using Radiant Mend.")
+			return
+	for hero_index in heroes.size():
+		if heroes[hero_index].pos.distance_to(point)<58 and tutorial_allows_hero(hero_index):
+			selected=hero_index;tutorial_record_valid_action()
+			if tutorial_step==3:
+				tutorial_hero_clicked=true
+				dragging_hero=false
+				queue_redraw()
+				return
+			if tutorial_step==7:
+				queue_redraw()
+				return
+			dragging_hero=true;drag_cursor=point;drag_start=point;drag_has_moved=false;drag_target_type="ground";drag_target_index=-1;queue_redraw();return
+	reject_tutorial_action()
+
+func update_hero_drag(point:Vector2)->void:
+	drag_cursor=point
+	if drag_cursor.distance_to(drag_start)>12:drag_has_moved=true
+	drag_target_type="ground";drag_target_index=-1
+	if heroes[selected]["class"]=="Cleric":
+		for hero_index in heroes.size():
+			if heroes[hero_index].hp>0 and heroes[hero_index].pos.distance_to(drag_cursor)<42:drag_target_type="ally";drag_target_index=hero_index;break
+	if drag_target_type=="ground":
+		for enemy_index in enemies.size():
+			if enemies[enemy_index].hp>0 and enemies[enemy_index].pos.distance_to(drag_cursor)<45:drag_target_type="enemy";drag_target_index=enemy_index;break
+	queue_redraw()
+
+func tutorial_drag_release_is_valid()->bool:
+	match tutorial_step:
+		0:
+			return drag_target_type=="ground"
+		1:
+			return drag_target_type=="ground"
+		2:
+			return drag_target_type=="enemy" and drag_target_index>=0 and enemies[drag_target_index].type=="Dummy"
+		4:
+			return drag_target_type=="ally" and drag_target_index==0
+		6:
+			if selected==1:return drag_target_type=="ground"
+			return drag_target_type=="enemy" and drag_target_index>=0 and enemies[drag_target_index].type=="Raider"
+	return false
+
+func finish_hero_drag()->void:
+	dragging_hero=false
+	if not drag_has_moved:return
+	if tutorial_active and not tutorial_drag_release_is_valid():reject_tutorial_action();queue_redraw();return
+	if tutorial_active:tutorial_record_valid_action()
+	if drag_target_type=="enemy":assign_hero_enemy(selected,drag_target_index);heroes[selected].suppress_auto_target=false
+	elif drag_target_type=="ally" and heroes[selected]["class"]=="Cleric":assign_hero_ally(selected,drag_target_index)
+	else:issue_hero_move(heroes[selected],Vector2(clamp(drag_cursor.x,55.0,1225.0),clamp(drag_cursor.y,70.0,570.0)));heroes[selected].suppress_auto_target=true;focused_enemy_index=-1
+	queue_redraw()
+
+func _unhandled_input(event:InputEvent) -> void:
+	if screen!="combat":return
+	if tutorial_active:
+		if event is InputEventScreenTouch or event is InputEventScreenDrag:tutorial_input_device="mobile"
+		elif not OS.has_feature("mobile") and (event is InputEventMouseButton or event is InputEventMouseMotion or event is InputEventKey):tutorial_input_device="pc"
+	if tutorial_active and tutorial_step==8 and ((event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey) and event.pressed):
+		tutorial_active=false;show_hall();return
+	if victory_sequence:
+		if victory_phase>=5 and ((event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey) and event.pressed):
+			if current_ashwood_encounter!="" and victory_timer<1.6:victory_timer=1.6;queue_redraw();return
+
+			victory_sequence=false
+			if current_ashwood_encounter!="":show_ashwood_victory()
+			else:show_zone_map(dungeon_id)
+		return
+	if battle_over:
+		if event is InputEventKey and event.pressed:
+			if event.keycode==KEY_ESCAPE or event.keycode==KEY_ENTER: show_hall()
+			elif event.keycode==KEY_R: start_battle(dungeon_id,encounter_id)
+		return
+	if tutorial_active and event is InputEventKey:
+		var accepted=false
+		if event.pressed and tutorial_step==7:
+			if event.keycode==KEY_2:selected=1;tutorial_record_valid_action();queue_redraw();accepted=true
+			elif not event.echo and event.keycode==KEY_Q and selected==1:tutorial_record_valid_action();begin_ability(0);accepted=true
+		if event.pressed and not accepted:reject_tutorial_action()
+		get_viewport().set_input_as_handled()
+		return
+	if tutorial_active and event is InputEventMouseButton and event.pressed and event.button_index!=MOUSE_BUTTON_LEFT:
+		reject_tutorial_action()
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventKey and event.pressed:
+		if event.keycode==KEY_ESCAPE and ability_aiming:cancel_ability_aim();get_viewport().set_input_as_handled();return
+		if event.keycode==KEY_F3 and testing_zone_active:debug_combat_overlay=not debug_combat_overlay;queue_redraw();return
+		if event.keycode==KEY_SPACE:paused=!paused;queue_redraw()
+		if event.keycode==KEY_TAB and not event.echo:
+			cycle_selected_enemy()
+			get_viewport().set_input_as_handled()
+		if event.keycode>=KEY_1 and event.keycode<=KEY_4:
+			var selectable_heroes:Array=player_controlled_hero_indices()
+			var requested_slot:int=event.keycode-KEY_1
+			if requested_slot<selectable_heroes.size():selected=selectable_heroes[requested_slot];queue_redraw()
+		if not event.echo and event.keycode==KEY_Q:begin_ability(0)
+		if not event.echo and event.keycode==KEY_W:begin_ability(1)
+		if not event.echo and event.keycode==KEY_E:begin_ability(2)
+		if not event.echo and event.keycode==KEY_R:begin_ability(3)
+	if event is InputEventKey and not event.pressed and ability_aiming and aimed_cast_mode=="release":
+		var released_slot={KEY_Q:0,KEY_W:1,KEY_E:2,KEY_R:3}.get(event.keycode,-1)
+		if released_slot==aimed_ability_slot:confirm_aim_at(get_global_mouse_position());return
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index==MOUSE_BUTTON_RIGHT:
+			if ability_aiming:cancel_ability_aim()
+			elif not paused:clear_selected_combat_target()
+			get_viewport().set_input_as_handled();return
+		if event.button_index==MOUSE_BUTTON_WHEEL_UP:
+			cycle_selected_hero(-1)
+			get_viewport().set_input_as_handled()
+			return
+		if event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
+			cycle_selected_hero(1)
+			get_viewport().set_input_as_handled()
+			return
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
+		var p=event.position
+		if tutorial_active:
+			tutorial_pointer_press(p,"pc")
+			get_viewport().set_input_as_handled()
+			return
+		if ability_aiming and aimed_cast_mode=="confirm":
+			if confirm_aim_at(p):get_viewport().set_input_as_handled()
+			return
+		if p.x>1190 and p.y<70: paused=true; queue_redraw(); return
+		if paused:
+			if Rect2(490,285,300,58).has_point(p):paused=false;queue_redraw()
+			elif testing_zone_active and Rect2(490,360,300,58).has_point(p):toggle_testing_dummy_attacks()
+			elif Rect2(490,435 if testing_zone_active else 360,300,58).has_point(p):paused=false;show_dungeons() if testing_zone_active else show_zone_map(dungeon_id)
+			return
+		if p.y>575 and p.y<635 and p.x>420 and p.x<875:
+			var selectable_heroes:Array=player_controlled_hero_indices()
+			var requested_slot:int=clampi(int((p.x-424)/54),0,7)
+			if requested_slot<selectable_heroes.size():selected=selectable_heroes[requested_slot];queue_redraw()
+			return
+		if p.y>635 and p.x>445 and p.x<835:begin_ability(clampi(int((p.x-445)/78),0,4));return
+		for i in heroes.size():
+			if not bool(heroes[i].get("independent",false)) and heroes[i].pos.distance_to(p)<58:
+				selected=i;if tutorial_active and tutorial_step==3:tutorial_hero_clicked=true
+				dragging_hero=true;drag_cursor=p;drag_start=p;drag_has_moved=false;drag_target_type="ground";drag_target_index=-1;queue_redraw();return
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed and ability_aiming and aimed_cast_mode=="release":
+		confirm_aim_at(event.position);return
+	if event is InputEventMouseMotion and ability_aiming:ability_aim_point=event.position;queue_redraw()
+	if event is InputEventScreenDrag and ability_aiming:ability_aim_point=event.position;queue_redraw();return
+
+	if event is InputEventScreenTouch:
+		if tutorial_active:
+			if event.pressed:tutorial_pointer_press(event.position,"mobile")
+			elif dragging_hero:update_hero_drag(event.position);finish_hero_drag()
+			get_viewport().set_input_as_handled()
+			return
+		if event.pressed and ability_aiming and aimed_cast_mode=="confirm":confirm_aim_at(event.position);return
+		if event.pressed and event.position.y>635 and event.position.x>445 and event.position.x<835:begin_ability(clampi(int((event.position.x-445)/78),0,4),"mobile");return
+		if not event.pressed and ability_aiming and aimed_cast_mode=="release":confirm_aim_at(event.position);return
+		if event.pressed and not paused and event.position.y<635:clear_selected_combat_target()
+	if event is InputEventScreenDrag and tutorial_active and dragging_hero:update_hero_drag(event.position);return
+	if event is InputEventMouseMotion and dragging_hero:update_hero_drag(event.position)
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed and dragging_hero:
+		finish_hero_drag()
