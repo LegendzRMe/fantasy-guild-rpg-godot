@@ -1,5 +1,7 @@
 extends RefCounted
 
+const ItemData = preload("res://scripts/data/item_data.gd")
+
 const ZONE_ID := "ashwood_marches"
 const MANDATORY_ORDER := ["first_battle","first_recruit","caravan","raider_cache","second_recruit","crossing","finale"]
 const OPTIONAL_ORDER := ["ruined_chapel","rune_servant"]
@@ -10,12 +12,12 @@ const MAP_CONNECTIONS := [
 ]
 
 const RARITY_COLORS := {
-	"Poor":Color("8b9199"),
-	"Common":Color("f0f0f0"),
-	"Uncommon":Color("54d66f"),
-	"Rare":Color("4e8cff"),
-	"Epic":Color("a86bff"),
-	"Legendary":Color("ff9a32")
+	"Poor":Color(ItemData.RARITY_COLORS.Poor),
+	"Common":Color(ItemData.RARITY_COLORS.Common),
+	"Uncommon":Color(ItemData.RARITY_COLORS.Uncommon),
+	"Rare":Color(ItemData.RARITY_COLORS.Rare),
+	"Epic":Color(ItemData.RARITY_COLORS.Epic),
+	"Legendary":Color(ItemData.RARITY_COLORS.Legendary)
 }
 
 const RECRUITS := {

@@ -96,7 +96,3 @@ static func finale_opening_roles(progress:Dictionary) -> Array:
 	var first="Controlled Rogue" if progress.first_recruit_choice=="ranger" else "Controlled Ranger"
 	var second="Controlled Warlock" if progress.second_recruit_choice=="mage" else "Controlled Mage"
 	return [first,second]
-
-static func available_decisions(progress:Dictionary,encounter_id:String) -> Array:
-	if encounter_is_completed(progress,encounter_id) and str(progress.encounters[encounter_id].decision)!="":return []
-	return AshwoodData.encounter(encounter_id,progress).get("decisions",[])

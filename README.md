@@ -4,7 +4,7 @@ An original Godot 4 prototype combining manual party control, guild management, 
 
 ## Run
 
-1. Install Godot 4.2 or newer.
+1. Install Godot 4.7 or newer.
 2. Import `project.godot`.
 3. Press **F6/F5** or select **Run Project**.
 
@@ -12,7 +12,7 @@ An original Godot 4 prototype combining manual party control, guild management, 
 
 - Three live guild save slots plus a separate unlocked testing slot, all with deletion confirmation
 - Guild Hall progression hub with chained previews for locked systems
-- Hero roster with equipment, stats, abilities, tooltips, professions, and prestige placeholders
+- Hero roster with functional equipment comparison/equip flow, stats, abilities, tooltips, professions, and Hero Prestige
 - Drag-and-drop team builder with named saved teams
 - Full-screen world map and zone encounter paths
 - Multi-wave real-time combat with manual movement and targeting
@@ -23,14 +23,16 @@ An original Godot 4 prototype combining manual party control, guild management, 
 - Command Table foundation for automated hero missions
 - Classic-era profession list and crafting placeholders
 - Item storage grid, bags, capacity upgrades, and organization controls
-- Market foundation
+- Merchant Contacts foundation
+- A dedicated testing Vault containing ten unequipped Legendary items for combat-system validation
 
 ## Combat controls
 
 - Drag a hero to reposition them or assign a target.
 - Clerics can target allies to heal.
 - **Q/W/E/R** activate abilities.
-- **Tab** cycles selected heroes.
+- **Mouse wheel** cycles selected heroes; **Tab** cycles living enemy targets.
+- **F3** toggles the Shared Combat Rules debug overlay in the testing range.
 - Click the pause button to resume or retreat.
 
 The project uses original placeholder systems and artwork. Names, UI, game rules, and assets are subject to change during development.
@@ -46,3 +48,5 @@ Run the complete local validation suite from PowerShell:
 ```
 
 The validator uses isolated Godot user data and does not modify normal guild saves.
+
+Shared Combat Rules v1, its test-range layout, tuning values, and acceptance matrix are documented in [`docs/shared_combat_rules_v1.md`](docs/shared_combat_rules_v1.md).

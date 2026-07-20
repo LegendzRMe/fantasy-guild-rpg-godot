@@ -1,13 +1,33 @@
 extends RefCounted
 
 const AshwoodManager = preload("res://scripts/systems/ashwood_manager.gd")
+const GameData = preload("res://scripts/data/game_data.gd")
+const ItemData = preload("res://scripts/data/item_data.gd")
+const InventorySystem = preload("res://scripts/systems/inventory_system.gd")
+const CombatSystem = preload("res://scripts/systems/combat_system.gd")
+const TalentSystem = preload("res://scripts/systems/talent_system.gd")
+const TeamManager = preload("res://scripts/systems/team_manager.gd")
 const LEGACY_SAVE_PATH := "user://guild_save.json"
 
 static func save_slot_path(slot:int) -> String:
 	return "user://guild_save_%d.json" % (slot+1)
 
+static func save_backup_path(slot:int) -> String:
+	return save_slot_path(slot)+".bak"
+
+static func save_temporary_path(slot:int) -> String:
+	return save_slot_path(slot)+".tmp"
+
+static func _read_dictionary(path:String)->Dictionary:
+	if not FileAccess.file_exists(path):return {}
+	var parser:=JSON.new()
+	if parser.parse(FileAccess.get_file_as_string(path))!=OK:return {}
+	return parser.data if parser.data is Dictionary else {}
+
 static func resolved_load_path(slot:int) -> String:
 	var path:=save_slot_path(slot)
+	if _read_dictionary(path).is_empty() and not _read_dictionary(save_backup_path(slot)).is_empty():
+		return save_backup_path(slot)
 	if slot==0 and not FileAccess.file_exists(path) and FileAccess.file_exists(LEGACY_SAVE_PATH):
 		return LEGACY_SAVE_PATH
 	return path
@@ -16,16 +36,22 @@ static func slot_state(slot:int) -> Dictionary:
 	var path:=resolved_load_path(slot)
 	if not FileAccess.file_exists(path):
 		return {}
-	var parsed=JSON.parse_string(FileAccess.get_file_as_string(path))
-	return parsed if parsed is Dictionary else {}
+	return _read_dictionary(path)
 
 static func default_casting_settings() -> Dictionary:
 	return {"pc":{"ground":"cursor","directional":"cursor","area":"instant","enemy":"target","ally":"target"},"mobile":{"ground":"facing","directional":"facing","area":"instant","enemy":"target","ally":"target"}}
 
+static func hero_state(hero_name:String,hero_class:String,level:int,gear:int,member_type:String="guild_recruit",special:bool=false,legacy_rank:int=0,extras:Dictionary={})->Dictionary:
+	var identity_type:="special" if special else "standard"
+	var hero_id:=str(extras.get("hero_id",hero_name.to_snake_case()))
+	var hero:={"hero_id":hero_id,"class_id":GameData.class_id_for(hero_class),"identity_type":identity_type,"named_hero_definition_id":str(extras.get("named_hero_definition_id",extras.get("special_identifier",""))) if special else "","name":hero_name,"display_name":hero_name,"class":hero_class,"editable_name":not special,"editable_appearance":not special,"can_edit_name":not special,"can_edit_appearance":not special,"appearance_data":{},"playable_race_id":"","level":level,"xp":0,"experience":0,"gear":gear,"selected_talents":{},"planned_talents":{},"selected_heroic_id":"","equipment":[],"equipment_slots":ItemData.empty_equipment_slots(),"member_type":member_type,"is_special_hero":special,"legacy_rank":legacy_rank,"prestige_rank":legacy_rank,"prestige_reward_floor_rank":legacy_rank if special else 0,"completed_prestige_cycles":0,"active_prestige_challenge_id":"","completed_prestige_challenge_ids":[],"prestige_specialization_ids":[],"prestige_reward_history":[],"prestige_five_legacy_id":"","is_guild_champion":false,"profession_progress":{},"pvp_progress":{},"guild_position_id":"","active_prestige_challenge":"","completed_prestige_challenges":[],"legacy_perk_ids":[],"prestige_unlock_tags":[]}
+	hero.merge(extras,true)
+	return hero
+
 static func fresh_state() -> Dictionary:
-	return {"guild_name":"", "faction":"Unaffiliated", "guild_prestige_rank":1, "guild_renown":0, "tutorial_complete":false, "major_systems_unlocked":false, "seen_page_intros":{}, "zone0":AshwoodManager.default_progress(), "casting_settings":default_casting_settings(), "gold":0, "ore":8, "herbs":8, "dust":4, "tokens":0, "vault_level":1, "vault_limit":30, "dungeon_clears":[0,0], "zone_progress":[0,0], "zone_branches":[[false,false],[false,false]], "unlocked_dungeon":0, "selected_team":[0,1], "active_team":[0,1], "saved_teams":[[],[],[],[],[]], "team_names":["Team 1","Team 2","Team 3","Team 4","Team 5"], "heroes":[
-		{"name":"Brann", "class":"Guardian", "level":1, "xp":0, "gear":10, "equipment":[], "member_type":"founding_recruit", "is_special_hero":false, "legacy_rank":0},
-		{"name":"Sera", "class":"Cleric", "level":1, "xp":0, "gear":10, "equipment":[], "member_type":"founding_recruit", "is_special_hero":false, "legacy_rank":0}
+	return {"guild_name":"", "faction":"Unaffiliated", "guild_prestige_rank":1, "guild_renown":0, "prestige_tokens":0, "class_talent_discovery":{}, "tutorial_complete":false, "major_systems_unlocked":false, "seen_page_intros":{}, "zone0":AshwoodManager.default_progress(), "casting_settings":default_casting_settings(), "item_instances":[], "material_stacks":[], "next_item_instance_id":1, "next_material_stack_id":1, "gold":0, "ore":8, "herbs":8, "dust":4, "tonics":0, "vault_level":1, "vault_limit":30, "dungeon_clears":[0,0], "zone_progress":[0,0], "zone_branches":[[false,false],[false,false]], "unlocked_dungeon":0, "selected_team":[0,1], "active_team":[0,1], "saved_teams":[[],[],[],[],[]], "team_names":["Team 1","Team 2","Team 3","Team 4","Team 5"], "heroes":[
+		hero_state("Brann","Guardian",1,10,"founding_recruit"),
+		hero_state("Sera","Cleric",1,10,"founding_recruit")
 	]}
 
 static func testing_state() -> Dictionary:
@@ -41,7 +67,8 @@ static func testing_state() -> Dictionary:
 		"ore":999,
 		"herbs":999,
 		"dust":999,
-		"tokens":99,
+		"prestige_tokens":999,
+		"class_talent_discovery":{"guardian":30,"cleric":30,"rogue":30,"ranger":30,"mage":30,"warlock":30},
 		"vault_level":6,
 		"vault_limit":180,
 		"dungeon_clears":[3,3],
@@ -52,17 +79,19 @@ static func testing_state() -> Dictionary:
 		"active_team":[0,1,2,3],
 		"saved_teams":[[0,1,2,3],[],[],[],[]],
 		"heroes":[
-			{"name":"Brann", "class":"Guardian", "level":4, "xp":0, "gear":16, "equipment":[], "member_type":"founding_recruit", "is_special_hero":false, "legacy_rank":0},
-			{"name":"Sera", "class":"Cleric", "level":4, "xp":0, "gear":16, "equipment":[], "member_type":"founding_recruit", "is_special_hero":false, "legacy_rank":0},
-			{"name":"Wren", "class":"Ranger", "level":4, "xp":0, "gear":16, "equipment":[], "member_type":"guild_recruit", "is_special_hero":false, "legacy_rank":0},
-			{"name":"Nyx", "class":"Mage", "level":4, "xp":0, "gear":16, "equipment":[], "member_type":"guild_recruit", "is_special_hero":false, "legacy_rank":0},
-			{"name":"Kestrel", "class":"Rogue", "level":4, "xp":0, "gear":16, "equipment":[], "member_type":"guild_recruit", "is_special_hero":false, "legacy_rank":0},
-			{"name":"Morrow", "class":"Warlock", "level":4, "xp":0, "gear":16, "equipment":[], "member_type":"guild_recruit", "is_special_hero":false, "legacy_rank":0},
-			{"name":"Aldren Vale", "class":"Guardian", "level":4, "xp":0, "gear":18, "equipment":[], "member_type":"special_hero", "is_special_hero":true, "legacy_rank":1, "signature_ability":"Oath of Cinders", "story_lead":"The traitor's broken oath-seal"},
-			{"name":"Mira Thorn", "class":"Ranger", "level":4, "xp":0, "gear":18, "equipment":[], "member_type":"special_hero", "is_special_hero":true, "legacy_rank":1, "signature_ability":"Ghostmark Volley", "story_lead":"Unnatural tracks leaving Ashwood"},
-			{"name":"Ilyra Voss", "class":"Mage", "level":4, "xp":0, "gear":18, "equipment":[], "member_type":"special_hero", "is_special_hero":true, "legacy_rank":1, "signature_ability":"Runebreak", "story_lead":"The force inside the servant's runes"}
+			hero_state("Brann","Guardian",4,16,"founding_recruit"),
+			hero_state("Sera","Cleric",4,16,"founding_recruit"),
+			hero_state("Wren","Ranger",4,16),
+			hero_state("Nyx","Mage",4,16),
+			hero_state("Kestrel","Rogue",4,16),
+			hero_state("Morrow","Warlock",4,16),
+			hero_state("Aldren Vale","Guardian",4,18,"special_hero",true,1,{"signature_ability":"Oath of Cinders","story_lead":"The traitor's broken oath-seal"}),
+			hero_state("Mira Thorn","Ranger",4,18,"special_hero",true,1,{"signature_ability":"Ghostmark Volley","story_lead":"Unnatural tracks leaving Ashwood"}),
+			hero_state("Ilyra Voss","Mage",4,18,"special_hero",true,1,{"signature_ability":"Runebreak","story_lead":"The force inside the servant's runes"})
 		]
 	},true)
+	state.item_instances=ItemData.testing_instances()
+	state=migrate_state(state,true,true)
 	return state
 
 static func load_state(slot:int) -> Dictionary:
@@ -78,9 +107,18 @@ static func load_state(slot:int) -> Dictionary:
 			state.merge(parsed,true)
 			if not save_declared_major_systems:
 				state.erase("major_systems_unlocked")
-	return migrate_state(state,save_declared_tutorial)
+	return migrate_state(state,save_declared_tutorial,slot==3)
 
-static func migrate_state(state:Dictionary, save_declared_tutorial:bool) -> Dictionary:
+static func migrate_state(state:Dictionary, save_declared_tutorial:bool, testing_save:bool=false) -> Dictionary:
+	var defaults:=fresh_state()
+	for array_key in ["heroes","selected_team","active_team","saved_teams","team_names","zone_progress","zone_branches","item_instances","material_stacks"]:
+		if not state.get(array_key) is Array:state[array_key]=defaults[array_key].duplicate(true)
+	for dictionary_key in ["seen_page_intros","casting_settings","zone0","class_talent_discovery"]:
+		if not state.get(dictionary_key) is Dictionary:state[dictionary_key]=defaults[dictionary_key].duplicate(true)
+	# The early prototype's generic dungeon token had no defined economy. It is
+	# intentionally discarded instead of being converted into either real currency.
+	state.erase("tokens")
+	if not state.has("prestige_tokens"):state["prestige_tokens"]=0
 	if state.guild_name!="" and not save_declared_tutorial:
 		state["tutorial_complete"]=true
 	if not state.has("active_team"):
@@ -120,25 +158,135 @@ static func migrate_state(state:Dictionary, save_declared_tutorial:bool) -> Dict
 				for category in casting_defaults[device]:
 					if not state.casting_settings[device].has(category):
 						state.casting_settings[device][category]=casting_defaults[device][category]
-	for hero in state.heroes:
+	if not state.has("item_instances") or not state.item_instances is Array:state["item_instances"]=[]
+	if testing_save or str(state.get("guild_name",""))=="Testing Guild":
+		state["item_instances"]=state.item_instances.filter(func(item):return str(item.get("instance_id","")) not in ItemData.LEGACY_TEST_INSTANCE_IDS)
+		for saved_hero in state.heroes:
+			if not saved_hero.has("equipment_slots") or not saved_hero.equipment_slots is Dictionary:continue
+			for saved_slot in ItemData.EQUIPMENT_SLOTS:
+				if str(saved_hero.equipment_slots.get(saved_slot,"")) in ItemData.LEGACY_TEST_INSTANCE_IDS:saved_hero.equipment_slots[saved_slot]=null
+		state["item_instances"]=ItemData.seed_testing_instances(state.item_instances)
+	var used_hero_ids:Dictionary={}
+	for hero_index in state.heroes.size():
+		var hero:Dictionary=state.heroes[hero_index]
+		hero["level"]=CombatSystem.clamp_level(int(hero.get("level",1)))
+		hero["xp"]=clampi(int(hero.get("xp",0)),0,int(hero.level)*100-1)
+		hero["experience"]=int(hero.xp)
+		var hero_class:=str(hero.get("class",GameData.class_display_name(str(hero.get("class_id","")))))
+		if not GameData.CLASSES.has(hero_class):hero_class=GameData.class_display_name(str(hero.get("class_id","")))
+		hero["class"]=hero_class;hero["class_id"]=GameData.class_id_for(hero_class)
+		var base_hero_id:=str(hero.get("hero_id",str(hero.get("name","hero")).to_snake_case()))
+		if base_hero_id=="":base_hero_id="hero_%d"%(hero_index+1)
+		var unique_hero_id:=base_hero_id;var suffix:=2
+		while used_hero_ids.has(unique_hero_id):unique_hero_id="%s_%d"%[base_hero_id,suffix];suffix+=1
+		hero["hero_id"]=unique_hero_id;used_hero_ids[unique_hero_id]=true
 		if not hero.has("member_type"):
 			hero["member_type"]="founding_recruit"
 		if not hero.has("is_special_hero"):
 			hero["is_special_hero"]=false
+		var special:=bool(hero.is_special_hero)
+		hero["identity_type"]="special" if special else "standard"
+		hero["named_hero_definition_id"]=str(hero.get("named_hero_definition_id",hero.get("special_identifier",""))) if special else ""
+		hero["display_name"]=str(hero.get("display_name",hero.get("name","Hero")))
+		hero["name"]=str(hero.display_name)
+		hero["editable_name"]=not special;hero["editable_appearance"]=not special;hero["can_edit_name"]=not special;hero["can_edit_appearance"]=not special
+		if not hero.get("appearance_data") is Dictionary:hero["appearance_data"]={}
+		if not hero.has("playable_race_id"):hero["playable_race_id"]=""
+		if not hero.get("selected_talents") is Dictionary:hero["selected_talents"]={}
+		if not hero.get("planned_talents") is Dictionary:hero["planned_talents"]={}
+		if not hero.has("selected_heroic_id"):hero["selected_heroic_id"]=""
 		if not hero.has("legacy_rank"):
 			hero["legacy_rank"]=0
+		if not hero.has("prestige_rank"):hero["prestige_rank"]=clampi(int(hero.get("legacy_rank",0)),0,5)
+		hero["prestige_rank"]=clampi(int(hero.prestige_rank),0,5)
+		if not hero.has("prestige_reward_floor_rank"):hero["prestige_reward_floor_rank"]=int(hero.prestige_rank) if special else 0
+		if not hero.has("completed_prestige_cycles"):hero["completed_prestige_cycles"]=0
+		if not hero.has("active_prestige_challenge_id"):hero["active_prestige_challenge_id"]=str(hero.get("active_prestige_challenge",""))
+		if not hero.get("completed_prestige_challenge_ids") is Array:hero["completed_prestige_challenge_ids"]=hero.get("completed_prestige_challenges",[]).duplicate()
+		if not hero.get("prestige_specialization_ids") is Array:hero["prestige_specialization_ids"]=[]
+		if not hero.get("prestige_reward_history") is Array:hero["prestige_reward_history"]=[]
+		if not hero.has("prestige_five_legacy_id"):hero["prestige_five_legacy_id"]=""
+		if not hero.has("is_guild_champion"):hero["is_guild_champion"]=false
+		if not hero.get("profession_progress") is Dictionary:hero["profession_progress"]={}
+		if not hero.get("pvp_progress") is Dictionary:hero["pvp_progress"]={}
+		if not hero.has("guild_position_id"):hero["guild_position_id"]=""
+		if not hero.has("active_prestige_challenge"):hero["active_prestige_challenge"]=""
+		if not hero.has("completed_prestige_challenges") or not hero.completed_prestige_challenges is Array:hero["completed_prestige_challenges"]=[]
+		if not hero.has("legacy_perk_ids") or not hero.legacy_perk_ids is Array:hero["legacy_perk_ids"]=[]
+		if not hero.has("prestige_unlock_tags") or not hero.prestige_unlock_tags is Array:hero["prestige_unlock_tags"]=[]
 		if not hero.has("equipment"):
 			hero["equipment"]=[]
+		if not hero.has("equipment_slots") or not hero.equipment_slots is Dictionary:
+			hero["equipment_slots"]=ItemData.empty_equipment_slots()
+		else:
+			for slot in ItemData.EQUIPMENT_SLOTS:
+				if not hero.equipment_slots.has(slot):hero.equipment_slots[slot]=null
+		state.class_talent_discovery=TalentSystem.record_class_discovery(state.class_talent_discovery,str(hero.class_id),int(hero.level))
+	if testing_save or str(state.get("guild_name",""))=="Testing Guild":
+		for class_definition in GameData.CLASSES.values():state.class_talent_discovery[str(class_definition.class_id)]=30
+	state["selected_team"]=TeamManager.sanitize_team(state.selected_team,state.heroes)
+	state["active_team"]=TeamManager.sanitize_team(state.active_team,state.heroes)
+	for saved_index in state.saved_teams.size():
+		if state.saved_teams[saved_index] is Array:state.saved_teams[saved_index]=TeamManager.sanitize_team(state.saved_teams[saved_index],state.heroes)
+		else:state.saved_teams[saved_index]=[]
+	# Ashwood's original prototype inventory stored disconnected text records.
+	# Convert those exact owned instances once, preserving their equipped hero.
+	var existing_ids:Dictionary={}
+	for existing_item in state.item_instances:existing_ids[str(existing_item.get("instance_id",""))]=true
+	for legacy_item in state.zone0.get("inventory",[]):
+		if not legacy_item is Dictionary:continue
+		var converted:=ItemData.legacy_ashwood_instance(legacy_item)
+		var converted_id:=str(converted.get("instance_id",""))
+		if not existing_ids.has(converted_id):
+			state.item_instances.append(converted);existing_ids[converted_id]=true
+		var owner_index:=int(legacy_item.get("equipped_by",-1))
+		if owner_index>=0 and owner_index<state.heroes.size():
+			var converted_slot:=str(converted.get("slot",""))
+			if converted_slot in ItemData.EQUIPMENT_SLOTS:state.heroes[owner_index].equipment_slots[converted_slot]=converted_id
+	state.zone0["inventory"]=[]
+	ItemData.reconcile_ownership(state)
+	InventorySystem.ensure_storage_state(state)
 	return state
 
-static func save_state(slot:int, state:Dictionary) -> void:
-	var file:=FileAccess.open(save_slot_path(slot),FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(state))
+static func save_state(slot:int, state:Dictionary) -> bool:
+	InventorySystem.ensure_storage_state(state)
+	var live_path:=save_slot_path(slot)
+	var temporary_path:=save_temporary_path(slot)
+	var backup_path:=save_backup_path(slot)
+	var serialized:=JSON.stringify(state)
+	var file:=FileAccess.open(temporary_path,FileAccess.WRITE)
+	if file==null:
+		push_error("Unable to open temporary guild save for writing: %s"%temporary_path)
+		return false
+	file.store_string(serialized)
+	file.flush()
+	file.close()
+	if _read_dictionary(temporary_path).is_empty():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary_path))
+		push_error("Guild save verification failed; the existing save was preserved.")
+		return false
+	var live_absolute:=ProjectSettings.globalize_path(live_path)
+	var temporary_absolute:=ProjectSettings.globalize_path(temporary_path)
+	var backup_absolute:=ProjectSettings.globalize_path(backup_path)
+	if FileAccess.file_exists(backup_path):DirAccess.remove_absolute(backup_absolute)
+	if FileAccess.file_exists(live_path):
+		var backup_error:=DirAccess.rename_absolute(live_absolute,backup_absolute)
+		if backup_error!=OK:
+			DirAccess.remove_absolute(temporary_absolute)
+			push_error("Unable to preserve the previous guild save; save was cancelled.")
+			return false
+	var replace_error:=DirAccess.rename_absolute(temporary_absolute,live_absolute)
+	if replace_error!=OK:
+		if FileAccess.file_exists(backup_path):DirAccess.rename_absolute(backup_absolute,live_absolute)
+		push_error("Unable to install the verified guild save; the previous save was restored.")
+		return false
+	return true
 
 static func delete_slot(slot:int) -> void:
 	var slot_path:=save_slot_path(slot)
 	if FileAccess.file_exists(slot_path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path))
+	for recovery_path in [save_backup_path(slot),save_temporary_path(slot)]:
+		if FileAccess.file_exists(recovery_path):DirAccess.remove_absolute(ProjectSettings.globalize_path(recovery_path))
 	if slot==0 and FileAccess.file_exists(LEGACY_SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(LEGACY_SAVE_PATH))

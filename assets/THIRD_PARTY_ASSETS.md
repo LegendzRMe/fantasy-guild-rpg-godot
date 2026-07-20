@@ -1,7 +1,8 @@
 # Third-Party Asset Ledger
 
-This file records every third-party visual, audio, font, and other media asset
-distributed with the project. Add an entry when an asset is imported; do not
+This file records third-party visual, audio, font, and other media sources that
+have been evaluated for the project. Unused source packs are kept outside the
+runtime repository to avoid import and checkout bloat. Add an entry when an asset is imported; do not
 rely on a storefront or download page remaining available.
 
 Assets created specifically for this project do not need to be listed here.
@@ -29,7 +30,7 @@ Before adding a third-party asset:
 - Downloaded: 2026-07-15
 - License: Creative Commons Zero 1.0 Universal (CC0-1.0)
 - Attribution: Not required; crediting Kenney is appreciated
-- Local files: `assets/third_party/kenney_fantasy_ui_borders/`
+- Local files: External reference archive; no runtime files currently imported
 - Modifications: None
 - Notes: The included `License.txt` is retained with the pack. The Aoboshi
   One font mentioned in that file is used only in Kenney's sample image.
@@ -41,7 +42,7 @@ Before adding a third-party asset:
 - Downloaded: 2026-07-15
 - License: Creative Commons Zero 1.0 Universal (CC0-1.0)
 - Attribution: Not required; crediting Kenney is appreciated
-- Local files: `assets/third_party/kenney_ui_rpg_expansion/`
+- Local files: External reference archive; no runtime files currently imported
 - Modifications: None
 - Notes: The included `license.txt` is retained with the pack.
 
@@ -52,7 +53,7 @@ Before adding a third-party asset:
 - Downloaded: 2026-07-15
 - License: Creative Commons Zero 1.0 Universal (CC0-1.0)
 - Attribution: Not required; crediting Kenney is appreciated
-- Local files: `assets/third_party/kenney_particle_pack/`
+- Local files: External reference archive; no runtime files currently imported
 - Modifications: None
 - Notes: The included `License.txt` is retained with the pack. The archive's
   original PNG, sample, and Unity reference files are preserved.
@@ -64,7 +65,7 @@ Before adding a third-party asset:
 - Downloaded: 2026-07-15
 - License: Creative Commons Zero 1.0 Universal (CC0-1.0)
 - Attribution: Not required; crediting Kenney is appreciated
-- Local files: `assets/third_party/kenney_rpg_sounds_50/`
+- Local files: External reference archive; no runtime files currently imported
 - Modifications: None
 - Notes: The included `license.txt` is retained with the pack.
 
@@ -75,7 +76,7 @@ Before adding a third-party asset:
 - Downloaded: 2026-07-15
 - License: Creative Commons Zero 1.0 Universal (CC0-1.0)
 - Attribution: Not required
-- Local files: `assets/third_party/rubberduck_rpg_sfx_80/`
+- Local files: External reference archive; no runtime files currently imported
 - Modifications: None
 - Notes: The downloaded archive did not include a license document. A local
   `LICENSE_SOURCE.md` records the source page and its published license.
@@ -87,10 +88,11 @@ Before adding a third-party asset:
 - Downloaded: 2026-07-15
 - License: Creative Commons Zero 1.0 Universal (CC0-1.0)
 - Attribution: Not required
-- Local files: `assets/third_party/ggbotnet_forest_ground/`
-- Modifications: Tinted and tiled at runtime; source image is unchanged
-- Notes: `Forest-Ground_01.png` is the diffuse texture used by the combat
-  background. `LICENSE_SOURCE.md` preserves its provenance.
+- Local files: External reference archive; no runtime files currently imported
+- Modifications: None; source image is unchanged
+- Notes: This texture was used by the initial flat combat background and is
+  retained for possible future terrain use. `LICENSE_SOURCE.md` preserves its
+  provenance.
 
 ### Foliage Pack
 
@@ -99,7 +101,7 @@ Before adding a third-party asset:
 - Downloaded: 2026-07-15
 - License: Creative Commons Zero 1.0 Universal (CC0-1.0)
 - Attribution: Not required; crediting Kenney is appreciated
-- Local files: `assets/third_party/kenney_foliage_pack/`
+- Local files: External reference archive; no runtime files currently imported
 - Modifications: None
 - Notes: The included `License.txt` is retained with the pack. This pack is
   available for later scenery work but is not used by the initial background.
@@ -123,3 +125,7 @@ When adding another asset, use this template:
 
 - `assets/world_map.png` — original project placeholder artwork; not a
   third-party asset.
+- `assets/generated/ashwood_combat_background.png` — original AI-generated
+  Ashwood clearing created for this project using the Battleheart screenshots
+  supplied by the project owner as high-level composition references. The
+  references were not copied into or distributed with the project.

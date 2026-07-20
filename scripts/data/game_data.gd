@@ -1,5 +1,9 @@
 extends RefCounted
 
+const CombatSystem = preload("res://scripts/systems/combat_system.gd")
+const ClassData = preload("res://scripts/data/class_data.gd")
+const TalentData = preload("res://scripts/data/talent_data.gd")
+
 const GUILD_PAGE_INTROS := {
 	"command":{"title":"COMMAND TABLE","body":"The Command Table is where the guild will organize missions beyond the active party. It is intended for assigning available heroes to longer tasks, following opportunities, and collecting useful rewards."},
 	"heroes":{"title":"HERO ROSTER","body":"Hero Roster is the guild's complete member directory. Review each hero's role and growth, inspect their abilities and equipment, and use the star on a card to update the Active Party."},
@@ -10,77 +14,33 @@ const GUILD_PAGE_INTROS := {
 	"workshop":{"title":"WORKSHOP","body":"The Workshop is where guild professions turn gathered resources into useful supplies and equipment. It will grow into the main place for crafting, improving, and preparing expedition tools."}
 }
 
-const CLASSES := {
-	"Guardian": {"role":"Tank", "color":Color("5fa8ff"), "hp":230.0, "damage":10.0, "range":55.0, "ability":"Shield Wall"},
-	"Cleric": {"role":"Healer", "color":Color("ffd86a"), "hp":150.0, "damage":8.0, "range":150.0, "ability":"Radiant Mend"},
-	"Rogue": {"role":"DPS", "color":Color("e6b35f"), "hp":175.0, "damage":16.0, "range":55.0, "ability":"Veiled Strike"},
-	"Ranger": {"role":"DPS", "color":Color("65dc89"), "hp":165.0, "damage":14.0, "range":210.0, "ability":"Volley"},
-	"Mage": {"role":"DPS", "color":Color("b381ff"), "hp":135.0, "damage":14.0, "range":190.0, "ability":"Arc Burst"},
-	"Warlock": {"role":"DPS", "color":Color("d16ca8"), "hp":145.0, "damage":15.0, "range":185.0, "ability":"Blackflame Bolt"}
-}
-
-const ABILITIES := {
-	"Guardian": ["Shield Wall", "Challenge", "Shield Rush", "Last Bastion"],
-	"Cleric": ["Radiant Mend", "Sanctuary", "Purifying Light", "Divine Renewal"],
-	"Rogue": ["Veiled Strike", "Shadowstep", "Fan of Knives", "Deathmark"],
-	"Ranger": ["Piercing Shot", "Quickstep", "Volley", "Arrowstorm"],
-	"Mage": ["Arc Bolt", "Blink", "Arc Burst", "Starfall"],
-	"Warlock": ["Blackflame Bolt", "Dark Passage", "Withering Circle", "Soulstorm"]
-}
-
-const TRAITS := {
-	"Guardian":"Bulwark",
-	"Cleric":"Grace",
-	"Rogue":"Opportunist",
-	"Ranger":"Keen Eye",
-	"Mage":"Arcane Echo",
-	"Warlock":"Soulbrand"
-}
-
-const ABILITY_TARGETING := {
-	"Guardian":["self","area","directional","area"],
-	"Cleric":["ally","area","area","area"],
-	"Rogue":["enemy","directional","area","enemy"],
-	"Ranger":["enemy","directional","ground","ground"],
-	"Mage":["enemy","ground","area","ground"],
-	"Warlock":["enemy","ground","ground","area"]
-}
-
-const ABILITY_RANGES := {
-	"Guardian":[0.0,170.0,100.0,0.0],
-	"Cleric":[0.0,0.0,180.0,0.0],
-	"Rogue":[0.0,160.0,120.0,0.0],
-	"Ranger":[0.0,120.0,280.0,320.0],
-	"Mage":[0.0,360.0,240.0,330.0],
-	"Warlock":[0.0,330.0,270.0,0.0]
-}
-
-const ABILITY_DESCRIPTIONS := {
-	"Guardian":["Reduce incoming damage for a short time.","Force nearby enemies to focus the Guardian.","Rush forward and strike enemies in the path.","Protect the entire party with a powerful barrier."],
-	"Cleric":["Deliver a strong heal to the most wounded ally.","Restore health to the full party.","Heal allies and damage nearby enemies.","Greatly restore the party during an emergency."],
-	"Rogue":["Strike the assigned target for heavy melee damage.","Step quickly toward a chosen position.","Damage nearby enemies with thrown blades.","Mark the assigned enemy for a devastating strike."],
-	"Ranger":["Fire a powerful shot at the assigned target.","Quickly reposition away from danger.","Damage enemies across a wide area.","Rain arrows across the battlefield."],
-	"Mage":["Strike the assigned target with arcane power.","Blink instantly toward the chosen position.","Damage enemies surrounding the Mage.","Call down arcane energy on every enemy."],
-	"Warlock":["Burn the assigned target with black flame.","Pass through shadow toward a chosen position.","Damage enemies inside a cursed area.","Unleash bound souls against every nearby enemy."]
-}
+const TALENT_TIER_DEFINITIONS := TalentData.TIER_DEFINITIONS
+const CLASS_IDS_BY_DISPLAY_NAME := ClassData.CLASS_IDS_BY_DISPLAY_NAME
+const CLASSES := ClassData.CLASSES
+const ABILITIES := ClassData.ABILITIES
+const TRAITS := ClassData.TRAITS
+const ABILITY_TARGETING := ClassData.ABILITY_TARGETING
+const ABILITY_RANGES := ClassData.ABILITY_RANGES
+const ABILITY_DESCRIPTIONS := ClassData.ABILITY_DESCRIPTIONS
 
 const WAVE_ENEMY_ROLES := ["Raider","Swift","Archer","Raider","Shaman","Brute"]
 
 const ENEMIES := {
-	"Dummy":{"base_hp":150.0,"color":Color("9a7652")},
-	"Raider":{"base_hp":150.0,"color":Color("bd4d58")},
-	"Swift":{"base_hp":90.0,"color":Color("e05f8f"),"prefers_backline":true},
-	"Stalker":{"base_hp":45.0,"base_damage":8.0,"color":Color("d971b0"),"prefers_backline":true,"ignores_tank_aggro":true},
-	"Archer":{"base_hp":150.0,"color":Color("8f68d8")},
-	"Shaman":{"base_hp":150.0,"color":Color("58a878")},
-	"Brute":{"base_hp":250.0,"color":Color("d97a45")},
-	"Boss":{"base_hp":500.0,"color":Color("e5863f"),"boss":true},
-	"Rune Servant":{"base_hp":420.0,"color":Color("ba565f"),"boss":true},
-	"Ashwood Servant":{"base_hp":720.0,"color":Color("e06b42"),"boss":true},
-	"Controlled Rogue":{"base_hp":220.0,"color":Color("e6b35f")},
-	"Controlled Ranger":{"base_hp":210.0,"color":Color("65dc89"),"ranged":true},
-	"Controlled Mage":{"base_hp":190.0,"color":Color("b381ff"),"ranged":true},
-	"Controlled Warlock":{"base_hp":200.0,"color":Color("d16ca8"),"ranged":true}
+	"Dummy":{"base_health":150.0,"health_growth":0.03,"base_power":0.0,"power_growth":0.03,"base_armor":0.0,"basic_action_type":"attack","basic_action_power_coefficient":0.0,"basic_action_interval":2.0,"basic_action_range":0.0,"movement_speed":0.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":[],"combat_tags":["training"],"color":Color("9a7652")},
+	"Defense Dummy":{"base_health":5000.0,"health_growth":0.03,"base_power":12.0,"power_growth":0.03,"base_armor":15.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.8,"basic_action_range":125.0,"movement_speed":0.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["ranged","stationary"],"combat_tags":["training","defense"],"color":Color("c06f45"),"ranged":true},
+	"Raider":{"base_health":150.0,"health_growth":0.03,"base_power":16.0,"power_growth":0.03,"base_armor":0.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":2.03,"basic_action_range":44.0,"movement_speed":110.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":[],"combat_tags":["regular","melee"],"color":Color("bd4d58")},
+	"Swift":{"base_health":90.0,"health_growth":0.03,"base_power":16.0,"power_growth":0.03,"base_armor":0.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":2.03,"basic_action_range":44.0,"movement_speed":160.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["prefers_backline"],"combat_tags":["light","melee"],"color":Color("e05f8f"),"prefers_backline":true},
+	"Stalker":{"base_health":45.0,"health_growth":0.03,"base_power":8.0,"power_growth":0.03,"base_armor":0.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":2.03,"basic_action_range":44.0,"movement_speed":160.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["prefers_backline","ignores_tank_aggro"],"combat_tags":["light","melee"],"color":Color("d971b0"),"prefers_backline":true,"ignores_tank_aggro":true},
+	"Archer":{"base_health":150.0,"health_growth":0.03,"base_power":16.0,"power_growth":0.03,"base_armor":0.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":2.03,"basic_action_range":185.0,"movement_speed":110.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["ranged"],"combat_tags":["regular","ranged"],"color":Color("8f68d8"),"ranged":true},
+	"Shaman":{"base_health":150.0,"health_growth":0.03,"base_power":16.0,"power_growth":0.03,"base_armor":0.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":3.2,"basic_action_range":185.0,"movement_speed":110.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"magical","behavior_flags":["ranged","healer"],"combat_tags":["regular","ranged"],"color":Color("58a878"),"ranged":true},
+	"Brute":{"base_health":250.0,"health_growth":0.03,"base_power":16.0,"power_growth":0.03,"base_armor":12.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":2.03,"basic_action_range":44.0,"movement_speed":75.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":[],"combat_tags":["heavy","melee"],"color":Color("d97a45")},
+	"Boss":{"base_health":500.0,"health_growth":0.03,"base_power":26.0,"power_growth":0.03,"base_armor":15.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":4.0,"basic_action_range":44.0,"movement_speed":75.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["boss"],"combat_tags":["boss"],"color":Color("e5863f"),"boss":true},
+	"Rune Servant":{"base_health":420.0,"health_growth":0.03,"base_power":26.0,"power_growth":0.03,"base_armor":15.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":4.0,"basic_action_range":44.0,"movement_speed":75.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"magical","behavior_flags":["boss"],"combat_tags":["boss"],"color":Color("ba565f"),"boss":true},
+	"Ashwood Servant":{"base_health":720.0,"health_growth":0.03,"base_power":26.0,"power_growth":0.03,"base_armor":18.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":4.0,"basic_action_range":44.0,"movement_speed":75.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["boss"],"combat_tags":["boss"],"color":Color("e06b42"),"boss":true},
+	"Controlled Rogue":{"base_health":220.0,"health_growth":0.03,"base_power":16.0,"power_growth":0.03,"base_armor":10.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.2,"basic_action_range":55.0,"movement_speed":145.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":[],"combat_tags":["hero"],"color":Color("e6b35f")},
+	"Controlled Ranger":{"base_health":210.0,"health_growth":0.03,"base_power":14.0,"power_growth":0.03,"base_armor":9.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.2,"basic_action_range":185.0,"movement_speed":145.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["ranged"],"combat_tags":["hero","ranged"],"color":Color("65dc89"),"ranged":true},
+	"Controlled Mage":{"base_health":190.0,"health_growth":0.03,"base_power":14.0,"power_growth":0.03,"base_armor":3.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.2,"basic_action_range":185.0,"movement_speed":145.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"magical","behavior_flags":["ranged"],"combat_tags":["hero","ranged"],"color":Color("b381ff"),"ranged":true},
+	"Controlled Warlock":{"base_health":200.0,"health_growth":0.03,"base_power":15.0,"power_growth":0.03,"base_armor":4.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.2,"basic_action_range":185.0,"movement_speed":145.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"magical","behavior_flags":["ranged"],"combat_tags":["hero","ranged"],"color":Color("d16ca8"),"ranged":true}
 }
 
 const WORLD_MAP_SIZE := Vector2(1536,864)
@@ -138,8 +98,23 @@ const STORAGE_ITEMS := [
 const STORAGE_COLUMNS := 10
 const STORAGE_BAG_SLOTS := 6
 const STORAGE_MAX_CAPACITY := 180
-const STORAGE_BAG_CAPACITY := 10
+const STORAGE_BAG_CAPACITY := 30
 const STORAGE_BAG_UNLOCK_BASE_COST := 120
+
+static func class_id_for(value:String)->String:
+	if value in CLASS_IDS_BY_DISPLAY_NAME:return CLASS_IDS_BY_DISPLAY_NAME[value]
+	var normalized:=value.to_snake_case()
+	return normalized if normalized in CLASS_IDS_BY_DISPLAY_NAME.values() else ""
+
+static func class_display_name(class_id:String)->String:
+	for display_name in CLASS_IDS_BY_DISPLAY_NAME:
+		if CLASS_IDS_BY_DISPLAY_NAME[display_name]==class_id:return display_name
+	return class_id.capitalize()
+
+static func class_definition(value:String)->Dictionary:
+	var display_name:=value if value in CLASSES else class_display_name(value)
+	return CLASSES.get(display_name,{})
+
 static func ability_tooltip(hero_class:String, slot:int) -> String:
 	return ABILITY_DESCRIPTIONS[hero_class][slot]
 
@@ -149,6 +124,5 @@ static func enemy_color(enemy_type:String) -> Color:
 static func create_enemy(enemy_type:String, pos:Vector2, dungeon_id:int) -> Dictionary:
 	var enemy_data:Dictionary = ENEMIES.get(enemy_type, ENEMIES["Raider"])
 	var boss:=bool(enemy_data.get("boss",false))
-	var base_hp:float=enemy_data["base_hp"]
-	var base_damage:float=float(enemy_data.get("base_damage",16.0))
-	return {"type":enemy_type,"pos":pos,"facing_direction":Vector2.LEFT,"hp":base_hp*(1+dungeon_id*.25),"max_hp":base_hp*(1+dungeon_id*.25),"damage":base_damage+dungeon_id*4+(10 if boss else 0),"cooldown":1.0,"telegraph":0.0,"target":0,"threat":{},"objective_threat":0.0,"taunt_target":-1,"taunt_time":0.0,"prefers_backline":bool(enemy_data.get("prefers_backline",false)),"ignores_tank_aggro":bool(enemy_data.get("ignores_tank_aggro",false)),"special":"","special_index":0,"danger_pos":pos,"summoned":false,"enraged":false,"revealed":false,"rewarded":false,"boss":boss,"ranged":bool(enemy_data.get("ranged",false))}
+	var enemy_level:int=CombatSystem.clamp_level(1+dungeon_id);var resolved:=CombatSystem.calculate_final_stats(enemy_data,enemy_level)
+	return {"type":enemy_type,"definition":enemy_data,"stats":resolved,"level":enemy_level,"pos":pos,"facing_direction":Vector2.LEFT,"hp":resolved.health,"max_hp":resolved.health,"power":resolved.power,"armor":resolved.armor,"basic_action_type":"attack","basic_action_power_coefficient":resolved.basic_action_power_coefficient,"basic_action_amount":resolved.basic_action_amount,"basic_action_range":resolved.basic_action_range,"attack_range":resolved.basic_action_range,"damage":resolved.basic_action_amount,"range":resolved.basic_action_range,"movement_speed":resolved.movement_speed,"basic_action_interval":resolved.basic_action_interval,"basic_attack_interval":resolved.basic_action_interval,"critical_chance":resolved.critical_chance,"critical_damage":resolved.critical_damage,"basic_action_damage_type":resolved.basic_action_damage_type,"basic_attack_damage_type":resolved.basic_action_damage_type,"shield":0.0,"shield_sources":[],"active_effects":[],"passive_cooldowns":{},"cooldown":1.0,"telegraph":0.0,"target":0,"threat":{},"objective_threat":0.0,"taunt_target":-1,"taunt_time":0.0,"prefers_backline":bool(enemy_data.get("prefers_backline",false)),"ignores_tank_aggro":bool(enemy_data.get("ignores_tank_aggro",false)),"special":"","special_index":0,"danger_pos":pos,"summoned":false,"enraged":false,"revealed":false,"rewarded":false,"boss":boss,"ranged":bool(enemy_data.get("ranged",false)),"behavior_flags":enemy_data.behavior_flags.duplicate(),"combat_tags":enemy_data.combat_tags.duplicate()}
