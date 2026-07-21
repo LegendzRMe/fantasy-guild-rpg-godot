@@ -1,6 +1,7 @@
 extends "res://scripts/runtime/combat_input_runtime.gd"
 
 func _process(delta:float) -> void:
+	if screen=="roster":update_roster_party_press(delta)
 	if screen=="vault" and vault_press_active:
 		vault_press_time+=delta
 		if not vault_dragging and vault_press_time>=InventorySystem.LONG_PRESS_DURATION:begin_vault_drag()

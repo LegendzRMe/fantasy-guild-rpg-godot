@@ -52,6 +52,8 @@ static func validate_selection(hero:Dictionary,class_definition:Dictionary,tier_
 	var definition:=tier_definition(class_definition,tier_id)
 	if definition.is_empty():return {"valid":false,"reason":"Unknown talent tier"}
 	if option_id not in definition.get("option_ids",[]):return {"valid":false,"reason":"Talent is not available in this tier"}
+	var selected_id:=str(hero.get("selected_talents",{}).get(tier_id,""))
+	if selected_id!="" and selected_id!=option_id:return {"valid":false,"reason":"A talent has already been chosen for this tier"}
 	if tier_id=="tier_7":
 		var selected_heroic_id:=str(hero.get("selected_heroic_id",""))
 		if selected_heroic_id=="":return {"valid":false,"reason":"Choose a Heroic before its upgrade"}

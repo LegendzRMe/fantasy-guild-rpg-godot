@@ -152,6 +152,7 @@ func finish_hero_drag()->void:
 
 func _unhandled_input(event:InputEvent) -> void:
 	if screen!="combat":return
+	if victory_talent_overlay!=null and is_instance_valid(victory_talent_overlay):return
 	if tutorial_active:
 		if event is InputEventScreenTouch or event is InputEventScreenDrag:tutorial_input_device="mobile"
 		elif not OS.has_feature("mobile") and (event is InputEventMouseButton or event is InputEventMouseMotion or event is InputEventKey):tutorial_input_device="pc"
@@ -159,11 +160,7 @@ func _unhandled_input(event:InputEvent) -> void:
 		tutorial_active=false;show_hall();return
 	if victory_sequence:
 		if victory_phase>=5 and ((event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey) and event.pressed):
-			if current_ashwood_encounter!="" and victory_timer<1.6:victory_timer=1.6;queue_redraw();return
-
-			victory_sequence=false
-			if current_ashwood_encounter!="":show_ashwood_victory()
-			else:show_zone_map(dungeon_id)
+			attempt_victory_continue()
 		return
 	if battle_over:
 		if event is InputEventKey and event.pressed:

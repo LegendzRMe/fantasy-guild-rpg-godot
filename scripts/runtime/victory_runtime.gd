@@ -2,6 +2,7 @@ extends "res://scripts/runtime/ashwood_runtime.gd"
 
 func finish_battle(win:bool)->void:
 	battle_over=true
+	victory_talent_prompt_handled=false;victory_talent_queue.clear();victory_talent_choice_index=0;close_victory_talent_overlay()
 	if current_ashwood_encounter!="":
 		finish_ashwood_battle(win)
 		return
