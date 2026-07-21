@@ -2,6 +2,7 @@ extends "res://scripts/runtime/app_core.gd"
 
 const AbilityKeyBadge = preload("res://scripts/ui/ability_key_badge.gd")
 const GuardianAbilityPresenter = preload("res://scripts/data/guardian_ability_presenter.gd")
+const TalentTierView = preload("res://scripts/ui/talent_tier_view.gd")
 
 func make_roster_ability_row(key_text:String,title:String,description:String,accent:Color,locked:bool=false,details_action:Callable=Callable())->PanelContainer:
 	var card:=PanelContainer.new();card.name="RosterTrait" if key_text=="D" else "RosterAbility%s"%key_text;card.custom_minimum_size=Vector2(600,58);card.add_theme_stylebox_override("panel",ui_box(Color("182334") if not locked else Color("151e2c"),6,Color("35445a"),1))
@@ -48,6 +49,33 @@ func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:Str
 
 func guardian_talent_name(talent_id:String)->String:
 	return str(GuardianData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
+
+func roster_talent_description(hero_class:String,option_id:String)->String:
+	if hero_class=="Guardian":return str(GuardianData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
+	return "Talent details are still being developed."
+
+func choose_or_plan_roster_talent(tier_id:String,option_id:String)->void:
+	if selected_roster_index<0 or selected_roster_index>=state.heroes.size():return
+	var hero:Dictionary=state.heroes[selected_roster_index];var definition:=GameData.class_definition(str(hero.get("class","")));var required_level:=int(TalentSystem.TIER_LEVELS.get(tier_id,999))
+	if int(hero.get("level",1))>=required_level:
+		var result:=TalentSystem.select_option(hero,definition,tier_id,option_id)
+		if not bool(result.get("success",false)):return
+		state.heroes[selected_roster_index]=result.hero
+	else:
+		var planned_id:=str(hero.get("planned_talents",{}).get(tier_id,""))
+		state.heroes[selected_roster_index]=TalentSystem.clear_planned_option(hero,tier_id) if planned_id==option_id else TalentSystem.plan_option(hero,definition,tier_id,option_id)
+	save_game();hero_roster_section="Talents";show_roster()
+
+func make_roster_talent_tier(hero:Dictionary,class_definition:Dictionary,class_id:String,discovery:Dictionary,tier_number:int)->Control:
+	var tier_id:="tier_%d"%tier_number;var tier_definition:=TalentSystem.tier_definition(class_definition,tier_id)
+	if tier_definition.is_empty():return Control.new()
+	var required_level:=int(tier_definition.get("unlock_level",TalentSystem.TIER_LEVELS.get(tier_id,999)));var revealed:=TalentSystem.tier_is_revealed(discovery,class_id,tier_id,is_testing_save());var hero_level:=int(hero.get("level",1));var selected_id:=str(hero.get("selected_talents",{}).get(tier_id,""));var planned_id:=str(hero.get("planned_talents",{}).get(tier_id,""));var options:Array=[]
+	for raw_option_id in tier_definition.get("option_ids",[]):
+		var option_id:=str(raw_option_id);var available:=true;var unavailable_reason:=""
+		if hero_level>=required_level:
+			var validation:=TalentSystem.validate_selection(hero,class_definition,tier_id,option_id);available=bool(validation.valid) or option_id==selected_id;unavailable_reason=str(validation.reason)
+		options.append({"id":option_id,"display_name":guardian_talent_name(option_id) if str(hero.get("class",""))=="Guardian" else option_id.replace("_"," ").capitalize(),"description":roster_talent_description(str(hero.get("class","")),option_id),"selected":option_id==selected_id,"planned":option_id==planned_id,"available":available,"unavailable_reason":unavailable_reason,"class_name":str(hero.get("class","Hero"))})
+	var view:=TalentTierView.new();view.configure(tier_id,tier_number,required_level,str(tier_definition.get("kind","talent")),hero_level,revealed,options,CLASSES[hero["class"]].color,C_TEXT,C_MUTED,C_GOLD);view.option_pressed.connect(choose_or_plan_roster_talent);return view
 
 func make_roster_card(idx:int) -> Button:
 
@@ -162,7 +190,9 @@ func equipment_comparison(instance_id:String,hero_index:int)->Dictionary:
 		if is_equal_approx(comparison[1],comparison[2]):continue
 		var suffix:="%" if comparison[3] else (" sec" if comparison[0]=="Action Interval" else "")
 		var direction:="faster" if comparison[0]=="Action Interval" and comparison[2]<comparison[1] else "slower" if comparison[0]=="Action Interval" else "increased" if comparison[2]>comparison[1] else "decreased"
-		rows.append("%s   %.1f%s  →  %.1f%s  (%s)"%[comparison[0],comparison[1],suffix,comparison[2],suffix,direction])
+		var before_text:=str(int(floor(float(comparison[1])))) if comparison[0]=="Basic Action" else "%.1f"%comparison[1]
+		var after_text:=str(int(floor(float(comparison[2])))) if comparison[0]=="Basic Action" else "%.1f"%comparison[2]
+		rows.append("%s   %s%s  →  %s%s  (%s)"%[comparison[0],before_text,suffix,after_text,suffix,direction])
 	var current:=equipped_item_in_slot(state.heroes[hero_index],str(item.get("slot","")))
 	var old_passives:Array=current.get("passive_effect_ids",[]) if not current.is_empty() else []
 	var new_passives:Array=item.get("passive_effect_ids",[])
@@ -407,28 +437,21 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 				content.add_child(make_roster_ability_row("R","Heroic Ability","Choose your Heroic at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[3]),class_color,true))
 			content.add_child(make_roster_ability_row("D",trait_name,trait_text,class_color,false,func():open_roster_ability_details(hero,"D")))
 		"Talents":
-			content.add_child(label("TALENTS",20,C_GOLD))
+			var talent_heading:=HBoxContainer.new();talent_heading.add_theme_constant_override("separation",12);content.add_child(talent_heading)
+			var talent_title:=label("TALENT TREE",20,C_GOLD);talent_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;talent_heading.add_child(talent_title)
+			var unlocked_count:=TalentSystem.unlocked_tier_ids(int(hero.get("level",1))).size();talent_heading.add_child(label("LEVEL %d  •  %d / 8 TIERS"%[int(hero.get("level",1)),unlocked_count],13,C_MUTED))
 			var class_definition:Dictionary=GameData.class_definition(str(hero["class"]));var class_id:=str(class_definition.get("class_id",GameData.class_id_for(str(hero["class"]))));var discovery:Dictionary=state.get("class_talent_discovery",{})
 			for tier_number in range(1,9):
-				var tier_id:="tier_%d"%tier_number;var tier_definition:=TalentSystem.tier_definition(class_definition,tier_id)
-				if tier_definition.is_empty():continue
-				var revealed:=TalentSystem.tier_is_revealed(discovery,class_id,tier_id,is_testing_save());var required_level:=int(tier_definition.get("unlock_level",TalentSystem.TIER_LEVELS.get(tier_id,999)));var selected_id:=str(hero.get("selected_talents",{}).get(tier_id,""))
-				var talent_card:=Label.new();talent_card.custom_minimum_size=Vector2(600,52);talent_card.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;talent_card.add_theme_font_size_override("font_size",14);talent_card.add_theme_stylebox_override("normal",ui_box(Color("182334") if revealed else Color("131b28"),6,Color("35445a"),1))
-				if revealed:
-					var option_names:Array=[]
-					for option_id in tier_definition.get("option_ids",[]):option_names.append(("✓ " if str(option_id)==selected_id else "")+guardian_talent_name(str(option_id)) if hero["class"]=="Guardian" else str(option_id).replace("_"," ").capitalize())
-					talent_card.text="TIER %d  •  LEVEL %d\n%s"%[tier_number,required_level,"   |   ".join(option_names)]
-				else:talent_card.text="TIER %d  •  UNLOCKS AT LEVEL %d\nTalent choices are not yet revealed."%[tier_number,required_level]
-				content.add_child(talent_card)
+				content.add_child(make_roster_talent_tier(hero,class_definition,class_id,discovery,tier_number))
 		"Professions":
 			content.add_child(label("PROFESSIONS",20,C_GOLD))
 		_:
 			content.add_child(label("DETAILS",20,C_GOLD))
 			var action_is_heal:bool=str(resolved_stats.basic_action_type)=="heal";var action_title:="BASIC HEAL" if action_is_heal else "BASIC ATTACK"
-			var action_rows:Array=[{"caption":"Healing" if action_is_heal else "Damage","value":"%.1f"%resolved_stats.basic_action_amount,"color":C_GREEN if action_is_heal else C_TEXT},{"caption":"Interval","value":"%.2f sec"%resolved_stats.basic_action_interval},{"caption":"Range","value":str(int(resolved_stats.basic_action_range))}]
+			var action_rows:Array=[{"caption":"Healing" if action_is_heal else "Damage","value":str(int(floor(float(resolved_stats.basic_action_amount)))),"color":C_GREEN if action_is_heal else C_TEXT},{"caption":"Interval","value":"%.2f sec"%resolved_stats.basic_action_interval},{"caption":"Range","value":str(int(resolved_stats.basic_action_range))}]
 			if not action_is_heal:action_rows.append({"caption":"Damage Type","value":str(resolved_stats.basic_action_damage_type).capitalize()})
 			var defense_rows:Array=[{"caption":"Armor Rating","value":"%.0f"%resolved_stats.armor},{"caption":"Damage Reduction","value":"%d%%"%int(round(resolved_stats.armor_reduction*100.0)),"color":Color("e6b85c")},{"caption":"Movement Speed","value":str(int(resolved_stats.movement_speed))},{"caption":"Threat Generation","value":"%.2fx"%resolved_stats.threat_modifier}]
-			if float(resolved_stats.health_regeneration)>0.0:defense_rows.append({"caption":"Health Regeneration","value":"%.1f"%resolved_stats.health_regeneration,"color":C_GREEN})
+			if float(resolved_stats.health_regeneration)>0.0:defense_rows.append({"caption":"Health Regeneration","value":str(int(floor(float(resolved_stats.health_regeneration)))),"color":C_GREEN})
 			var critical_rows:Array=[{"caption":"Chance","value":"%.1f%%"%(resolved_stats.critical_chance*100.0)},{"caption":"Critical Result","value":"%.0f%%"%(resolved_stats.critical_damage*100.0)}]
 			var concise_weapon_names:Dictionary={"weapon_and_shield":"Shield","one_handed":"1-Handed","two_handed":"2-Handed","dual_wield":"Dual Wield"}
 			var weapon_names:Array=resolved_stats.weapon_proficiencies.map(func(weapon):return str(concise_weapon_names.get(str(weapon),str(weapon).replace("_"," ").capitalize())))

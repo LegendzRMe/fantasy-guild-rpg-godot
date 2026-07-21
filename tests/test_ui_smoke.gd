@@ -4,6 +4,7 @@ const SaveManager = preload("res://scripts/systems/save_manager.gd")
 const GameData = preload("res://scripts/data/game_data.gd")
 const ItemData = preload("res://scripts/data/item_data.gd")
 const InventorySystem = preload("res://scripts/systems/inventory_system.gd")
+const TalentSystem = preload("res://scripts/systems/talent_system.gd")
 const TestSupport = preload("res://tests/test_support.gd")
 
 static func run(main:Node) -> Array:
@@ -124,8 +125,16 @@ static func run(main:Node) -> Array:
 	main.select_roster_section("Talents")
 	await main.get_tree().process_frame
 	var talents_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	var talent_text:String="\n".join(main.ui.find_children("*","Label",true,false).map(func(candidate):return candidate.text))
-	TestSupport.check(errors,talents_content.get_child_count()==9 and talent_text.contains("Avatar") and talent_text.contains("Haymaker"),"The Talents workspace should retain revealed Heroic choices even while Abilities hides an unselected R.")
+	TestSupport.check(errors,talents_content.get_child_count()==9 and main.ui.find_child("TalentOption_guardian_l15_r1",true,false)!=null and main.ui.find_child("TalentOption_guardian_l15_r2",true,false)!=null,"The visual Talent Tree should retain revealed Heroic choices even while Abilities hides an unselected R.")
+	main.ui.find_child("TalentOption_guardian_l9_2",true,false).emit_signal("pressed");await main.get_tree().process_frame
+	TestSupport.check(errors,main.state.heroes[0].planned_talents.get("tier_1","")=="guardian_l9_2" and main.ui.find_child("TalentOption_guardian_l9_2",true,false).text.contains("PLANNED"),"A revealed future talent should support one visible, changeable planned heart without granting its gameplay effect.")
+	main.state.heroes[0].level=30;main.select_roster_section("Talents");await main.get_tree().process_frame
+	main.ui.find_child("TalentOption_guardian_l9_1",true,false).emit_signal("pressed");await main.get_tree().process_frame
+	TestSupport.check(errors,main.state.heroes[0].selected_talents.get("tier_1","")=="guardian_l9_1" and main.ui.find_child("TalentOption_guardian_l9_1",true,false).text.contains("SELECTED"),"An unlocked talent card should be selectable and immediately show its selected state.")
+	main.ui.find_child("TalentOption_guardian_l15_r2",true,false).emit_signal("pressed");await main.get_tree().process_frame
+	var avatar_upgrade:Button=main.ui.find_child("TalentOption_guardian_l27_r1",true,false);var haymaker_upgrade:Button=main.ui.find_child("TalentOption_guardian_l27_r2",true,false)
+	TestSupport.check(errors,main.state.heroes[0].selected_heroic_id=="guardian_l15_r2" and avatar_upgrade.disabled and not haymaker_upgrade.disabled,"Choosing a Heroic should enable only its matching Level 27 upgrade.")
+	main.state.heroes[0]=TalentSystem.clear_all(main.state.heroes[0]);main.state.heroes[0].level=1
 	main.select_roster_section("Professions")
 	await main.get_tree().process_frame
 	var professions_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)

@@ -46,10 +46,26 @@ const WORKING_NAMES := {
 }
 
 const TALENT_DESCRIPTIONS := {
+	"guardian_l9_1":"Dwarf Toss grants 3 Block charges. Each charge provides 75 Physical Armor against one hostile Physical Basic Attack.",
+	"guardian_l9_2":"Second Wind restores 90 Health per second, increasing to 180 Health per second while below 60% Health. Healing scales with level.",
+	"guardian_l9_3":"Basic Attacking a Slowed, Rooted, or Stunned enemy increases Basic Attack damage by 40% for 3 seconds.",
+	"guardian_l12_1":"Storm Bolt deals 500% damage to non-Boss enemies. Basic Attacks also reduce Storm Bolt's cooldown by 1.5 seconds.",
+	"guardian_l12_2":"Thunder Clap reduces enemy Basic Action speed by 50% for 3.5 seconds. Each enemy hit also reduces the current Heroic cooldown by 5%.",
+	"guardian_l12_3":"Two seconds after Thunder Clap hits, a second blast deals 75% of its damage at the same location.",
 	"guardian_l15_r1":"Gain maximum and current Health for 20 seconds and increase visible combat size. Cooldown: 90 seconds.",
 	"guardian_l15_r2":"Strike a chosen enemy for heavy Physical damage and launch ordinary enemies backward. Bosses are staggered instead. Cooldown: 40 seconds.",
+	"guardian_l18_1":"When an enemy marked by Storm Bolt dies within 3 seconds, reset Storm Bolt's cooldown. Can occur once every 8.5 seconds.",
+	"guardian_l18_2":"Enemies struck by Dwarf Toss are Slowed by 80% for 1.5 seconds.",
+	"guardian_l18_3":"Every third consecutive Basic Attack against the same enemy deals 90% bonus damage and Stuns for 0.25 seconds.",
+	"guardian_l21_1":"Deal periodic Physical damage to nearby enemies and heal for 75% of damage dealt. Storm Bolt hits empower the effect for 3 seconds.",
+	"guardian_l21_2":"Thunder Clap restores 6% maximum Health for each enemy hit.",
+	"guardian_l21_3":"Thunder Clap deals triple damage when it hits exactly one enemy. Dwarf Toss Armor also lasts 2 seconds longer.",
+	"guardian_l24_1":"Increase Dwarf Toss range by 30%. Each enemy hit reduces its cooldown by 1 second.",
 	"guardian_l24_2":"Press D to heal for 30% maximum Health over 10 seconds. Second Wind pauses during Stoneform. Cooldown: 60 seconds.",
 	"guardian_l24_3":"Enemies that hit Guardian with Basic Actions have their Basic Action speed reduced by 20% for 2.5 seconds. Once every 20 seconds, this reduction is increased to 50%.",
+	"guardian_l27_r1":"While Avatar is active, gain 20 Armor. Basic Attacks reduce Thunder Clap and Dwarf Toss cooldowns by 0.75 seconds.",
+	"guardian_l27_r2":"Haymaker gains a second charge and deals 25% more damage. If its target dies within 3 seconds, reset the current Heroic cooldown.",
+	"guardian_l30_1":"Thunder Clap and Dwarf Toss each gain a second charge.",
 	"guardian_l30_2":"Falling below 30% maximum Health grants 75 Armor for 4 seconds. Hardened Shield can trigger only once every 60 seconds.",
 	"guardian_l30_3":"Casting Storm Bolt, Thunder Clap, and Dwarf Toss within 8 seconds resets the cooldowns of all three abilities. Rewind can trigger only once every 60 seconds."
 }

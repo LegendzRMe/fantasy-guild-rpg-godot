@@ -3,7 +3,7 @@ extends RefCounted
 const GuardianData = preload("res://scripts/data/guardian_data.gd")
 
 static func _number(value:float)->String:
-	return str(int(round(value))) if is_equal_approx(value,round(value)) else "%.1f"%value
+	return str(int(floor(value)))
 
 static func _level_scaled(key:String,level:int)->String:
 	return _number(GuardianData.scaled(float(GuardianData.VALUES[key]),level))
