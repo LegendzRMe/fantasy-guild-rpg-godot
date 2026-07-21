@@ -357,7 +357,7 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 			content.add_child(label("ABILITIES",20,C_GOLD))
 			var trait_name:String="Stoneform" if hero["class"]=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2") else str(TRAITS[hero["class"]])
 			var trait_text:String=GuardianData.TALENT_DESCRIPTIONS.guardian_l24_2 if trait_name=="Stoneform" else "Passive Trait"
-			var class_color:Color=CLASSES[hero["class"]].color;content.add_child(make_roster_ability_row("D",trait_name,trait_text,class_color))
+			var class_color:Color=CLASSES[hero["class"]].color
 			for slot in 3:
 				var required_level:=int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]);var locked:=int(hero.get("level",1))<required_level;var description:=ability_tooltip(hero["class"],slot)
 				if locked:description="Unlocks at Level %d  •  %s"%[required_level,description]
@@ -367,6 +367,7 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"]=="Guardian" else str(ABILITIES[hero["class"]][3])
 				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else ability_tooltip(hero["class"],3)
 				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color))
+			content.add_child(make_roster_ability_row("D",trait_name,trait_text,class_color))
 		"Talents":
 			content.add_child(label("TALENTS",20,C_GOLD))
 			var class_definition:Dictionary=GameData.class_definition(str(hero["class"]));var class_id:=str(class_definition.get("class_id",GameData.class_id_for(str(hero["class"]))));var discovery:Dictionary=state.get("class_talent_discovery",{})

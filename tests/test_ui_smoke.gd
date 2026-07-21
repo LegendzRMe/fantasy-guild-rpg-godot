@@ -109,6 +109,7 @@ static func run(main:Node) -> Array:
 	await main.get_tree().process_frame
 	var abilities_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
 	TestSupport.check(errors,main.ui.find_child("RosterTrait",true,false)!=null and main.ui.find_children("RosterAbility*","PanelContainer",true,false).size()==3 and main.ui.find_children("AbilityKeyBadge","Control",true,false).size()==4 and abilities_content.get_child_count()==5,"The concise Abilities workspace should show visual D/Q/W/E rows without an unselected Heroic or extra talent action slots.")
+	TestSupport.check(errors,abilities_content.get_child(1).name=="RosterAbilityQ" and abilities_content.get_child(2).name=="RosterAbilityW" and abilities_content.get_child(3).name=="RosterAbilityE" and abilities_content.get_child(4).name=="RosterTrait","Hero Roster abilities should follow the combat action-bar order: Q, W, E, optional R, then D.")
 	TestSupport.check(errors,main.ui.find_child("RosterAbilityR",true,false)==null,"An unselected or locked Heroic should not appear in the Abilities workspace.")
 	main.state.heroes[0].level=15;main.state.heroes[0].selected_heroic_id="guardian_l15_r2";main.state.heroes[0].selected_talents["tier_3"]="guardian_l15_r2";main.select_roster_section("Abilities");await main.get_tree().process_frame
 	var heroic_row:PanelContainer=main.ui.find_child("RosterAbilityR",true,false);var heroic_text:String="\n".join(heroic_row.find_children("*","Label",true,false).map(func(candidate):return candidate.text)) if heroic_row!=null else ""
