@@ -27,6 +27,12 @@ static func telemetry_add(unit:Dictionary,key:String,value=1)->void:
 	if runtime.is_empty() or not bool(runtime.get("telemetry_enabled",false)):return
 	runtime.telemetry[key]=runtime.telemetry.get(key,0)+value
 
+static func telemetry_append(unit:Dictionary,key:String,value)->void:
+	var runtime:Dictionary=unit.get("guardian_runtime",{})
+	if runtime.is_empty() or not bool(runtime.get("telemetry_enabled",false)):return
+	var entries:Array=runtime.telemetry.get(key,[])
+	entries.append(value);runtime.telemetry[key]=entries
+
 static func add_quest(unit:Dictionary,amount:int,source:String,now:float)->void:
 	var runtime:Dictionary=unit.guardian_runtime
 	runtime.quest_stacks=int(runtime.quest_stacks)+amount

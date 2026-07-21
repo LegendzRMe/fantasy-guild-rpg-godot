@@ -27,6 +27,8 @@ static func run()->Array:
 	TestSupport.check(errors,not names.contains("Shield Wall") and not names.contains("Challenge") and not names.contains("Shield Rush") and not names.contains("Last Bastion"),"The placeholder Guardian kit should be removed.")
 
 	var hero:=guardian();hero.hp=1000.0
+	GuardianSystem.telemetry_append(hero,"thunder_clap_casts",2);GuardianSystem.telemetry_append(hero,"thunder_clap_casts",0)
+	TestSupport.check(errors,hero.guardian_runtime.telemetry.thunder_clap_casts==[2,0],"Thunder Clap telemetry should record per-cast target counts without mixing Array and numeric accumulator types.")
 	var before:=GuardianSystem.update_timers(hero,3.99);var active:=GuardianSystem.update_timers(hero,0.02)
 	TestSupport.check(errors,before.second_wind_heal==0.0 and active.second_wind_heal>0.0 and hero.guardian_runtime.second_wind_active,"Second Wind should activate after four seconds without damage.")
 	hero.hp=500.0;var low:=GuardianSystem.update_timers(hero,1.0)

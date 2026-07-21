@@ -62,7 +62,7 @@ func cast_thunder_clap(hero:Dictionary)->bool:
 		GuardianSystem.telemetry_add(hero,"healing_static_healing",float(healing.effective_amount))
 	if GuardianSystem.has_talent(hero,"guardian_l12_2"):hero.ability_cds[3]=float(hero.ability_cds[3])*pow(0.95,targets.size())
 	if GuardianSystem.has_talent(hero,"guardian_l12_3") and not targets.is_empty():hero.guardian_runtime.delayed_effects.append({"remaining":2.0,"point":hero.pos,"amount":amount*0.75,"radius":GuardianData.SPACE.thunder_clap_radius})
-	hero.ability_cds[1]=float(GuardianData.VALUES.thunder_clap_cooldown);GuardianSystem.telemetry_add(hero,"thunder_clap_casts",targets.size());CombatRulesV1.restore_preserved_command(hero,true)
+	hero.ability_cds[1]=float(GuardianData.VALUES.thunder_clap_cooldown);GuardianSystem.telemetry_append(hero,"thunder_clap_casts",targets.size());CombatRulesV1.restore_preserved_command(hero,true)
 	GuardianSystem.record_rewind_cast(hero,"w",battle_time)
 	return true
 

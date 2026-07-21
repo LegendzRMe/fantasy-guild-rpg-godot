@@ -444,6 +444,12 @@ static func run(main:Node) -> Array:
 	input_guardian.guardian_runtime.stoneform_remaining=0.0
 	input_guardian.selected_talents={"tier_8":"guardian_l30_3"};input_guardian.ability_cds[2]=0.0;var invalid_toss:bool=bool(main.cast_guardian_ability(2,Vector2(55,320)))
 	TestSupport.check(errors,not invalid_toss and input_guardian.ability_cds[2]==0.0 and main.GuardianSystem.rewind_sequence_count(input_guardian,main.battle_time)==0,"An invalid Dwarf Toss should consume no cooldown and should not count toward Rewind.")
+	var original_enemy_positions:Array=main.enemies.map(func(enemy):return enemy.pos)
+	for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=Vector2(1100,100+enemy_index*70)
+	input_guardian.ability_cds[1]=0.0
+	var thunder_clap_cast:bool=bool(main.cast_guardian_ability(1,input_guardian.pos))
+	TestSupport.check(errors,thunder_clap_cast and input_guardian.guardian_runtime.telemetry.thunder_clap_casts[-1]==0,"Thunder Clap should complete safely and record its per-cast target count without a telemetry type crash.")
+	for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=original_enemy_positions[enemy_index]
 	var defense_dummy:Dictionary=main.enemies[-1]
 	main.heroes[0].pos=defense_dummy.pos+Vector2(100,0);main.heroes[0].dest=main.heroes[0].pos;main.heroes[0].suppress_auto_target=true
 	var defense_health_before:float=main.heroes[0].hp
