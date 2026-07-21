@@ -1,4 +1,4 @@
-extends "res://scripts/runtime/enemy_combat_runtime.gd"
+extends "res://scripts/runtime/guardian_runtime.gd"
 
 func clamped_cast_point(hero:Dictionary,point:Vector2,range_limit:float)->Vector2:
 	if range_limit<=0:return hero.pos
@@ -22,6 +22,9 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 		elif h.ability_cds[slot]>0:return
 	if tutorial_active and tutorial_step==7 and h["class"]=="Cleric" and slot==0:tutorial_ability_used=true
 	if cast_position==Vector2.INF:cast_position=get_global_mouse_position()
+	if h["class"]=="Guardian":
+		cast_guardian_ability(slot,cast_position,item_repeat)
+		return
 	var ability_range=float(ABILITY_RANGES[h["class"]][slot])
 	var resolved_point=clamped_cast_point(h,cast_position,ability_range) if ability_range>0 else h.pos
 	if resolved_point.distance_to(h.pos)>1:h.facing_direction=h.pos.direction_to(resolved_point)

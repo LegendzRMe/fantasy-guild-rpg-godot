@@ -22,6 +22,10 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		var start_position:=battle_formation_position(i);var data=state.heroes[battle_hero_indices[i]];var runtime_stats:=hero_final_stats(data);var equipped:=hero_equipped_items(data);heroes.append({"name":data.name,"class":data["class"],"hero_index":battle_hero_indices[i],"battle_index":i,"level":runtime_stats.level,"combat_affiliation":"player","independent":false,"pos":start_position,"dest":start_position,"facing_direction":Vector2.RIGHT,"stats":runtime_stats,"equipped_items":equipped,"active_effects":[],"passive_cooldowns":{},"hp":runtime_stats.health,"max_hp":runtime_stats.health,"base_power":runtime_stats.power,"power":runtime_stats.power,"armor":runtime_stats.armor,"basic_action_type":runtime_stats.basic_action_type,"basic_action_coefficient":runtime_stats.basic_action_power_coefficient,"basic_action_power_ratio":runtime_stats.basic_action_amount/maxf(0.001,runtime_stats.power),"basic_action_amount":runtime_stats.basic_action_amount,"damage":runtime_stats.basic_action_amount,"basic_heal_amount":runtime_stats.basic_heal_amount,"range":runtime_stats.basic_action_range,"movement_speed":runtime_stats.movement_speed,"base_basic_action_interval":runtime_stats.basic_action_interval,"basic_attack_interval":runtime_stats.basic_action_interval,"basic_heal_interval":runtime_stats.basic_action_interval,"critical_chance":runtime_stats.critical_chance,"critical_damage":runtime_stats.critical_damage,"threat_modifier":runtime_stats.threat_modifier,"damage_multiplier":runtime_stats.damage_multiplier,"healing_multiplier":runtime_stats.healing_multiplier,"damage_taken_multiplier":runtime_stats.damage_taken_multiplier,"healing_taken_multiplier":runtime_stats.healing_taken_multiplier,"basic_attack_damage_type":runtime_stats.basic_action_damage_type,"target":-1,"heal_target":-1,"suppress_auto_target":false,"cooldown":0.0,"ability_cds":[0.0,0.0,0.0,0.0,0.0],"shield":0.0,"shield_sources":[],"last_hit":0.0,"bloodletting_stacks":[],"thousand_cuts_count":0,"retribution_charges":[],"soul_furnace_stacks":0,"last_dawn_ready":true,"borrowed_time_timer":0.0,"borrowed_time_armed":false,"pending_repeats":[],"q_charges":2 if has_item_passive(equipped,"twin_incantation") else 1,"q_charge_timers":[]})
 		var stable_hero_id:=str(data.get("hero_id",data.get("id",battle_hero_indices[i])))
 		CombatRulesV1.initialize_unit(heroes[-1],"hero:%s"%stable_hero_id,"player")
+		heroes[-1]["selected_talents"]=data.get("selected_talents",{}).duplicate(true)
+		heroes[-1]["selected_heroic_id"]=str(data.get("selected_heroic_id",""))
+		heroes[-1]["combat_radius"]=42.0
+		if str(heroes[-1].get("class",""))=="Guardian":GuardianSystem.initialize_runtime(heroes[-1],is_testing_save())
 	queue_redraw()
 
 func start_testing_zone() -> void:
@@ -32,12 +36,15 @@ func start_testing_zone() -> void:
 	if test_party.is_empty():test_party=state.selected_team.duplicate()
 	start_battle(0,-1,test_party)
 	testing_zone_active=true
+	for hero in heroes:
+		if str(hero.get("class",""))=="Guardian":hero.guardian_runtime.telemetry_enabled=true
 	testing_dummy_attacks_enabled=true
 	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
 	spawn_enemy(Vector2(650,120),"Dummy");enemies[-1]["passive_test_enemy"]=true
 	spawn_enemy(Vector2(610,525),"Raider")
 	spawn_enemy(Vector2(720,525),"Archer")
 	spawn_enemy(Vector2(665,555),"Dummy")
+	spawn_enemy(Vector2(1050,170),"Boss");enemies[-1]["passive_test_enemy"]=true
 	spawn_enemy(Vector2(880,330),"Defense Dummy")
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:pillar",Rect2(570,250,74,145)))
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:wall",Rect2(760,210,38,165),{"destructible":true,"current_health":240.0,"maximum_health":240.0}))

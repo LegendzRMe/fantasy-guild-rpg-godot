@@ -18,6 +18,8 @@ const ItemCardView = preload("res://scripts/ui/item_card_view.gd")
 const CombatRulesV1 = preload("res://scripts/combat/combat_rules_v1.gd")
 const CombatGeometry = preload("res://scripts/combat/combat_geometry.gd")
 const CombatProjectile = preload("res://scripts/combat/combat_projectile.gd")
+const GuardianData = preload("res://scripts/data/guardian_data.gd")
+const GuardianSystem = preload("res://scripts/systems/guardian_system.gd")
 const ASHWOOD_COMBAT_BACKGROUND = preload("res://assets/generated/ashwood_combat_background.png")
 
 const W := 1280.0

@@ -153,7 +153,7 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.screen=="combat" and main.current_ashwood_encounter=="first_battle","Selecting Encounter 1 should skip previews and immediately begin combat.")
 	TestSupport.check(errors,main.heroes.size()==2 and main.heroes.map(func(hero):return hero["class"])==["Guardian","Cleric"],"Encounter 1 should deploy both founding heroes.")
 	TestSupport.check(errors,main.heroes[0].pos==Vector2(210,320) and main.heroes[1].pos==Vector2(145,215) and main.battle_formation_position(2)==Vector2(145,425) and main.battle_formation_position(3)==Vector2(90,320),"Combat should deploy ordered party slots as front, top, bottom, and back points of a diamond.")
-	TestSupport.check(errors,main.heroes[0].max_hp==230.0 and main.heroes[1].max_hp==150.0,"Level-one heroes should begin at class base health without receiving the level-two health bonus early.")
+	TestSupport.check(errors,main.heroes[0].max_hp==2765.0 and main.heroes[1].max_hp==150.0,"Level-one heroes should begin at class base health without receiving the level-two health bonus early.")
 	TestSupport.check(errors,main.objective_banner_time>0 and main.objective_combat_intro!="","Encounter 1 should briefly combine its story line and objective in the combat banner.")
 	main.spawn_enemy(Vector2(1050,250),"Swift")
 	main.spawn_enemy(Vector2(1050,420),"Stalker")
@@ -416,7 +416,7 @@ static func run(main:Node) -> Array:
 	main.state.selected_team=[0,1,4,2];main.state.active_team=[0,1,4,2]
 	main.state.heroes[1].level=6
 	main.start_testing_zone()
-	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==5,"The testing range should create its single, AoE, and defense dummy layout without waves.")
+	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==6 and main.enemies.any(func(enemy):return bool(enemy.get("boss",false))),"The testing range should retain its dummy layout and add a Boss-control target without waves.")
 	var defense_dummy:Dictionary=main.enemies[-1]
 	main.heroes[0].pos=defense_dummy.pos+Vector2(100,0);main.heroes[0].dest=main.heroes[0].pos;main.heroes[0].suppress_auto_target=true
 	var defense_health_before:float=main.heroes[0].hp

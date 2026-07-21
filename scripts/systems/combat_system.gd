@@ -108,6 +108,16 @@ static func calculate_armor_reduction(armor:float,attacker_level:int=1)->float:
 	var safe_armor:float=maxf(0.0,armor)
 	return clampf(safe_armor/(safe_armor+armor_constant),0.0,ARMOR_REDUCTION_CAP)
 
+static func strongest_armor(base_armor:float,sources:Array,damage_type:String="physical",source_action:String="basic_attack")->float:
+	var strongest:=base_armor
+	for source in sources:
+		if float(source.get("remaining",1.0))<=0.0:continue
+		var restricted_type:=str(source.get("damage_type",""));var restricted_action:=str(source.get("source_action",""))
+		if restricted_type!="" and restricted_type!=damage_type:continue
+		if restricted_action!="" and restricted_action!=source_action:continue
+		strongest=maxf(strongest,float(source.get("armor",0.0)))
+	return strongest
+
 static func default_can_crit(source_action:String,result_category:String,damage_type:String="physical")->bool:
 	if result_category=="shield" or damage_type=="true" or source_action=="periodic":return false
 	if result_category=="damage":return source_action in ["basic_attack","basic_ability","heroic"]
@@ -135,13 +145,36 @@ static func resolve_damage(source:Dictionary,target:Dictionary,request:Dictionar
 	if critical:amount*=critical_multiplier
 	amount*=float(request.get("damage_taken_multiplier",target.get("damage_taken_multiplier",1.0)))
 	amount=maxf(0.0,amount)
-	var reduction:float=0.0 if damage_type=="true" else calculate_armor_reduction(float(target.get("armor",0.0)),int(source.get("level",1)))
+	var resolved_armor:=strongest_armor(float(target.get("armor",0.0)),request.get("armor_sources",target.get("temporary_armor_sources",[])),damage_type,source_action)
+	var reduction:float=0.0 if damage_type=="true" else calculate_armor_reduction(resolved_armor,int(source.get("level",1)))
 	var mitigated_amount:float=amount*(1.0-reduction)
 	var available_shield:float=maxf(0.0,float(target.get("shield",0.0)));var shield_damage:float=minf(available_shield,mitigated_amount)
 	var shield_absorptions:Array=_consume_shield_sources(target,shield_damage);target["shield"]=available_shield-shield_damage
 	var health_damage:float=minf(maxf(0.0,float(target.get("hp",0.0))),mitigated_amount-shield_damage);target["hp"]=maxf(0.0,float(target.get("hp",0.0))-health_damage)
 	var resolved_damage:float=shield_damage+health_damage
-	return {"amount":mitigated_amount,"raw_amount":amount,"resolved_damage":resolved_damage,"health_damage":health_damage,"shield_damage":shield_damage,"shield_absorptions":shield_absorptions,"overkill":maxf(0.0,mitigated_amount-resolved_damage),"critical":critical,"critical_multiplier":critical_multiplier,"damage_type":damage_type,"source_action":source_action,"result_category":"damage","armor_reduction":reduction,"defeated":health_damage>0.0 and float(target.get("hp",0.0))<=0.0}
+	return {"amount":mitigated_amount,"raw_amount":amount,"resolved_damage":resolved_damage,"health_damage":health_damage,"shield_damage":shield_damage,"shield_absorptions":shield_absorptions,"overkill":maxf(0.0,mitigated_amount-resolved_damage),"critical":critical,"critical_multiplier":critical_multiplier,"damage_type":damage_type,"source_action":source_action,"result_category":"damage","armor":resolved_armor,"armor_reduction":reduction,"armor_prevented":maxf(0.0,amount-mitigated_amount),"defeated":health_damage>0.0 and float(target.get("hp",0.0))<=0.0}
+
+static func default_control_profile(unit:Dictionary)->Dictionary:
+	if not bool(unit.get("boss",false)):return {"stun_multiplier":1.0,"slow_multiplier":1.0,"attack_speed_multiplier":1.0,"displacement":true,"interruptible":true,"stagger_multiplier":1.0}
+	return unit.get("control_profile",{"stun_multiplier":0.25,"slow_multiplier":0.5,"attack_speed_multiplier":0.5,"displacement":false,"interruptible":true,"stagger_multiplier":1.0})
+
+static func apply_control(unit:Dictionary,control_type:String,duration:float,magnitude:float=0.0)->Dictionary:
+	var profile:=default_control_profile(unit);var multiplier:=float(profile.get("%s_multiplier"%control_type,profile.get("slow_multiplier",1.0)))
+	if control_type=="displacement" and not bool(profile.get("displacement",true)):return {"applied":false,"duration":0.0,"magnitude":0.0}
+	var resolved_duration:=maxf(0.0,duration*multiplier);var resolved_magnitude:=magnitude*multiplier
+	if resolved_duration<=0.0:return {"applied":false,"duration":0.0,"magnitude":0.0}
+	if not unit.get("active_effects") is Array:unit["active_effects"]=[]
+	unit.active_effects=apply_named_effect(unit.active_effects,{"id":"control_%s"%control_type,"control_type":control_type,"amount":resolved_magnitude,"remaining_duration":resolved_duration})
+	return {"applied":true,"duration":resolved_duration,"magnitude":resolved_magnitude}
+
+static func control_amount(unit:Dictionary,control_type:String)->float:
+	var strongest:=0.0
+	for effect in unit.get("active_effects",[]):
+		if str(effect.get("control_type",""))==control_type and float(effect.get("remaining_duration",0.0))>0.0:strongest=maxf(strongest,float(effect.get("amount",0.0)))
+	return strongest
+
+static func is_stunned(unit:Dictionary)->bool:
+	return unit.get("active_effects",[]).any(func(effect):return str(effect.get("control_type","")) in ["stun","stagger"] and float(effect.get("remaining_duration",0.0))>0.0)
 
 static func resolve_healing(source:Dictionary,target:Dictionary,request:Dictionary,rng_roll:float=-1.0)->Dictionary:
 	var source_action:String=str(request.get("source_action","basic_ability"));var amount:float=maxf(0.0,float(request.get("amount",calculate_power_scaled_amount(source,float(request.get("power_coefficient",0.0))))))

@@ -32,8 +32,9 @@ static func tier_definition(class_definition:Dictionary,tier_id:String)->Diction
 	for definition in class_definition.get("talent_tier_definitions",[]):
 		if str(definition.get("tier_id",""))==tier_id:
 			var resolved:Dictionary=definition.duplicate(true)
-			if tier_id=="tier_3":resolved["option_ids"]=class_definition.get("heroic_option_ids",[]).duplicate()
+			if tier_id=="tier_3" and resolved.get("option_ids",[]).is_empty():resolved["option_ids"]=class_definition.get("heroic_option_ids",[]).duplicate()
 			elif tier_id=="tier_7":
+				if not resolved.get("option_ids",[]).is_empty():return resolved
 				var options:Array=[];var requirements:Dictionary={}
 				for heroic_id in class_definition.get("heroic_option_ids",[]):
 					var upgrade_id:="%s_upgrade"%str(heroic_id);options.append(upgrade_id);requirements[upgrade_id]=heroic_id

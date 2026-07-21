@@ -42,7 +42,7 @@ const ENCOUNTERS := {
 		"objective":{"type":"elimination","label":"Defeat every attacker"},
 		"waves":[["Raider","Raider","Swift","Raider"],["Raider","Archer","Raider"],["Raider","Stalker","Swift","Raider"],["Brute","Brute"]],
 		"enemy_health_multiplier":0.30,
-		"enemy_health_overrides":{"Swift":20.0,"Stalker":10.0,"Raider":50.0,"Archer":50.0,"Brute":100.0},
+		"enemy_health_overrides":{"Swift":176.0,"Stalker":88.0,"Raider":440.0,"Archer":440.0,"Brute":880.0},
 		"spawn_all_sides":true,
 		"spawn_interval":1.65,
 		"first_rewards":{"gold":10,"xp":20,"loot":[]},"repeat_rewards":{"gold":5,"xp":8,"loot_table":"early"},

@@ -50,3 +50,12 @@ static func apply_nudge(target_position:Vector2,source_position:Vector2,distance
 	var direction:=source_position.direction_to(target_position)
 	if direction==Vector2.ZERO:direction=Vector2.RIGHT
 	return move_toward_safe(target_position,target_position+direction*distance,distance,radius,blockers)
+
+static func segment_distance_to_point(from:Vector2,to:Vector2,point:Vector2)->float:
+	var segment:=to-from
+	if segment.length_squared()<=0.0001:return from.distance_to(point)
+	var factor:=clampf((point-from).dot(segment)/segment.length_squared(),0.0,1.0)
+	return (from+segment*factor).distance_to(point)
+
+static func segment_hits_circle(from:Vector2,to:Vector2,center:Vector2,radius:float)->bool:
+	return segment_distance_to_point(from,to,center)<=radius

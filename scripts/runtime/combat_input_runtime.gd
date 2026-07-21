@@ -46,6 +46,7 @@ func begin_ability(slot:int,device:String="pc")->void:
 	var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
 	if not TalentSystem.ability_is_unlocked(hero_level,slot):flash("This ability unlocks at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]));return
 	var category=ABILITY_TARGETING[heroes[selected]["class"]][slot]
+	if heroes[selected]["class"]=="Guardian" and slot==3 and guardian_heroic_id(heroes[selected])=="guardian_l15_r2":category="enemy"
 	var mode="instant" if category=="self" else str(state.casting_settings[device].get(category,"cursor"))
 	if mode=="instant" or mode=="cursor" or mode=="facing" or mode=="target":
 		if (category=="enemy" and combat_enemy_target()<0) or (category=="ally" and (heroes[selected].heal_target<0 or heroes[selected].heal_target>=heroes.size())):
@@ -174,6 +175,20 @@ func _unhandled_input(event:InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
 		if event.keycode==KEY_ESCAPE and ability_aiming:cancel_ability_aim();get_viewport().set_input_as_handled();return
 		if event.keycode==KEY_F3 and testing_zone_active:debug_combat_overlay=not debug_combat_overlay;queue_redraw();return
+		if event.keycode==KEY_F4 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Guardian":GuardianSystem.add_quest(hero,45,"testing_control",battle_time);flash("Guardian quest +45")
+			return
+		if event.keycode==KEY_F5 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Guardian":hero.selected_heroic_id="guardian_l15_r2" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l15_r1";hero.selected_talents["tier_3"]=hero.selected_heroic_id;flash("Heroic: %s"%GuardianData.WORKING_NAMES[hero.selected_heroic_id])
+			return
+		if event.keycode==KEY_F6 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Guardian":hero.selected_talents={"tier_1":"guardian_l9_1","tier_2":"guardian_l12_2","tier_3":guardian_heroic_id(hero),"tier_4":"guardian_l18_2","tier_5":"guardian_l21_2","tier_6":"guardian_l24_1","tier_7":"guardian_l27_r1" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l27_r2","tier_8":"guardian_l30_1"};hero.guardian_runtime.ability_charges=GuardianSystem.default_charges(hero);flash("Guardian test talents loaded")
+			return
+		if event.keycode==KEY_F7 and testing_zone_active and selected<heroes.size() and str(heroes[selected].get("class",""))=="Guardian":use_guardian_active(heroes[selected],"guardian_l24_2");return
+		if event.keycode==KEY_F8 and testing_zone_active and selected<heroes.size() and str(heroes[selected].get("class",""))=="Guardian":use_guardian_active(heroes[selected],"guardian_l30_3");return
 		if event.keycode==KEY_SPACE:paused=!paused;queue_redraw()
 		if event.keycode==KEY_TAB and not event.echo:
 			cycle_selected_enemy()
