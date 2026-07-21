@@ -3,6 +3,7 @@ extends "res://scripts/runtime/app_core.gd"
 const AbilityKeyBadge = preload("res://scripts/ui/ability_key_badge.gd")
 const GuardianAbilityPresenter = preload("res://scripts/data/guardian_ability_presenter.gd")
 const ClericAbilityPresenter = preload("res://scripts/data/cleric_ability_presenter.gd")
+const RangerAbilityPresenter = preload("res://scripts/data/ranger_ability_presenter.gd")
 const TalentTierView = preload("res://scripts/ui/talent_tier_view.gd")
 const EquipmentSlotSilhouette = preload("res://scripts/ui/equipment_slot_silhouette.gd")
 
@@ -38,6 +39,10 @@ func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:Str
 		var presenter_hero:=hero.duplicate(true);presenter_hero["power"]=float(hero_final_stats(hero).power)
 		if not presenter_hero.has("cleric_runtime"):ClericSystem.initialize_runtime(presenter_hero,false)
 		details=ClericAbilityPresenter.details(presenter_hero,action_key,heroic_id)
+	elif str(hero.get("class",""))=="Ranger":
+		var presenter_hero:=hero.duplicate(true);presenter_hero["ranger_runtime"]=hero.get("ranger_runtime",{})
+		if presenter_hero.ranger_runtime.is_empty():RangerSystem.initialize_runtime(presenter_hero,is_testing_save())
+		details=RangerAbilityPresenter.details(presenter_hero,action_key,heroic_id)
 	else:
 		var action_keys:Array=["Q","W","E","R"];var slot:=action_keys.find(action_key)
 		details={"key":action_key,"title":str(TRAITS[hero["class"]]) if action_key=="D" else str(ABILITIES[hero["class"]][slot]),"meta":"Passive Trait" if action_key=="D" else "Ability","description":"Passive Trait" if action_key=="D" else ability_tooltip(hero["class"],slot),"sections":[],"note":""}
@@ -65,11 +70,13 @@ func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:Str
 
 func guardian_talent_name(talent_id:String)->String:
 	if talent_id.begins_with("cleric_"):return str(ClericData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
+	if talent_id.begins_with("ranger_"):return str(RangerData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 	return str(GuardianData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 
 func roster_talent_description(hero_class:String,option_id:String)->String:
 	if hero_class=="Guardian":return str(GuardianData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
 	if hero_class=="Cleric":return str(ClericData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
+	if hero_class=="Ranger":return str(RangerData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
 	return "Talent details are still being developed."
 
 func remember_roster_scroll()->void:
@@ -596,8 +603,8 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 				content.add_child(make_roster_ability_row(action_key,str(ABILITIES[hero["class"]][slot]),description,class_color,locked,func(key=action_key):open_roster_ability_details(hero,key)))
 			var selected_heroic_id:=str(hero.get("selected_heroic_id",""));var heroic_unlocked:=TalentSystem.ability_is_unlocked(int(hero.get("level",1)),3)
 			if heroic_unlocked and selected_heroic_id!="":
-				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"] in ["Guardian","Cleric"] else str(ABILITIES[hero["class"]][3])
-				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else str(ClericData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Cleric" else ability_tooltip(hero["class"],3)
+				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"] in ["Guardian","Cleric","Ranger"] else str(ABILITIES[hero["class"]][3])
+				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else str(ClericData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Cleric" else str(RangerData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Ranger" else ability_tooltip(hero["class"],3)
 				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color,false,func(heroic=selected_heroic_id):open_roster_ability_details(hero,"R",heroic)))
 			else:
 				content.add_child(make_roster_ability_row("R","Heroic Ability","Choose your Heroic at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[3]),class_color,true))

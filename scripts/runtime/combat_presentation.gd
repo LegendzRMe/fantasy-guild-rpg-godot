@@ -230,8 +230,13 @@ func _draw() -> void:
 				if slot==3 and active["class"]=="Cleric":action_name=str(ClericData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_2"):action_name="Safety Sprint"
 				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_3"):action_name="Let's Go!"
+				elif slot==3 and active["class"]=="Ranger":action_name=str(RangerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+				elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
 				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3);draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
+				if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
+					var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
+					draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[charge_state.charges,charge_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 			if active["class"]=="Guardian" and not active.get("guardian_runtime",{}).is_empty():
 				var status_parts:Array=[]
 				if GuardianSystem.has_talent(active,"guardian_l24_3"):status_parts.append("PRESENCE READY" if battle_time>=float(active.guardian_runtime.imposing_ready_at) else "PRESENCE %.0fs"%(float(active.guardian_runtime.imposing_ready_at)-battle_time))
@@ -241,6 +246,8 @@ func _draw() -> void:
 			elif active["class"]=="Cleric" and not active.get("cleric_runtime",{}).is_empty() and testing_zone_active:
 				var cleric_status:="FAST FEET  Q/E %.2fx  W %.2fx"%[ClericSystem.qwe_cooldown_rate(active),ClericSystem.w_cooldown_rate(active)] if ClericSystem.fast_feet_active(active) else "FAST FEET READY"
 				draw_string(ThemeDB.fallback_font,Vector2(450,620),cleric_status,HORIZONTAL_ALIGNMENT_CENTER,390,11,C_MUTED)
+			elif active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty():
+				draw_string(ThemeDB.fallback_font,Vector2(450,620),"HATRED  %d / %d"%[int(active.ranger_runtime.hatred),int(RangerData.VALUES.hatred_max)],HORIZONTAL_ALIGNMENT_CENTER,390,11,C_GOLD)
 		draw_string(ThemeDB.fallback_font,Vector2(1080,50),"●  %d"%state.gold,HORIZONTAL_ALIGNMENT_RIGHT,115,20,C_GOLD);draw_circle(Vector2(1235,42),25,Color(0.08,.11,.16,.9)); draw_string(ThemeDB.fallback_font,Vector2(1222,50),"Ⅱ",HORIZONTAL_ALIGNMENT_LEFT,-1,22,C_TEXT)
 
 	if tutorial_active and tutorial_step==4:

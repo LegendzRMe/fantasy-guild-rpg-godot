@@ -534,7 +534,9 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,int(item_cleric.q_charges)==1 and item_cleric.q_charge_timers.size()==1,"Casting E should restore one missing Twin Incantation Q charge.")
 	main.update_item_runtime(item_cleric,8.1);item_cleric.ability_cds[1]=0.0;main.use_ability(1,item_cleric.pos)
 	TestSupport.check(errors,item_cleric.pending_repeats.size()==1 and not item_cleric.borrowed_time_armed,"Borrowed Time should arm after eight seconds and schedule one non-recursive repeat.")
-	item_dummy.hp=item_dummy.max_hp;item_rogue.thousand_cuts_count=0
+	# Ranger V1 deals substantially more Basic Attack damage than the old placeholder;
+	# keep this item-proc fixture alive through all three attacks.
+	item_dummy.max_hp=maxf(float(item_dummy.max_hp),5000.0);item_dummy.hp=item_dummy.max_hp;item_rogue.thousand_cuts_count=0
 	var hp_before_three:float=item_dummy.hp
 	main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_one");main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_two")
 	var hp_before_third:float=item_dummy.hp;main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_three")

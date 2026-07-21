@@ -22,6 +22,10 @@ const GuardianData = preload("res://scripts/data/guardian_data.gd")
 const GuardianSystem = preload("res://scripts/systems/guardian_system.gd")
 const ClericData = preload("res://scripts/data/cleric_data.gd")
 const ClericSystem = preload("res://scripts/systems/cleric_system.gd")
+const RangerData = preload("res://scripts/data/ranger_data.gd")
+const RangerSystem = preload("res://scripts/systems/ranger_system.gd")
+const AbilitySlotSystem = preload("res://scripts/systems/ability_slot_system.gd")
+const PercentageHealthDamageSystem = preload("res://scripts/systems/percentage_health_damage_system.gd")
 const ASHWOOD_COMBAT_BACKGROUND = preload("res://assets/generated/ashwood_combat_background.png")
 
 const W := 1280.0
@@ -199,7 +203,7 @@ func start_team_drag(idx:int, origin:String) -> void:
 	team_drag_index = idx
 	team_drag_origin = origin
 	var preview_size:=Vector2(58,48) if screen=="roster" else Vector2(180,100) if origin=="active" else Vector2(150,74)
-	team_drag_preview=Button.new(); team_drag_preview.text=role_glyph(str(state.heroes[idx].get("class",""))) if screen=="roster" else team_card_text(idx);team_drag_preview.add_theme_font_size_override("font_size",22 if screen=="roster" else 14);team_drag_preview.size=preview_size; team_drag_preview.mouse_filter=Control.MOUSE_FILTER_IGNORE; team_drag_preview.modulate=Color(1,1,1,.82); team_drag_preview.position=get_viewport().get_mouse_position()-preview_size*.5; ui.add_child(team_drag_preview)
+	team_drag_preview=Button.new(); team_drag_preview.text=role_glyph(str(state.heroes[idx].get("class",""))) if screen=="roster" else team_card_text(idx);team_drag_preview.add_theme_font_size_override("font_size",18 if screen=="roster" else 14);team_drag_preview.size=preview_size; team_drag_preview.mouse_filter=Control.MOUSE_FILTER_IGNORE; team_drag_preview.modulate=Color(1,1,1,.82); team_drag_preview.position=get_viewport().get_mouse_position()-preview_size*.5; ui.add_child(team_drag_preview);team_drag_preview.size=preview_size
 	queue_redraw()
 
 func _input(event:InputEvent) -> void:

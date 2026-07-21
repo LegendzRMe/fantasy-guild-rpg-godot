@@ -65,6 +65,10 @@ func begin_trait()->void:
 	elif str(hero.get("class",""))=="Cleric":
 		if not use_cleric_trait(hero):flash("Fast Feet talent action is unavailable or not ready.")
 		queue_redraw()
+	elif str(hero.get("class",""))=="Ranger" and RangerSystem.has_talent(hero,"ranger_l21_3"):
+		if float(hero.ranger_runtime.strafe_remaining)>0.0:flash("Gloom is unavailable during Strafe.");return
+		if not RangerSystem.activate_gloom(hero):flash("Gloom is not ready.")
+		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
