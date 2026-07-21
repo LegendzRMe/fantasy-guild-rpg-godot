@@ -64,7 +64,7 @@ static func run()->Array:
 
 	var focus:=ItemData.create_instance("cinderlight_focus","focus_test")
 	var cleric_focus_stats:=CombatSystem.calculate_final_stats(GameData.CLASSES.Cleric,1,[focus])
-	TestSupport.check(errors,cleric_focus_stats.power==11.0 and cleric_focus_stats.basic_action_type=="heal" and cleric_focus_stats.basic_action_amount==22.0 and cleric_focus_stats.basic_heal_amount==22.0 and is_equal_approx(cleric_focus_stats.critical_chance,0.13),"Power should scale a Cleric's canonical Basic Heal while Critical Chance resolves independently.")
+	TestSupport.check(errors,cleric_focus_stats.power==63.0 and cleric_focus_stats.basic_action_type=="heal" and cleric_focus_stats.basic_action_amount==63.0 and cleric_focus_stats.basic_heal_amount==63.0 and is_equal_approx(cleric_focus_stats.critical_chance,0.13),"Power should scale a Cleric's canonical Basic Heal while Critical Chance resolves independently.")
 	TestSupport.check(errors,ItemData.can_equip(bulwark,GameData.CLASSES.Guardian,"Guardian") and not ItemData.can_equip(bulwark,GameData.CLASSES.Cleric,"Cleric"),"Armor equipment should enforce armor-family requirements.")
 	TestSupport.check(errors,ItemData.can_equip(focus,GameData.CLASSES.Cleric,"Cleric") and ItemData.can_equip(focus,GameData.CLASSES.Mage,"Mage") and not ItemData.can_equip(ashfang,GameData.CLASSES.Mage,"Mage"),"Weapons should enforce each class's declared proficiency list.")
 	TestSupport.check(errors,ItemData.can_equip(stormbreaker,GameData.CLASSES.Guardian,"Guardian"),"Stormbreaker should keep its explicit Guardian testing compatibility.")

@@ -12,6 +12,8 @@ Player heroes use `IDLE`, `MOVE`, `ATTACK`, `HEAL`, `CAST`, `CHANNEL`, and `INCA
 
 Idle self-defense only looks inside `IDLE_MELEE_DEFENSE_RADIUS`. It never chases outside that radius and never casts an ability. Clerics do not automatically select a wounded ally; a player-assigned ally remains selected at full Health and produces only overhealing until Health is missing.
 
+Blind is evaluated only when a Basic Attack releases. Melee attacks miss immediately; ranged attacks retain a release-time `will_miss` decision through projectile travel. Blind never affects Basic Heals or abilities, and a miss emits completion telemetry without damage, threat, nudge, Block consumption, or on-hit processing. Boss Blind immunity and duration changes are data-driven through shared control profiles. See `docs/blind_and_boss_blind_v1.md`.
+
 ## Geometry and projectiles
 
 Rectangular blockers independently flag movement, line of sight, and projectiles. An established assignment is cancelled when sight is broken. A newly issued blocked assignment probes nearby positions for a reachable range-and-sight angle, then fails cleanly after the path timeout. Straight physical projectiles remain in world space and test every travelled segment, so a newly created wall can block an arrow already in flight. Destructible blockers receive configured obstacle damage.

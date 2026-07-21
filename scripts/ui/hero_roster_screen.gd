@@ -2,6 +2,7 @@ extends "res://scripts/runtime/app_core.gd"
 
 const AbilityKeyBadge = preload("res://scripts/ui/ability_key_badge.gd")
 const GuardianAbilityPresenter = preload("res://scripts/data/guardian_ability_presenter.gd")
+const ClericAbilityPresenter = preload("res://scripts/data/cleric_ability_presenter.gd")
 const TalentTierView = preload("res://scripts/ui/talent_tier_view.gd")
 
 func make_roster_ability_row(key_text:String,title:String,description:String,accent:Color,locked:bool=false,details_action:Callable=Callable())->PanelContainer:
@@ -23,6 +24,10 @@ func close_roster_ability_details(overlay:Control)->void:
 func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:String="")->void:
 	var details:Dictionary
 	if str(hero.get("class",""))=="Guardian":details=GuardianAbilityPresenter.details(hero,action_key,heroic_id,float(hero_final_stats(hero).power))
+	elif str(hero.get("class",""))=="Cleric":
+		var presenter_hero:=hero.duplicate(true);presenter_hero["power"]=float(hero_final_stats(hero).power)
+		if not presenter_hero.has("cleric_runtime"):ClericSystem.initialize_runtime(presenter_hero,false)
+		details=ClericAbilityPresenter.details(presenter_hero,action_key,heroic_id)
 	else:
 		var action_keys:Array=["Q","W","E","R"];var slot:=action_keys.find(action_key)
 		details={"key":action_key,"title":str(TRAITS[hero["class"]]) if action_key=="D" else str(ABILITIES[hero["class"]][slot]),"meta":"Passive Trait" if action_key=="D" else "Ability","description":"Passive Trait" if action_key=="D" else ability_tooltip(hero["class"],slot),"sections":[],"note":""}
@@ -48,10 +53,12 @@ func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:Str
 		var note:=label(str(details.note),12,C_MUTED);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
 
 func guardian_talent_name(talent_id:String)->String:
+	if talent_id.begins_with("cleric_"):return str(ClericData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 	return str(GuardianData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 
 func roster_talent_description(hero_class:String,option_id:String)->String:
 	if hero_class=="Guardian":return str(GuardianData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
+	if hero_class=="Cleric":return str(ClericData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
 	return "Talent details are still being developed."
 
 func choose_or_plan_roster_talent(tier_id:String,option_id:String)->void:
@@ -74,7 +81,7 @@ func make_roster_talent_tier(hero:Dictionary,class_definition:Dictionary,class_i
 		var option_id:=str(raw_option_id);var available:=true;var unavailable_reason:=""
 		if hero_level>=required_level:
 			var validation:=TalentSystem.validate_selection(hero,class_definition,tier_id,option_id);available=bool(validation.valid) or option_id==selected_id;unavailable_reason=str(validation.reason)
-		options.append({"id":option_id,"display_name":guardian_talent_name(option_id) if str(hero.get("class",""))=="Guardian" else option_id.replace("_"," ").capitalize(),"description":roster_talent_description(str(hero.get("class","")),option_id),"selected":option_id==selected_id,"planned":option_id==planned_id,"available":available,"unavailable_reason":unavailable_reason,"class_name":str(hero.get("class","Hero"))})
+		options.append({"id":option_id,"display_name":guardian_talent_name(option_id) if str(hero.get("class","")) in ["Guardian","Cleric"] else option_id.replace("_"," ").capitalize(),"description":roster_talent_description(str(hero.get("class","")),option_id),"selected":option_id==selected_id,"planned":option_id==planned_id,"available":available,"unavailable_reason":unavailable_reason,"class_name":str(hero.get("class","Hero"))})
 	var view:=TalentTierView.new();view.configure(tier_id,tier_number,required_level,str(tier_definition.get("kind","talent")),hero_level,revealed,options,CLASSES[hero["class"]].color,C_TEXT,C_MUTED,C_GOLD);view.option_pressed.connect(choose_or_plan_roster_talent);return view
 
 func make_roster_card(idx:int) -> Button:
@@ -430,8 +437,8 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 				content.add_child(make_roster_ability_row(action_key,str(ABILITIES[hero["class"]][slot]),description,class_color,locked,func(key=action_key):open_roster_ability_details(hero,key)))
 			var selected_heroic_id:=str(hero.get("selected_heroic_id",""));var heroic_unlocked:=TalentSystem.ability_is_unlocked(int(hero.get("level",1)),3)
 			if heroic_unlocked and selected_heroic_id!="":
-				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"]=="Guardian" else str(ABILITIES[hero["class"]][3])
-				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else ability_tooltip(hero["class"],3)
+				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"] in ["Guardian","Cleric"] else str(ABILITIES[hero["class"]][3])
+				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else str(ClericData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Cleric" else ability_tooltip(hero["class"],3)
 				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color,false,func(heroic=selected_heroic_id):open_roster_ability_details(hero,"R",heroic)))
 			else:
 				content.add_child(make_roster_ability_row("R","Heroic Ability","Choose your Heroic at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[3]),class_color,true))

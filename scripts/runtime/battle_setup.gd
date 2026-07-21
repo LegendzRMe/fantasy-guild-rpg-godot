@@ -26,6 +26,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		heroes[-1]["selected_heroic_id"]=str(data.get("selected_heroic_id",""))
 		heroes[-1]["combat_radius"]=42.0
 		if str(heroes[-1].get("class",""))=="Guardian":GuardianSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Cleric":ClericSystem.initialize_runtime(heroes[-1],is_testing_save())
 	queue_redraw()
 
 func start_testing_zone() -> void:
@@ -38,6 +39,7 @@ func start_testing_zone() -> void:
 	testing_zone_active=true
 	for hero in heroes:
 		if str(hero.get("class",""))=="Guardian":hero.guardian_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Cleric":hero.cleric_runtime.telemetry_enabled=true
 	testing_dummy_attacks_enabled=true
 	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
 	spawn_enemy(Vector2(650,120),"Dummy");enemies[-1]["passive_test_enemy"]=true
@@ -45,6 +47,7 @@ func start_testing_zone() -> void:
 	spawn_enemy(Vector2(720,525),"Archer")
 	spawn_enemy(Vector2(665,555),"Dummy")
 	spawn_enemy(Vector2(1050,170),"Boss");enemies[-1]["passive_test_enemy"]=true
+	spawn_enemy(Vector2(1080,505),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["control_profile"]={"blind_immune":false,"blind_duration_multiplier":0.5,"slow_multiplier":0.5,"stun_multiplier":0.25,"displacement":false}
 	spawn_enemy(Vector2(880,330),"Defense Dummy")
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:pillar",Rect2(570,250,74,145)))
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:wall",Rect2(760,210,38,165),{"destructible":true,"current_health":240.0,"maximum_health":240.0}))
@@ -52,6 +55,7 @@ func start_testing_zone() -> void:
 		if enemy.type in ["Dummy","Defense Dummy"]:enemy.hp=5000.0 if enemy.type=="Defense Dummy" else 2500.0;enemy.max_hp=enemy.hp
 		enemy.rewarded=true;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0
 	if heroes.size()>1:heroes[0].hp*=0.55
+	if heroes.size()>2:heroes[2].hp*=0.75
 	queue_redraw()
 
 func toggle_testing_dummy_attacks() -> void:

@@ -175,7 +175,7 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.screen=="combat" and main.current_ashwood_encounter=="first_battle","Selecting Encounter 1 should skip previews and immediately begin combat.")
 	TestSupport.check(errors,main.heroes.size()==2 and main.heroes.map(func(hero):return hero["class"])==["Guardian","Cleric"],"Encounter 1 should deploy both founding heroes.")
 	TestSupport.check(errors,main.heroes[0].pos==Vector2(210,320) and main.heroes[1].pos==Vector2(145,215) and main.battle_formation_position(2)==Vector2(145,425) and main.battle_formation_position(3)==Vector2(90,320),"Combat should deploy ordered party slots as front, top, bottom, and back points of a diamond.")
-	TestSupport.check(errors,main.heroes[0].max_hp==2765.0 and main.heroes[1].max_hp==150.0,"Level-one heroes should begin at class base health without receiving the level-two health bonus early.")
+	TestSupport.check(errors,main.heroes[0].max_hp==2765.0 and main.heroes[1].max_hp==1500.0,"Level-one heroes should begin at class base health without receiving the level-two health bonus early.")
 	TestSupport.check(errors,main.objective_banner_time>0 and main.objective_combat_intro!="","Encounter 1 should briefly combine its story line and objective in the combat banner.")
 	main.spawn_enemy(Vector2(1050,250),"Swift")
 	main.spawn_enemy(Vector2(1050,420),"Stalker")
@@ -438,7 +438,7 @@ static func run(main:Node) -> Array:
 	main.state.selected_team=[0,1,4,2];main.state.active_team=[0,1,4,2]
 	main.state.heroes[1].level=6
 	main.start_testing_zone()
-	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==6 and main.enemies.any(func(enemy):return bool(enemy.get("boss",false))),"The testing range should retain its dummy layout and add a Boss-control target without waves.")
+	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==7 and main.enemies.filter(func(enemy):return bool(enemy.get("boss",false))).size()==2 and main.enemies.any(func(enemy):return float(enemy.get("control_profile",{}).get("blind_duration_multiplier",0.0))==0.5),"The testing range should retain its dummy layout and include default-immune and partially Blind-vulnerable Boss targets without waves.")
 	var input_guardian:Dictionary=main.heroes[0];main.selected=0;input_guardian.selected_talents={"tier_6":"guardian_l24_2"};input_guardian.ability_cds[4]=0.0;main.begin_trait()
 	TestSupport.check(errors,input_guardian.guardian_runtime.stoneform_remaining==10.0 and input_guardian.ability_cds[4]==60.0,"The existing D Trait input should activate Stoneform and expose its cooldown without another action slot.")
 	input_guardian.guardian_runtime.stoneform_remaining=0.0

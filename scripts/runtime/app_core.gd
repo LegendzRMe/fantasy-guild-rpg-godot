@@ -20,6 +20,8 @@ const CombatGeometry = preload("res://scripts/combat/combat_geometry.gd")
 const CombatProjectile = preload("res://scripts/combat/combat_projectile.gd")
 const GuardianData = preload("res://scripts/data/guardian_data.gd")
 const GuardianSystem = preload("res://scripts/systems/guardian_system.gd")
+const ClericData = preload("res://scripts/data/cleric_data.gd")
+const ClericSystem = preload("res://scripts/systems/cleric_system.gd")
 const ASHWOOD_COMBAT_BACKGROUND = preload("res://assets/generated/ashwood_combat_background.png")
 
 const W := 1280.0

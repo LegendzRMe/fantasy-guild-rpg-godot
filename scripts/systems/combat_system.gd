@@ -1,5 +1,7 @@
 extends RefCounted
 
+const StatusEffectSystem = preload("res://scripts/systems/status_effect_system.gd")
+
 const LEVEL_CAP := 30
 const DEFAULT_HEALTH_GROWTH := 0.03
 const DEFAULT_POWER_GROWTH := 0.03
@@ -13,8 +15,8 @@ const NEARBY_AGGRO_MULTIPLIER := 1.10
 const DISTANT_AGGRO_MULTIPLIER := 1.30
 const AGGRO_DISTANCE_THRESHOLD := 180.0
 
-const ACTION_SOURCES := ["basic_attack","basic_heal","basic_ability","heroic","periodic","summon"]
-const ACTION_TAGS := ["basic_action","basic_attack","basic_heal","basic_ability","heroic","direct","periodic","summon"]
+const ACTION_SOURCES := ["basic_attack","basic_heal","basic_ability","heroic","trait","periodic","summon"]
+const ACTION_TAGS := ["basic_action","basic_attack","basic_heal","basic_ability","heroic","trait","direct","periodic","summon"]
 const DAMAGE_TYPES := ["physical","magical","true"]
 const RESULT_CATEGORIES := ["damage","healing","shield","buff","debuff"]
 
@@ -155,17 +157,22 @@ static func resolve_damage(source:Dictionary,target:Dictionary,request:Dictionar
 	return {"amount":mitigated_amount,"raw_amount":amount,"resolved_damage":resolved_damage,"health_damage":health_damage,"shield_damage":shield_damage,"shield_absorptions":shield_absorptions,"overkill":maxf(0.0,mitigated_amount-resolved_damage),"critical":critical,"critical_multiplier":critical_multiplier,"damage_type":damage_type,"source_action":source_action,"result_category":"damage","armor":resolved_armor,"armor_reduction":reduction,"armor_prevented":maxf(0.0,amount-mitigated_amount),"defeated":health_damage>0.0 and float(target.get("hp",0.0))<=0.0}
 
 static func default_control_profile(unit:Dictionary)->Dictionary:
-	if not bool(unit.get("boss",false)):return {"stun_multiplier":1.0,"slow_multiplier":1.0,"attack_speed_multiplier":1.0,"displacement":true,"interruptible":true,"stagger_multiplier":1.0}
-	return unit.get("control_profile",{"stun_multiplier":0.25,"slow_multiplier":0.5,"attack_speed_multiplier":0.5,"displacement":false,"interruptible":true,"stagger_multiplier":1.0})
+	return StatusEffectSystem.control_profile(unit)
 
 static func apply_control(unit:Dictionary,control_type:String,duration:float,magnitude:float=0.0)->Dictionary:
-	var profile:=default_control_profile(unit);var multiplier:=float(profile.get("%s_multiplier"%control_type,profile.get("slow_multiplier",1.0)))
-	if control_type=="displacement" and not bool(profile.get("displacement",true)):return {"applied":false,"duration":0.0,"magnitude":0.0}
-	var resolved_duration:=maxf(0.0,duration*multiplier);var resolved_magnitude:=magnitude*multiplier
-	if resolved_duration<=0.0:return {"applied":false,"duration":0.0,"magnitude":0.0}
-	if not unit.get("active_effects") is Array:unit["active_effects"]=[]
-	unit.active_effects=apply_named_effect(unit.active_effects,{"id":"control_%s"%control_type,"control_type":control_type,"amount":resolved_magnitude,"remaining_duration":resolved_duration})
-	return {"applied":true,"duration":resolved_duration,"magnitude":resolved_magnitude}
+	return StatusEffectSystem.apply_control(unit,control_type,duration,magnitude)
+
+static func apply_blind(unit:Dictionary,duration:float)->Dictionary:
+	return StatusEffectSystem.apply_blind(unit,duration)
+
+static func is_blinded(unit:Dictionary)->bool:
+	return StatusEffectSystem.is_blinded(unit)
+
+static func apply_unstoppable(unit:Dictionary,duration:float)->Dictionary:
+	return StatusEffectSystem.apply_unstoppable(unit,duration)
+
+static func is_unstoppable(unit:Dictionary)->bool:
+	return StatusEffectSystem.is_unstoppable(unit)
 
 static func control_amount(unit:Dictionary,control_type:String)->float:
 	var strongest:=0.0
@@ -225,6 +232,14 @@ static func event_bundle_for_healing(source:Dictionary,target:Dictionary,result:
 	if bool(result.get("critical",false)):events.append(create_event("critical_result",source,target,result,context))
 	return events
 
+static func event_bundle_for_basic_action_miss(source:Dictionary,target:Dictionary,context:Dictionary={})->Array:
+	var result:={"amount":0.0,"resolved_damage":0.0,"critical":false,"source_action":"basic_attack","result_category":"damage","damage_type":str(context.get("damage_type","physical"))}
+	return [
+		create_event("basic_action_missed",source,target,result,context),
+		create_event("blind_miss",source,target,result,context),
+		create_event("basic_action_completed",source,target,result,context)
+	]
+
 static func passive_matches(passive:Dictionary,event:Dictionary)->bool:
 	if str(passive.get("trigger",""))!=str(event.get("event_type","")):return false
 	if str(passive.get("id",""))=="last_dawn" and not bool(event.get("crossed_below_half",false)):return false
@@ -251,13 +266,7 @@ static func evaluate_passives(unit:Dictionary,event:Dictionary,equipped_items:Ar
 	return triggered
 
 static func apply_named_effect(active_effects:Array,effect:Dictionary)->Array:
-	var next:Array=active_effects.duplicate(true);var effect_id:String=str(effect.get("id",""))
-	for index in next.size():
-		if str(next[index].get("id",""))==effect_id:
-			if float(effect.get("amount",0.0))>=float(next[index].get("amount",0.0)):next[index]=effect.duplicate(true)
-			else:next[index]["remaining_duration"]=maxf(float(next[index].get("remaining_duration",0.0)),float(effect.get("remaining_duration",effect.get("duration",0.0))))
-			return next
-	next.append(effect.duplicate(true));return next
+	return StatusEffectSystem.strongest_refresh(active_effects,effect)
 
 static func damage_threat(result:Dictionary,threat_modifier:float=1.0)->float:
 	return maxf(0.0,float(result.get("resolved_damage",float(result.get("health_damage",0.0))+float(result.get("shield_damage",0.0)))))*DAMAGE_THREAT_RATIO*threat_modifier

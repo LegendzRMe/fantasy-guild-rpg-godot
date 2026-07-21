@@ -77,6 +77,7 @@ func apply_passive_trigger(owner:Dictionary,event:Dictionary,target:Dictionary)-
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var resolved_amount:=amount;var retribution_bonus:float=0.0
+	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and ClericSystem.has_talent(source,"cleric_l21_2") and CombatSystem.is_blinded(target):resolved_amount*=2.0
 	var guardian_basic_result:={}
 	if str(source.get("class",""))=="Guardian" and source_action=="basic_attack" and not source.get("guardian_runtime",{}).is_empty():
 		guardian_basic_result=GuardianSystem.on_basic_attack(source,target,battle_time);resolved_amount*=float(guardian_basic_result.damage_multiplier);resolved_amount+=amount*float(guardian_basic_result.bonus_damage_multiplier)
@@ -92,6 +93,9 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var armor_sources:Array=target.guardian_runtime.temporary_armor_sources.duplicate(true)
 		if damage_type=="physical" and source_action=="basic_attack" and int(target.guardian_runtime.block_charges)>0:armor_sources.append({"id":"dwarf_block","armor":GuardianData.VALUES.block_armor,"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
 		damage_request["armor_sources"]=armor_sources
+	elif str(target.get("class",""))=="Cleric" and not target.get("cleric_runtime",{}).is_empty():
+		var cleric_armor:=ClericSystem.active_armor(target)
+		if cleric_armor>0.0:damage_request["armor_sources"]=[{"id":"safety_sprint","armor":cleric_armor,"remaining":1.0}]
 	if can_crit_override!=null:damage_request["can_crit"]=bool(can_crit_override)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request)
 	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
@@ -104,6 +108,9 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 			if imposing_amount>0.0:CombatSystem.apply_control(source,"attack_speed",2.5,imposing_amount)
 		var after_ratio:float=float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))
 		GuardianSystem.try_hardened_shield(target,before_ratio,after_ratio,float(result.resolved_damage),battle_time)
+	if str(target.get("class",""))=="Cleric" and not target.get("cleric_runtime",{}).is_empty() and float(result.resolved_damage)>0.0:ClericSystem.note_hostile_damage(target,float(result.resolved_damage))
+	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and float(result.resolved_damage)>0.0:ClericSystem.reduce_mistweaver(source,1.0)
+	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and not source.get("cleric_runtime",{}).is_empty():ClericSystem.telemetry_add(source,"offensive_basic_attacks");if float(result.resolved_damage)>0.0:ClericSystem.telemetry_add(source,"offensive_basic_attack_hits")
 	if not guardian_basic_result.is_empty() and float(guardian_basic_result.stun)>0.0:CombatSystem.apply_control(target,"stun",float(guardian_basic_result.stun))
 	if testing_zone_active and "training" in target.get("combat_tags",[]) and float(result.get("resolved_damage",0.0))>0.0:target["seconds_since_damage"]=0.0
 	var crossed_below_half:bool=before_ratio>0.50 and float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))<0.50
@@ -131,7 +138,11 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	return result
 
 func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="")->Dictionary:
-	var result:=CombatSystem.resolve_healing(source,target,{"amount":amount,"source_action":source_action})
+	var incoming_multiplier:=1.0
+	for hero in heroes:
+		if str(hero.get("class",""))!="Cleric" or not ClericSystem.has_talent(hero,"cleric_l24_3"):continue
+		if hero.get("cleric_runtime",{}).get("serpents",[]).any(func(serpent):return str(serpent.get("host_id",""))==str(target.get("combat_id",""))):incoming_multiplier=maxf(incoming_multiplier,1.10)
+	var result:=CombatSystem.resolve_healing(source,target,{"amount":amount,"source_action":source_action,"incoming_multiplier":incoming_multiplier})
 	var context:={"source_action":source_action,"action_tags":[source_action,"healing"],"origin":origin,"originating_effect_id":originating_effect_id};var events:=CombatSystem.event_bundle_for_healing(source,target,result,context);combat_events.append_array(events)
 	for event in events:
 		if event.event_type=="overhealing_done" or float(event.get("effective_amount",0.0))>0.0 and event.event_type in ["direct_healing_done","periodic_healing_done","critical_result"]:apply_passive_trigger(source,event,target)
