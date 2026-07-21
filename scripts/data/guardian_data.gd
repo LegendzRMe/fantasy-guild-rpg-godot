@@ -2,6 +2,7 @@ extends RefCounted
 
 const CLASS_ID := "guardian"
 const SCALE_PER_LEVEL := 1.04
+const ACTION_KEYS := ["D","Q","W","E","R"]
 
 const IDS := {
 	"basic_attack":"guardian_basic_attack","trait":"guardian_trait","q":"guardian_q","w":"guardian_w","e":"guardian_e","r1":"guardian_r1","r2":"guardian_r2"
@@ -26,7 +27,9 @@ const VALUES := {
 	"haymaker_cooldown":40.0,"haymaker_damage":319.0,"haymaker_stagger":0.50,
 	"block_charges":3,"block_armor":75.0,"perfect_storm_icd":8.5,
 	"bronzebeard_damage":15.0,"stoneform_fraction":0.30,"stoneform_duration":10.0,
-	"hardened_shield_armor":75.0,"hardened_shield_duration":4.0,"capstone_cooldown":60.0
+	"stoneform_cooldown":60.0,"imposing_presence_cooldown":20.0,
+	"hardened_shield_armor":75.0,"hardened_shield_duration":4.0,"capstone_cooldown":60.0,
+	"rewind_window":8.0,"rewind_cooldown":60.0
 }
 
 const WORKING_NAMES := {
@@ -40,6 +43,13 @@ const WORKING_NAMES := {
 	"guardian_l24_1":"Dwarf Launch","guardian_l24_2":"Stoneform","guardian_l24_3":"Imposing Presence",
 	"guardian_l27_r1":"Unstoppable Force","guardian_l27_r2":"Grand Slam",
 	"guardian_l30_1":"Mountain King","guardian_l30_2":"Hardened Shield","guardian_l30_3":"Rewind"
+}
+
+const TALENT_DESCRIPTIONS := {
+	"guardian_l24_2":"Press D to heal for 30% maximum Health over 10 seconds. Second Wind pauses during Stoneform. Cooldown: 60 seconds.",
+	"guardian_l24_3":"Enemies that hit Guardian with Basic Actions have their Basic Action speed reduced by 20% for 2.5 seconds. Once every 20 seconds, this reduction is increased to 50%.",
+	"guardian_l30_2":"Falling below 30% maximum Health grants 75 Armor for 4 seconds. Hardened Shield can trigger only once every 60 seconds.",
+	"guardian_l30_3":"Casting Storm Bolt, Thunder Clap, and Dwarf Toss within 8 seconds resets the cooldowns of all three abilities. Rewind can trigger only once every 60 seconds."
 }
 
 const TALENT_TIERS := [

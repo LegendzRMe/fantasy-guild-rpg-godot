@@ -60,4 +60,29 @@ static func run()->Array:
 	var tier_three:=TalentSystem.tier_definition(definition,"tier_3");var tier_seven:=TalentSystem.tier_definition(definition,"tier_7");var tier_eight:=TalentSystem.tier_definition(definition,"tier_8")
 	TestSupport.check(errors,tier_three.option_ids==["guardian_l15_r1","guardian_l15_r2"] and tier_seven.heroic_requirements.guardian_l27_r1=="guardian_l15_r1","Guardian Heroic selection and matching upgrade eligibility should remain data-driven.")
 	TestSupport.check(errors,tier_eight.option_ids==["guardian_l30_1","guardian_l30_2","guardian_l30_3"],"Level 30 should offer Mountain King, Hardened Shield, and Rewind.")
+	TestSupport.check(errors,GuardianData.ACTION_KEYS==["D","Q","W","E","R"] and GuardianData.ACTION_KEYS.size()==5,"Guardian should expose only D, Q, W, E, and the selected R action inputs.")
+
+	var stoneform:=guardian();stoneform.selected_talents={"tier_6":"guardian_l24_2"};stoneform.hp=1000.0;stoneform.guardian_runtime.seconds_since_damage=8.0
+	TestSupport.check(errors,GuardianSystem.activate_stoneform(stoneform) and stoneform.ability_cds[4]==60.0 and stoneform.guardian_runtime.stoneform_remaining==10.0,"Stoneform should activate through Guardian Trait with a sixty-second cooldown.")
+	TestSupport.check(errors,GuardianSystem.update_timers(stoneform,1.0).second_wind_heal==0.0,"Stoneform should disable Second Wind only while active.")
+	GuardianSystem.update_timers(stoneform,9.0)
+	TestSupport.check(errors,GuardianSystem.update_timers(stoneform,0.1).second_wind_heal>0.0,"Second Wind should resume after Stoneform ends.")
+
+	var presence:=guardian();presence.selected_talents={"tier_6":"guardian_l24_3"}
+	var enhanced:=GuardianSystem.imposing_presence_amount(presence,0.0);var normal:=GuardianSystem.imposing_presence_amount(presence,1.0);var ready_again:=GuardianSystem.imposing_presence_amount(presence,20.0)
+	TestSupport.check(errors,enhanced==0.50 and normal==0.20 and ready_again==0.50,"Imposing Presence should automatically enhance one attacker every twenty seconds and otherwise apply twenty percent.")
+
+	var hardened:=guardian();hardened.selected_talents={"tier_8":"guardian_l30_2"}
+	TestSupport.check(errors,GuardianSystem.try_hardened_shield(hardened,0.40,0.29,100.0,5.0) and GuardianSystem.active_armor(hardened)==75.0,"Hardened Shield should activate after actual damage crosses below thirty percent and use 75 Armor.")
+	TestSupport.check(errors,not GuardianSystem.try_hardened_shield(hardened,0.40,0.20,100.0,20.0) and hardened.guardian_runtime.hardened_ready_at==65.0,"Hardened Shield should not trigger twice inside sixty seconds.")
+
+	var rewind:=guardian();rewind.selected_talents={"tier_8":"guardian_l30_3"};rewind.ability_cds=[10.0,8.0,10.0,40.0,60.0]
+	TestSupport.check(errors,not GuardianSystem.record_rewind_cast(rewind,"e",1.0) and not GuardianSystem.record_rewind_cast(rewind,"q",2.0) and GuardianSystem.rewind_sequence_count(rewind,2.0)==2,"Rewind should accept distinct Q/W/E casts in any order.")
+	GuardianSystem.record_rewind_cast(rewind,"q",3.0)
+	TestSupport.check(errors,GuardianSystem.rewind_sequence_count(rewind,3.0)==2,"Duplicate Rewind casts should not replace a missing ability.")
+	var triggered:=GuardianSystem.record_rewind_cast(rewind,"w",4.0)
+	TestSupport.check(errors,triggered and rewind.ability_cds.slice(0,3)==[0.0,0.0,0.0] and rewind.ability_cds[3]==40.0 and rewind.ability_cds[4]==60.0 and GuardianSystem.rewind_sequence_count(rewind,4.0)==0,"Rewind should reset only Q/W/E, clear its sequence, and leave Heroic and Trait cooldowns unchanged.")
+	TestSupport.check(errors,not GuardianSystem.record_rewind_cast(rewind,"q",5.0),"Rewind should not activate or build another sequence during its sixty-second cooldown.")
+	var expired:=guardian();expired.selected_talents={"tier_8":"guardian_l30_3"};GuardianSystem.record_rewind_cast(expired,"q",1.0);GuardianSystem.record_rewind_cast(expired,"w",10.0)
+	TestSupport.check(errors,GuardianSystem.rewind_sequence_count(expired,10.0)==1,"An expired eight-second Rewind sequence should clear and restart with the next qualifying cast.")
 	return errors

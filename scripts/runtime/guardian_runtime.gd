@@ -43,6 +43,7 @@ func cast_storm_bolt(hero:Dictionary,cast_position:Vector2)->bool:
 	hero.facing_direction=hero.pos.direction_to(destination)
 	var projectile:=CombatProjectile.create("guardian_bolt:%d"%next_projectile_combat_id,str(hero.combat_id),"",hero.pos,destination,float(GuardianData.VALUES.storm_bolt_projectile_speed),{"guardian":true,"amount":guardian_scaled(hero,"storm_bolt_damage"),"width":float(GuardianData.SPACE.storm_bolt_width)*(2.0 if bool(runtime.quest_mythic_reached) else 1.0),"remaining_hits":999 if bool(runtime.quest_mythic_reached) else 2 if bool(runtime.quest_first_reached) else 1,"hit_ids":[]})
 	next_projectile_combat_id+=1;combat_projectiles.append(projectile);hero.ability_cds[0]=float(GuardianData.VALUES.storm_bolt_cooldown);GuardianSystem.telemetry_add(hero,"storm_bolt_casts")
+	GuardianSystem.record_rewind_cast(hero,"q",battle_time)
 	CombatRulesV1.restore_preserved_command(hero,target_is_valid_for(hero,unit_by_combat_id(str(hero.get("preserved_target_id",""))),str(hero.get("preserved_target_kind",""))))
 	return true
 
@@ -62,6 +63,7 @@ func cast_thunder_clap(hero:Dictionary)->bool:
 	if GuardianSystem.has_talent(hero,"guardian_l12_2"):hero.ability_cds[3]=float(hero.ability_cds[3])*pow(0.95,targets.size())
 	if GuardianSystem.has_talent(hero,"guardian_l12_3") and not targets.is_empty():hero.guardian_runtime.delayed_effects.append({"remaining":2.0,"point":hero.pos,"amount":amount*0.75,"radius":GuardianData.SPACE.thunder_clap_radius})
 	hero.ability_cds[1]=float(GuardianData.VALUES.thunder_clap_cooldown);GuardianSystem.telemetry_add(hero,"thunder_clap_casts",targets.size());CombatRulesV1.restore_preserved_command(hero,true)
+	GuardianSystem.record_rewind_cast(hero,"w",battle_time)
 	return true
 
 func cast_dwarf_toss(hero:Dictionary,cast_position:Vector2)->bool:
@@ -79,6 +81,7 @@ func cast_dwarf_toss(hero:Dictionary,cast_position:Vector2)->bool:
 	if GuardianSystem.has_talent(hero,"guardian_l18_2"):
 		for foe in hits:CombatSystem.apply_control(foe,"slow",1.5,0.80)
 	hero.ability_cds[2]=maxf(0.0,float(GuardianData.VALUES.dwarf_toss_cooldown)-(hits.size() if GuardianSystem.has_talent(hero,"guardian_l24_1") else 0));GuardianSystem.telemetry_add(hero,"dwarf_toss_valid")
+	GuardianSystem.record_rewind_cast(hero,"e",battle_time)
 	if had_assignment:GuardianSystem.telemetry_add(hero,"dwarf_toss_assignments_cleared")
 	return true
 
@@ -97,15 +100,8 @@ func cast_haymaker(hero:Dictionary)->bool:
 	else:target.pos=CombatGeometry.move_toward_safe(target.pos,target.pos+hero.pos.direction_to(target.pos)*float(GuardianData.SPACE.haymaker_launch),float(GuardianData.SPACE.haymaker_launch),float(target.get("combat_radius",28.0)),combat_blockers)
 	hero.ability_cds[3]=float(GuardianData.VALUES.haymaker_cooldown);GuardianSystem.telemetry_add(hero,"haymaker_uses");return true
 
-func use_guardian_active(hero:Dictionary,talent_id:String)->bool:
-	if not GuardianSystem.has_talent(hero,talent_id):return false
-	match talent_id:
-		"guardian_l24_2":hero.guardian_runtime.stoneform_remaining=float(GuardianData.VALUES.stoneform_duration)
-		"guardian_l30_2":GuardianSystem.add_armor_source(hero,"hardened_shield",float(GuardianData.VALUES.hardened_shield_armor),float(GuardianData.VALUES.hardened_shield_duration))
-		"guardian_l30_3":
-			for slot in 3:hero.ability_cds[slot]=0.0
-		_:return false
-	GuardianSystem.telemetry_add(hero,"capstone_uses");return true
+func use_guardian_trait(hero:Dictionary)->bool:
+	return GuardianSystem.activate_stoneform(hero)
 
 func update_guardian_projectiles(delta:float)->void:
 	for index in range(combat_projectiles.size()-1,-1,-1):

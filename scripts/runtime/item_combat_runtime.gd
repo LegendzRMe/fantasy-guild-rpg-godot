@@ -99,7 +99,11 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		if consumed:GuardianSystem.telemetry_add(target,"block_prevented",float(result.armor_prevented))
 		elif float(result.armor_prevented)>0.0:GuardianSystem.telemetry_add(target,"temporary_armor_prevented",float(result.armor_prevented))
 		if float(result.resolved_damage)>0.0:GuardianSystem.note_damage(target,float(result.resolved_damage))
-		if source_action=="basic_attack" and GuardianSystem.has_talent(target,"guardian_l24_3") and float(result.resolved_damage)>0.0:CombatSystem.apply_control(source,"attack_speed",2.5,0.20)
+		if source_action=="basic_attack" and float(result.resolved_damage)>0.0:
+			var imposing_amount:=GuardianSystem.imposing_presence_amount(target,battle_time)
+			if imposing_amount>0.0:CombatSystem.apply_control(source,"attack_speed",2.5,imposing_amount)
+		var after_ratio:float=float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))
+		GuardianSystem.try_hardened_shield(target,before_ratio,after_ratio,float(result.resolved_damage),battle_time)
 	if not guardian_basic_result.is_empty() and float(guardian_basic_result.stun)>0.0:CombatSystem.apply_control(target,"stun",float(guardian_basic_result.stun))
 	if testing_zone_active and "training" in target.get("combat_tags",[]) and float(result.get("resolved_damage",0.0))>0.0:target["seconds_since_damage"]=0.0
 	var crossed_below_half:bool=before_ratio>0.50 and float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))<0.50

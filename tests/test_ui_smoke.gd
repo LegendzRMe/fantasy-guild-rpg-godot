@@ -108,7 +108,7 @@ static func run(main:Node) -> Array:
 	main.select_roster_section("Abilities")
 	await main.get_tree().process_frame
 	var abilities_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	TestSupport.check(errors,main.ui.find_children("RosterAbility*","Button",true,false).size()==4 and abilities_content.get_child_count()==5,"The concise Abilities workspace should contain only its title and four ability cards.")
+	TestSupport.check(errors,main.ui.find_child("RosterTrait",true,false)!=null and main.ui.find_children("RosterAbility*","Button",true,false).size()==4 and abilities_content.get_child_count()==6,"The concise Abilities workspace should show the existing D Trait plus Q, W, E, and R without extra talent action slots.")
 	main.select_roster_section("Talents")
 	await main.get_tree().process_frame
 	var talents_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
@@ -417,6 +417,11 @@ static func run(main:Node) -> Array:
 	main.state.heroes[1].level=6
 	main.start_testing_zone()
 	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==6 and main.enemies.any(func(enemy):return bool(enemy.get("boss",false))),"The testing range should retain its dummy layout and add a Boss-control target without waves.")
+	var input_guardian:Dictionary=main.heroes[0];main.selected=0;input_guardian.selected_talents={"tier_6":"guardian_l24_2"};input_guardian.ability_cds[4]=0.0;main.begin_trait()
+	TestSupport.check(errors,input_guardian.guardian_runtime.stoneform_remaining==10.0 and input_guardian.ability_cds[4]==60.0,"The existing D Trait input should activate Stoneform and expose its cooldown without another action slot.")
+	input_guardian.guardian_runtime.stoneform_remaining=0.0
+	input_guardian.selected_talents={"tier_8":"guardian_l30_3"};input_guardian.ability_cds[2]=0.0;var invalid_toss:bool=bool(main.cast_guardian_ability(2,Vector2(55,320)))
+	TestSupport.check(errors,not invalid_toss and input_guardian.ability_cds[2]==0.0 and main.GuardianSystem.rewind_sequence_count(input_guardian,main.battle_time)==0,"An invalid Dwarf Toss should consume no cooldown and should not count toward Rewind.")
 	var defense_dummy:Dictionary=main.enemies[-1]
 	main.heroes[0].pos=defense_dummy.pos+Vector2(100,0);main.heroes[0].dest=main.heroes[0].pos;main.heroes[0].suppress_auto_target=true
 	var defense_health_before:float=main.heroes[0].hp

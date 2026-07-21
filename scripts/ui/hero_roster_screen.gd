@@ -341,10 +341,18 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 	match hero_roster_section:
 		"Abilities":
 			content.add_child(label("ABILITIES",20,C_GOLD))
+			var trait_name:String="Stoneform" if hero["class"]=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2") else str(TRAITS[hero["class"]])
+			var trait_text:String=GuardianData.TALENT_DESCRIPTIONS.guardian_l24_2 if trait_name=="Stoneform" else "Passive Trait"
+			var trait_button:=Button.new();trait_button.name="RosterTrait";trait_button.text="D   "+trait_name+"\n"+trait_text;trait_button.custom_minimum_size=Vector2(600,65);trait_button.add_theme_font_size_override("font_size",14);trait_button.alignment=HORIZONTAL_ALIGNMENT_LEFT;trait_button.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;trait_button.tooltip_text=trait_text;content.add_child(trait_button)
 			for slot in 4:
 				var ability:=Button.new();ability.name="RosterAbility%d"%slot;ability.text=["Q","W","E","R"][slot]+"   "+ABILITIES[hero["class"]][slot]+"\n"+ability_tooltip(hero["class"],slot);ability.custom_minimum_size=Vector2(600,65);ability.add_theme_font_size_override("font_size",14);ability.alignment=HORIZONTAL_ALIGNMENT_LEFT;ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;ability.tooltip_text=ability_tooltip(hero["class"],slot);content.add_child(ability)
 		"Talents":
 			content.add_child(label("TALENTS",20,C_GOLD))
+			if hero["class"]=="Guardian":
+				for tier_number in range(1,9):
+					var talent_id:=str(hero.get("selected_talents",{}).get("tier_%d"%tier_number,""))
+					if talent_id=="":continue
+					var talent_name:=str(GuardianData.WORKING_NAMES.get(talent_id,talent_id));var description:=str(GuardianData.TALENT_DESCRIPTIONS.get(talent_id,"Selected Guardian talent."));var talent_card:=Label.new();talent_card.text="TIER %d  •  %s\n%s"%[tier_number,talent_name,description];talent_card.custom_minimum_size=Vector2(600,58);talent_card.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;talent_card.add_theme_font_size_override("font_size",14);talent_card.add_theme_stylebox_override("normal",ui_box(Color("182334"),6,Color("35445a"),1));content.add_child(talent_card)
 		"Professions":
 			content.add_child(label("PROFESSIONS",20,C_GOLD))
 		_:

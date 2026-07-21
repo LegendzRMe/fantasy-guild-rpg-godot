@@ -38,11 +38,13 @@ At 45 stacks, Storm Bolt pierces one additional target and Basic Attacks reduce 
 | 15 | Avatar | Haymaker | — |
 | 18 | Perfect Storm | Heavy Impact | Skullcracker |
 | 21 | Bronzebeard Rage | Healing Static | Thunder Strike |
-| 24 | Dwarf Launch | Stoneform | Imposing Presence |
+| 24 | Dwarf Launch | Stoneform (D Trait activation) | Imposing Presence (automatic) |
 | 27 | Unstoppable Force (Avatar only) | Grand Slam (Haymaker only) | — |
 | 30 | Mountain King | Hardened Shield | Rewind |
 
-Selection remains one option per tier. The shared talent system validates that a Level 27 upgrade matches the Level 15 Heroic. Rewind resets Q/W/E normal cooldowns only; it does not reset Heroics, items, or itself. In this prototype, charge restoration is separate from cooldown reset and Rewind does not restore spent charges.
+Selection remains one option per tier. The shared talent system validates that a Level 27 upgrade matches the Level 15 Heroic. Guardian exposes exactly five combat inputs: D Trait, Q/W/E Basic Abilities, and the selected R Heroic. Talents never add an action-bar slot.
+
+Stoneform replaces the passive-only D behavior while selected: D starts its ten-second periodic heal and 60-second Trait cooldown; Second Wind is suppressed only for the duration. Imposing Presence is automatic: qualifying Basic Attackers receive a 20% attack-speed reduction, enhanced to 50% for one attacker whenever its independent 20-second timer is ready. Hardened Shield automatically activates after actual damage crosses Guardian below 30% Health, grants 75 Armor for four seconds, and then waits 60 seconds. Rewind tracks distinct valid Q/W/E casts in any order; completing all three inside eight seconds resets only Q/W/E, clears the sequence, and starts its 60-second lockout. Invalid Dwarf Toss casts never enter the sequence.
 
 ## Armor, Block, controls, and classification
 
@@ -56,7 +58,7 @@ Optional runtime telemetry records Storm Bolt casts/hits/misses, quest sources a
 
 The shared testing range retains all prior heroes and dummies, adds a passive Boss-tagged control target, a projectile-blocking destructible wall, and uses existing debug shapes. Manual checks should cover projectile misses/walls, 45/160 milestones, one/many-target Thunder Clap, valid/invalid leaps, Block versus multiple Armor sources, Avatar size/expiry, Haymaker normal/Boss behavior, Heroic interruption, every talent tier, and all capstones.
 
-Testing shortcuts: `F3` toggles the shared debug overlay, `F4` adds 45 quest stacks, `F5` swaps the selected Guardian Heroic, `F6` loads a representative legal test build, `F7` activates Stoneform when authored, and `F8` activates Rewind when authored.
+Testing shortcuts: `F3` toggles the shared debug overlay, `F4` adds 45 quest stacks, `F5` swaps the selected Guardian Heroic, and `F6` loads a representative legal test build. These shortcuts alter testing state; they do not activate talent abilities. Stoneform is tested through D, while Imposing Presence, Hardened Shield, and Rewind use their automatic mechanics.
 
 ## Known limitations and postponed work
 
@@ -64,6 +66,5 @@ Testing shortcuts: `F3` toggles the shared debug overlay, `F4` adds 45 quest sta
 - The current project has no persistent multi-room dungeon encounter object, so quest state currently persists through waves but not a scene-level room transition.
 - Haymaker V1 displaces its chosen normal target; full launched-target collision chains and damageable-object targeting need a reusable physics target layer.
 - Heroic pre-release interruption and multi-charge UI need the current instant-cast prototype to gain a general cast/charge presentation before they can be fully exercised manually.
-- Stoneform, Hardened Shield, and Rewind have reusable runtime actions, but the current four-button action bar has no finalized extra-active input surface.
-- Imposing Presence active/passive and full Grand Slam death-marker charge recovery remain data/system follow-ups; no Boss-specific code should be added when completing them.
+- Grand Slam death attribution resets the current Heroic cooldown in V1; a finalized two-charge Heroic presentation still requires the shared charge UI.
 - Numbers live in `guardian_data.gd` and should be tuned only after playtesting.

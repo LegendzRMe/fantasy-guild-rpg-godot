@@ -11,6 +11,7 @@ static func initialize_runtime(unit:Dictionary,telemetry_enabled:bool=false)->vo
 		"block_charges":0,"quest_stacks":0,"quest_first_reached":false,"quest_mythic_reached":false,"quest_markers":{},
 		"perfect_storm_ready_at":0.0,"skullcracker_target":"","skullcracker_count":0,"give_axe_remaining":0.0,"haymaker_markers":{},
 		"bronzebeard_empowered":0.0,"bronzebeard_tick":0.0,"avatar_remaining":0.0,"avatar_health_bonus":0.0,
+		"imposing_ready_at":0.0,"hardened_ready_at":0.0,"rewind_ready_at":0.0,"rewind_window_ends":0.0,"rewind_casts":{},
 		"temporary_armor_sources":[],"delayed_effects":[],"ability_charges":default_charges(unit),"ability_recharge":{},
 		"telemetry_enabled":telemetry_enabled,"telemetry":default_telemetry()
 	}
@@ -78,6 +79,34 @@ static func process_haymaker_death(unit:Dictionary,target_id:String,now:float)->
 	var expires:=float(unit.guardian_runtime.haymaker_markers.get(target_id,-1.0));unit.guardian_runtime.haymaker_markers.erase(target_id)
 	if expires<now or not has_talent(unit,"guardian_l27_r2"):return false
 	unit.ability_cds[3]=0.0;telemetry_add(unit,"grand_slam_resets");return true
+
+static func imposing_presence_amount(unit:Dictionary,now:float)->float:
+	if not has_talent(unit,"guardian_l24_3"):return 0.0
+	if now>=float(unit.guardian_runtime.imposing_ready_at):
+		unit.guardian_runtime.imposing_ready_at=now+float(GuardianData.VALUES.imposing_presence_cooldown)
+		return 0.50
+	return 0.20
+
+static func try_hardened_shield(unit:Dictionary,before_ratio:float,after_ratio:float,actual_damage:float,now:float)->bool:
+	if not has_talent(unit,"guardian_l30_2") or actual_damage<=0.0 or before_ratio<0.30 or after_ratio>=0.30 or now<float(unit.guardian_runtime.hardened_ready_at):return false
+	add_armor_source(unit,"hardened_shield",float(GuardianData.VALUES.hardened_shield_armor),float(GuardianData.VALUES.hardened_shield_duration))
+	unit.guardian_runtime.hardened_ready_at=now+float(GuardianData.VALUES.capstone_cooldown);telemetry_add(unit,"capstone_uses");return true
+
+static func record_rewind_cast(unit:Dictionary,ability_id:String,now:float)->bool:
+	if not has_talent(unit,"guardian_l30_3") or now<float(unit.guardian_runtime.rewind_ready_at):return false
+	if unit.guardian_runtime.rewind_casts.is_empty() or now>float(unit.guardian_runtime.rewind_window_ends):unit.guardian_runtime.rewind_casts={};unit.guardian_runtime.rewind_window_ends=now+float(GuardianData.VALUES.rewind_window)
+	unit.guardian_runtime.rewind_casts[ability_id]=true
+	if not ["q","w","e"].all(func(id):return bool(unit.guardian_runtime.rewind_casts.get(id,false))):return false
+	for slot in 3:unit.ability_cds[slot]=0.0
+	unit.guardian_runtime.rewind_casts={};unit.guardian_runtime.rewind_window_ends=0.0;unit.guardian_runtime.rewind_ready_at=now+float(GuardianData.VALUES.rewind_cooldown);telemetry_add(unit,"capstone_uses");return true
+
+static func rewind_sequence_count(unit:Dictionary,now:float)->int:
+	if now>float(unit.guardian_runtime.rewind_window_ends):return 0
+	return unit.guardian_runtime.rewind_casts.size()
+
+static func activate_stoneform(unit:Dictionary)->bool:
+	if not has_talent(unit,"guardian_l24_2") or float(unit.ability_cds[4])>0.0:return false
+	unit.guardian_runtime.stoneform_remaining=float(GuardianData.VALUES.stoneform_duration);unit.guardian_runtime.stoneform_tick=0.0;unit.ability_cds[4]=float(GuardianData.VALUES.stoneform_cooldown);return true
 
 static func second_wind_profile(unit:Dictionary)->Dictionary:
 	if has_talent(unit,"guardian_l9_2"):

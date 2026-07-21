@@ -56,6 +56,13 @@ func begin_ability(slot:int,device:String="pc")->void:
 		use_ability(slot,cast_point);return
 	ability_aiming=true;aimed_ability_slot=slot;aimed_ability_category=category;aimed_cast_mode=mode;aimed_from_touch=device=="mobile";ability_button_held=mode=="release";ability_aim_point=get_global_mouse_position();queue_redraw()
 
+func begin_trait()->void:
+	if selected<0 or selected>=heroes.size() or bool(heroes[selected].get("independent",false)):return
+	var hero:Dictionary=heroes[selected]
+	if str(hero.get("class",""))=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2"):
+		if not use_guardian_trait(hero):flash("Stoneform is not ready.")
+		queue_redraw()
+
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
 	if aimed_ability_category=="enemy":
@@ -187,8 +194,6 @@ func _unhandled_input(event:InputEvent) -> void:
 			for hero in heroes:
 				if str(hero.get("class",""))=="Guardian":hero.selected_talents={"tier_1":"guardian_l9_1","tier_2":"guardian_l12_2","tier_3":guardian_heroic_id(hero),"tier_4":"guardian_l18_2","tier_5":"guardian_l21_2","tier_6":"guardian_l24_1","tier_7":"guardian_l27_r1" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l27_r2","tier_8":"guardian_l30_1"};hero.guardian_runtime.ability_charges=GuardianSystem.default_charges(hero);flash("Guardian test talents loaded")
 			return
-		if event.keycode==KEY_F7 and testing_zone_active and selected<heroes.size() and str(heroes[selected].get("class",""))=="Guardian":use_guardian_active(heroes[selected],"guardian_l24_2");return
-		if event.keycode==KEY_F8 and testing_zone_active and selected<heroes.size() and str(heroes[selected].get("class",""))=="Guardian":use_guardian_active(heroes[selected],"guardian_l30_3");return
 		if event.keycode==KEY_SPACE:paused=!paused;queue_redraw()
 		if event.keycode==KEY_TAB and not event.echo:
 			cycle_selected_enemy()
@@ -201,6 +206,7 @@ func _unhandled_input(event:InputEvent) -> void:
 		if not event.echo and event.keycode==KEY_W:begin_ability(1)
 		if not event.echo and event.keycode==KEY_E:begin_ability(2)
 		if not event.echo and event.keycode==KEY_R:begin_ability(3)
+		if not event.echo and event.keycode==KEY_D:begin_trait()
 	if event is InputEventKey and not event.pressed and ability_aiming and aimed_cast_mode=="release":
 		var released_slot={KEY_Q:0,KEY_W:1,KEY_E:2,KEY_R:3}.get(event.keycode,-1)
 		if released_slot==aimed_ability_slot:confirm_aim_at(get_global_mouse_position());return
@@ -237,7 +243,11 @@ func _unhandled_input(event:InputEvent) -> void:
 			var requested_slot:int=clampi(int((p.x-424)/54),0,7)
 			if requested_slot<selectable_heroes.size():selected=selectable_heroes[requested_slot];queue_redraw()
 			return
-		if p.y>635 and p.x>445 and p.x<835:begin_ability(clampi(int((p.x-445)/78),0,4));return
+		if p.y>635 and p.x>445 and p.x<835:
+			var action_slot:=clampi(int((p.x-445)/78),0,4)
+			if action_slot==4:begin_trait()
+			else:begin_ability(action_slot)
+			return
 		for i in heroes.size():
 			if not bool(heroes[i].get("independent",false)) and heroes[i].pos.distance_to(p)<58:
 				selected=i;if tutorial_active and tutorial_step==3:tutorial_hero_clicked=true
@@ -254,7 +264,11 @@ func _unhandled_input(event:InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event.pressed and ability_aiming and aimed_cast_mode=="confirm":confirm_aim_at(event.position);return
-		if event.pressed and event.position.y>635 and event.position.x>445 and event.position.x<835:begin_ability(clampi(int((event.position.x-445)/78),0,4),"mobile");return
+		if event.pressed and event.position.y>635 and event.position.x>445 and event.position.x<835:
+			var action_slot:=clampi(int((event.position.x-445)/78),0,4)
+			if action_slot==4:begin_trait()
+			else:begin_ability(action_slot,"mobile")
+			return
 		if not event.pressed and ability_aiming and aimed_cast_mode=="release":confirm_aim_at(event.position);return
 		if event.pressed and not paused and event.position.y<635:clear_selected_combat_target()
 	if event is InputEventScreenDrag and tutorial_active and dragging_hero:update_hero_drag(event.position);return
