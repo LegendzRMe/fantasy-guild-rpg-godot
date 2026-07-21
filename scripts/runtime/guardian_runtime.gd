@@ -11,7 +11,7 @@ func guardian_heroic_id(hero:Dictionary)->String:
 	return heroic if heroic in ["guardian_l15_r1","guardian_l15_r2"] else "guardian_l15_r1"
 
 func guardian_scaled(hero:Dictionary,key:String)->float:
-	return GuardianData.scaled(float(GuardianData.VALUES[key]),int(hero.level))
+	return GuardianData.power_scaled(float(GuardianData.VALUES[key]),float(hero.get("power",GuardianData.scaled(float(GuardianData.VALUES.basic_attack_damage),int(hero.level)))))
 
 func guardian_damage_near(hero:Dictionary,point:Vector2,radius:float,amount:float,origin:String)->Array:
 	var hits:Array=[]

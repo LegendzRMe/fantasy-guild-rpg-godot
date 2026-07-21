@@ -14,6 +14,8 @@ Level 1 uses 2765 Health, 0 base Armor, 88 Basic Attack damage, 1.11 attacks per
 
 Calculations remain floating point internally. `guardian_data.gd` owns source values and explicit Godot-space conversions.
 
+Guardian Basic Ability and Heroic damage uses the same Level 1 ratios but resolves from the Hero's current Power, so equipped Power changes both the combat result and the value shown in the Hero Roster. Defensive fixed values such as Avatar Health and Second Wind healing retain their authored level scaling.
+
 ## Base kit
 
 - **Second Wind:** after four seconds without resolved damage, heals 55 per second, or 111 below 40% Health. Shield-absorbed damage is resolved damage and resets the delay. State lasts through waves in one battle and is discarded when the encounter runtime is rebuilt.

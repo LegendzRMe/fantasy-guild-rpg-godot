@@ -20,6 +20,7 @@ static func run()->Array:
 	var definition:Dictionary=ClassData.CLASSES.Guardian
 	TestSupport.check(errors,definition.base_health==2765.0 and definition.base_power==88.0 and is_equal_approx(1.0/definition.basic_action_interval,1.11),"Guardian V1 should use the source Level 1 chassis.")
 	TestSupport.check(errors,is_equal_approx(GuardianData.scaled(100.0,4),100.0*pow(1.04,3)),"Guardian scalable values should use four-percent exponential level scaling.")
+	TestSupport.check(errors,is_equal_approx(GuardianData.power_scaled(110.0,176.0),220.0),"Guardian Basic Abilities and Heroics should scale from current Power so equipment and the displayed value agree with combat.")
 	var names:String=" ".join(ClassData.ABILITIES.Guardian)
 	TestSupport.check(errors,not names.contains("Shield Wall") and not names.contains("Challenge") and not names.contains("Shield Rush") and not names.contains("Last Bastion"),"The placeholder Guardian kit should be removed.")
 

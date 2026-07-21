@@ -1,15 +1,50 @@
 extends "res://scripts/runtime/app_core.gd"
 
 const AbilityKeyBadge = preload("res://scripts/ui/ability_key_badge.gd")
+const GuardianAbilityPresenter = preload("res://scripts/data/guardian_ability_presenter.gd")
 
-func make_roster_ability_row(key_text:String,title:String,description:String,accent:Color,locked:bool=false)->PanelContainer:
+func make_roster_ability_row(key_text:String,title:String,description:String,accent:Color,locked:bool=false,details_action:Callable=Callable())->PanelContainer:
 	var card:=PanelContainer.new();card.name="RosterTrait" if key_text=="D" else "RosterAbility%s"%key_text;card.custom_minimum_size=Vector2(600,58);card.add_theme_stylebox_override("panel",ui_box(Color("182334") if not locked else Color("151e2c"),6,Color("35445a"),1))
+	if not locked and details_action.is_valid():
+		card.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND
+		card.gui_input.connect(func(event):
+			if (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed) or (event is InputEventScreenTouch and event.pressed):details_action.call())
 	var row:=HBoxContainer.new();row.add_theme_constant_override("separation",14);card.add_child(row)
 	var badge:=AbilityKeyBadge.new();badge.name="AbilityKeyBadge";badge.configure(key_text,accent,locked);row.add_child(badge)
 	var copy:=VBoxContainer.new();copy.size_flags_horizontal=Control.SIZE_EXPAND_FILL;copy.alignment=BoxContainer.ALIGNMENT_CENTER;copy.add_theme_constant_override("separation",2);row.add_child(copy)
 	var heading:=label(title,16,C_MUTED if locked else C_TEXT);copy.add_child(heading)
 	var body:=label(description,13,C_MUTED);body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.size_flags_horizontal=Control.SIZE_EXPAND_FILL;copy.add_child(body)
 	return card
+
+func close_roster_ability_details(overlay:Control)->void:
+	if overlay!=null and is_instance_valid(overlay):overlay.queue_free()
+
+func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:String="")->void:
+	var details:Dictionary
+	if str(hero.get("class",""))=="Guardian":details=GuardianAbilityPresenter.details(hero,action_key,heroic_id,float(hero_final_stats(hero).power))
+	else:
+		var action_keys:Array=["Q","W","E","R"];var slot:=action_keys.find(action_key)
+		details={"key":action_key,"title":str(TRAITS[hero["class"]]) if action_key=="D" else str(ABILITIES[hero["class"]][slot]),"meta":"Passive Trait" if action_key=="D" else "Ability","description":"Passive Trait" if action_key=="D" else ability_tooltip(hero["class"],slot),"sections":[],"note":""}
+	var overlay:=Control.new();overlay.name="RosterAbilityDetailsOverlay";overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);overlay.mouse_filter=Control.MOUSE_FILTER_STOP;ui.add_child(overlay)
+	var backdrop:=Button.new();backdrop.name="RosterAbilityDetailsBackdrop";backdrop.flat=true;backdrop.focus_mode=Control.FOCUS_NONE;backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);backdrop.add_theme_stylebox_override("normal",ui_box(Color(0.01,0.02,0.04,.78),0));backdrop.pressed.connect(func():close_roster_ability_details(overlay));overlay.add_child(backdrop)
+	var panel:=PanelContainer.new();panel.name="RosterAbilityDetailsCard";panel.position=Vector2(300,70);panel.size=Vector2(680,580);panel.add_theme_stylebox_override("panel",ui_box(Color("1b283a"),10,CLASSES[hero["class"]].color,2));overlay.add_child(panel)
+	var margin:=MarginContainer.new();margin.add_theme_constant_override("margin_left",26);margin.add_theme_constant_override("margin_right",26);margin.add_theme_constant_override("margin_top",24);margin.add_theme_constant_override("margin_bottom",24);panel.add_child(margin)
+	var column:=VBoxContainer.new();column.add_theme_constant_override("separation",12);margin.add_child(column)
+	var header:=HBoxContainer.new();header.add_theme_constant_override("separation",16);column.add_child(header)
+	var badge:=AbilityKeyBadge.new();badge.name="RosterAbilityDetailsBadge";badge.configure(str(details.key),CLASSES[hero["class"]].color,false);header.add_child(badge)
+	var identity:=VBoxContainer.new();identity.size_flags_horizontal=Control.SIZE_EXPAND_FILL;header.add_child(identity)
+	identity.add_child(label(str(details.title),27,CLASSES[hero["class"]].color))
+	identity.add_child(label(str(details.meta),14,C_MUTED))
+	column.add_child(rule())
+	var scroll:=ScrollContainer.new();scroll.name="RosterAbilityDetailsScroll";scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;column.add_child(scroll)
+	var body:=VBoxContainer.new();body.size_flags_horizontal=Control.SIZE_EXPAND_FILL;body.add_theme_constant_override("separation",13);scroll.add_child(body)
+	var description:=label(str(details.description),16,C_TEXT);description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.size_flags_horizontal=Control.SIZE_EXPAND_FILL;body.add_child(description)
+	for section in details.sections:
+		body.add_child(label(str(section.heading),14,C_GOLD))
+		var section_body:=label(str(section.body),14,C_MUTED);section_body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;section_body.size_flags_horizontal=Control.SIZE_EXPAND_FILL;body.add_child(section_body)
+	if str(details.note)!="":
+		body.add_child(rule())
+		var note:=label(str(details.note),12,C_MUTED);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
 
 func guardian_talent_name(talent_id:String)->String:
 	return str(GuardianData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
@@ -361,13 +396,16 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 			for slot in 3:
 				var required_level:=int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]);var locked:=int(hero.get("level",1))<required_level;var description:=ability_tooltip(hero["class"],slot)
 				if locked:description="Unlocks at Level %d  •  %s"%[required_level,description]
-				content.add_child(make_roster_ability_row(["Q","W","E"][slot],str(ABILITIES[hero["class"]][slot]),description,class_color,locked))
+				var action_key:String=["Q","W","E"][slot]
+				content.add_child(make_roster_ability_row(action_key,str(ABILITIES[hero["class"]][slot]),description,class_color,locked,func(key=action_key):open_roster_ability_details(hero,key)))
 			var selected_heroic_id:=str(hero.get("selected_heroic_id",""));var heroic_unlocked:=TalentSystem.ability_is_unlocked(int(hero.get("level",1)),3)
 			if heroic_unlocked and selected_heroic_id!="":
 				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"]=="Guardian" else str(ABILITIES[hero["class"]][3])
 				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else ability_tooltip(hero["class"],3)
-				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color))
-			content.add_child(make_roster_ability_row("D",trait_name,trait_text,class_color))
+				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color,false,func(heroic=selected_heroic_id):open_roster_ability_details(hero,"R",heroic)))
+			else:
+				content.add_child(make_roster_ability_row("R","Heroic Ability","Choose your Heroic at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[3]),class_color,true))
+			content.add_child(make_roster_ability_row("D",trait_name,trait_text,class_color,false,func():open_roster_ability_details(hero,"D")))
 		"Talents":
 			content.add_child(label("TALENTS",20,C_GOLD))
 			var class_definition:Dictionary=GameData.class_definition(str(hero["class"]));var class_id:=str(class_definition.get("class_id",GameData.class_id_for(str(hero["class"]))));var discovery:Dictionary=state.get("class_talent_discovery",{})

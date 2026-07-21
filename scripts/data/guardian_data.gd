@@ -81,3 +81,6 @@ static func scale(level:int)->float:
 
 static func scaled(value:float,level:int)->float:
 	return value*scale(level)
+
+static func power_scaled(value:float,current_power:float)->float:
+	return maxf(0.0,current_power)*(value/float(VALUES.basic_attack_damage))
