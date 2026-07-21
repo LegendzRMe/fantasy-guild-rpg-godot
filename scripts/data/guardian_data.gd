@@ -46,6 +46,8 @@ const WORKING_NAMES := {
 }
 
 const TALENT_DESCRIPTIONS := {
+	"guardian_l15_r1":"Gain maximum and current Health for 20 seconds and increase visible combat size. Cooldown: 90 seconds.",
+	"guardian_l15_r2":"Strike a chosen enemy for heavy Physical damage and launch ordinary enemies backward. Bosses are staggered instead. Cooldown: 40 seconds.",
 	"guardian_l24_2":"Press D to heal for 30% maximum Health over 10 seconds. Second Wind pauses during Stoneform. Cooldown: 60 seconds.",
 	"guardian_l24_3":"Enemies that hit Guardian with Basic Actions have their Basic Action speed reduced by 20% for 2.5 seconds. Once every 20 seconds, this reduction is increased to 50%.",
 	"guardian_l30_2":"Falling below 30% maximum Health grants 75 Armor for 4 seconds. Hardened Shield can trigger only once every 60 seconds.",

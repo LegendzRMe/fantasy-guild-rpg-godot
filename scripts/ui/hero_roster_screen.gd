@@ -1,5 +1,19 @@
 extends "res://scripts/runtime/app_core.gd"
 
+const AbilityKeyBadge = preload("res://scripts/ui/ability_key_badge.gd")
+
+func make_roster_ability_row(key_text:String,title:String,description:String,accent:Color,locked:bool=false)->PanelContainer:
+	var card:=PanelContainer.new();card.name="RosterTrait" if key_text=="D" else "RosterAbility%s"%key_text;card.custom_minimum_size=Vector2(600,58);card.add_theme_stylebox_override("panel",ui_box(Color("182334") if not locked else Color("151e2c"),6,Color("35445a"),1))
+	var row:=HBoxContainer.new();row.add_theme_constant_override("separation",14);card.add_child(row)
+	var badge:=AbilityKeyBadge.new();badge.name="AbilityKeyBadge";badge.configure(key_text,accent,locked);row.add_child(badge)
+	var copy:=VBoxContainer.new();copy.size_flags_horizontal=Control.SIZE_EXPAND_FILL;copy.alignment=BoxContainer.ALIGNMENT_CENTER;copy.add_theme_constant_override("separation",2);row.add_child(copy)
+	var heading:=label(title,16,C_MUTED if locked else C_TEXT);copy.add_child(heading)
+	var body:=label(description,13,C_MUTED);body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.size_flags_horizontal=Control.SIZE_EXPAND_FILL;copy.add_child(body)
+	return card
+
+func guardian_talent_name(talent_id:String)->String:
+	return str(GuardianData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
+
 func make_roster_card(idx:int) -> Button:
 
 	var h=state.heroes[idx]
@@ -343,16 +357,30 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 			content.add_child(label("ABILITIES",20,C_GOLD))
 			var trait_name:String="Stoneform" if hero["class"]=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2") else str(TRAITS[hero["class"]])
 			var trait_text:String=GuardianData.TALENT_DESCRIPTIONS.guardian_l24_2 if trait_name=="Stoneform" else "Passive Trait"
-			var trait_button:=Button.new();trait_button.name="RosterTrait";trait_button.text="D   "+trait_name+"\n"+trait_text;trait_button.custom_minimum_size=Vector2(600,65);trait_button.add_theme_font_size_override("font_size",14);trait_button.alignment=HORIZONTAL_ALIGNMENT_LEFT;trait_button.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;trait_button.tooltip_text=trait_text;content.add_child(trait_button)
-			for slot in 4:
-				var ability:=Button.new();ability.name="RosterAbility%d"%slot;ability.text=["Q","W","E","R"][slot]+"   "+ABILITIES[hero["class"]][slot]+"\n"+ability_tooltip(hero["class"],slot);ability.custom_minimum_size=Vector2(600,65);ability.add_theme_font_size_override("font_size",14);ability.alignment=HORIZONTAL_ALIGNMENT_LEFT;ability.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;ability.tooltip_text=ability_tooltip(hero["class"],slot);content.add_child(ability)
+			var class_color:Color=CLASSES[hero["class"]].color;content.add_child(make_roster_ability_row("D",trait_name,trait_text,class_color))
+			for slot in 3:
+				var required_level:=int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]);var locked:=int(hero.get("level",1))<required_level;var description:=ability_tooltip(hero["class"],slot)
+				if locked:description="Unlocks at Level %d  •  %s"%[required_level,description]
+				content.add_child(make_roster_ability_row(["Q","W","E"][slot],str(ABILITIES[hero["class"]][slot]),description,class_color,locked))
+			var selected_heroic_id:=str(hero.get("selected_heroic_id",""));var heroic_unlocked:=TalentSystem.ability_is_unlocked(int(hero.get("level",1)),3)
+			if heroic_unlocked and selected_heroic_id!="":
+				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"]=="Guardian" else str(ABILITIES[hero["class"]][3])
+				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else ability_tooltip(hero["class"],3)
+				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color))
 		"Talents":
 			content.add_child(label("TALENTS",20,C_GOLD))
-			if hero["class"]=="Guardian":
-				for tier_number in range(1,9):
-					var talent_id:=str(hero.get("selected_talents",{}).get("tier_%d"%tier_number,""))
-					if talent_id=="":continue
-					var talent_name:=str(GuardianData.WORKING_NAMES.get(talent_id,talent_id));var description:=str(GuardianData.TALENT_DESCRIPTIONS.get(talent_id,"Selected Guardian talent."));var talent_card:=Label.new();talent_card.text="TIER %d  •  %s\n%s"%[tier_number,talent_name,description];talent_card.custom_minimum_size=Vector2(600,58);talent_card.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;talent_card.add_theme_font_size_override("font_size",14);talent_card.add_theme_stylebox_override("normal",ui_box(Color("182334"),6,Color("35445a"),1));content.add_child(talent_card)
+			var class_definition:Dictionary=GameData.class_definition(str(hero["class"]));var class_id:=str(class_definition.get("class_id",GameData.class_id_for(str(hero["class"]))));var discovery:Dictionary=state.get("class_talent_discovery",{})
+			for tier_number in range(1,9):
+				var tier_id:="tier_%d"%tier_number;var tier_definition:=TalentSystem.tier_definition(class_definition,tier_id)
+				if tier_definition.is_empty():continue
+				var revealed:=TalentSystem.tier_is_revealed(discovery,class_id,tier_id,is_testing_save());var required_level:=int(tier_definition.get("unlock_level",TalentSystem.TIER_LEVELS.get(tier_id,999)));var selected_id:=str(hero.get("selected_talents",{}).get(tier_id,""))
+				var talent_card:=Label.new();talent_card.custom_minimum_size=Vector2(600,52);talent_card.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;talent_card.add_theme_font_size_override("font_size",14);talent_card.add_theme_stylebox_override("normal",ui_box(Color("182334") if revealed else Color("131b28"),6,Color("35445a"),1))
+				if revealed:
+					var option_names:Array=[]
+					for option_id in tier_definition.get("option_ids",[]):option_names.append(("✓ " if str(option_id)==selected_id else "")+guardian_talent_name(str(option_id)) if hero["class"]=="Guardian" else str(option_id).replace("_"," ").capitalize())
+					talent_card.text="TIER %d  •  LEVEL %d\n%s"%[tier_number,required_level,"   |   ".join(option_names)]
+				else:talent_card.text="TIER %d  •  UNLOCKS AT LEVEL %d\nTalent choices are not yet revealed."%[tier_number,required_level]
+				content.add_child(talent_card)
 		"Professions":
 			content.add_child(label("PROFESSIONS",20,C_GOLD))
 		_:

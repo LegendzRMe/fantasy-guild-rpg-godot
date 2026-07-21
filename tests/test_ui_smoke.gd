@@ -108,11 +108,18 @@ static func run(main:Node) -> Array:
 	main.select_roster_section("Abilities")
 	await main.get_tree().process_frame
 	var abilities_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	TestSupport.check(errors,main.ui.find_child("RosterTrait",true,false)!=null and main.ui.find_children("RosterAbility*","Button",true,false).size()==4 and abilities_content.get_child_count()==6,"The concise Abilities workspace should show the existing D Trait plus Q, W, E, and R without extra talent action slots.")
+	TestSupport.check(errors,main.ui.find_child("RosterTrait",true,false)!=null and main.ui.find_children("RosterAbility*","PanelContainer",true,false).size()==3 and main.ui.find_children("AbilityKeyBadge","Control",true,false).size()==4 and abilities_content.get_child_count()==5,"The concise Abilities workspace should show visual D/Q/W/E rows without an unselected Heroic or extra talent action slots.")
+	TestSupport.check(errors,main.ui.find_child("RosterAbilityR",true,false)==null,"An unselected or locked Heroic should not appear in the Abilities workspace.")
+	main.state.heroes[0].level=15;main.state.heroes[0].selected_heroic_id="guardian_l15_r2";main.state.heroes[0].selected_talents["tier_3"]="guardian_l15_r2";main.select_roster_section("Abilities");await main.get_tree().process_frame
+	var heroic_row:PanelContainer=main.ui.find_child("RosterAbilityR",true,false);var heroic_text:String="\n".join(heroic_row.find_children("*","Label",true,false).map(func(candidate):return candidate.text)) if heroic_row!=null else ""
+	TestSupport.check(errors,heroic_row!=null and heroic_text.contains("Haymaker") and not heroic_text.contains("Avatar"),"Abilities should show only the Heroic that the Hero has unlocked and selected.")
+	main.state.heroes[0].level=1;main.state.heroes[0].selected_heroic_id="";main.state.heroes[0].selected_talents.erase("tier_3")
+	main.state.class_talent_discovery["guardian"]=30
 	main.select_roster_section("Talents")
 	await main.get_tree().process_frame
 	var talents_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	TestSupport.check(errors,talents_content.get_child_count()==1,"The empty Talents workspace should show only its title without implementation notes.")
+	var talent_text:String="\n".join(main.ui.find_children("*","Label",true,false).map(func(candidate):return candidate.text))
+	TestSupport.check(errors,talents_content.get_child_count()==9 and talent_text.contains("Avatar") and talent_text.contains("Haymaker"),"The Talents workspace should retain revealed Heroic choices even while Abilities hides an unselected R.")
 	main.select_roster_section("Professions")
 	await main.get_tree().process_frame
 	var professions_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
