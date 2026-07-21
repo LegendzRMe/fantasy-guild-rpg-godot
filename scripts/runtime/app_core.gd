@@ -20,6 +20,8 @@ const CombatGeometry = preload("res://scripts/combat/combat_geometry.gd")
 const CombatProjectile = preload("res://scripts/combat/combat_projectile.gd")
 const GuardianData = preload("res://scripts/data/guardian_data.gd")
 const GuardianSystem = preload("res://scripts/systems/guardian_system.gd")
+const ClericData = preload("res://scripts/data/cleric_data.gd")
+const ClericSystem = preload("res://scripts/systems/cleric_system.gd")
 const ASHWOOD_COMBAT_BACKGROUND = preload("res://assets/generated/ashwood_combat_background.png")
 
 const W := 1280.0
@@ -47,6 +49,22 @@ const CHALLENGE_TAUNT_DURATION := 3.0
 const TESTING_DUMMY_RESPAWN_TIME := 5.0
 const TESTING_DUMMY_REGEN_DELAY := 2.5
 const TESTING_DUMMY_REGEN_RATE := 0.10
+
+# Transient UI coordination belongs beside the UI/input methods that consume it.
+# Declaring it here also keeps Godot hot reloads from compiling AppCore against a
+# stale cached AppState layout while several descendant scripts are reloading.
+var hero_roster_scroll_positions:Dictionary = {}
+var victory_talent_queue:Array = []
+var victory_talent_choice_index := 0
+var victory_talent_overlay:Control = null
+var victory_talent_prompt_handled := false
+var roster_party_press_active := false
+var roster_party_press_index := -1
+var roster_party_press_origin := ""
+var roster_party_press_time := 0.0
+var roster_party_press_start := Vector2.ZERO
+
+const ROSTER_PARTY_HOLD_DURATION := 0.24
 
 func _ready() -> void:
 	get_viewport().set_embedding_subwindows(false)
@@ -114,18 +132,45 @@ func team_has_member(idx:int) -> bool:
 	return TeamManager.has_member(state.selected_team,idx)
 
 func hero_is_on_active_team(idx:int) -> bool:
-	return TeamManager.has_member(state.active_team,idx)
+	return TeamManager.has_member(state.selected_team,idx)
 
 func toggle_active_team_from_roster(idx:int) -> void:
 	var was_active:=hero_is_on_active_team(idx)
-	var next_active_team:Array=TeamManager.toggle_member(state.active_team,idx,state.heroes)
-	if not was_active and next_active_team==state.active_team:
-		flash("Only one hero of each class may join a party." if state.active_team.size()<4 else "Active party is full.")
+	var next_active_team:Array=TeamManager.toggle_member(state.selected_team,idx,state.heroes)
+	if not was_active and next_active_team==state.selected_team:
+		flash("Only one hero of each class may join a party." if state.selected_team.size()<4 else "Party is full.")
 		return
-	state.active_team=next_active_team
-	if current_team_slot<0:state.selected_team=TeamManager.copy_team(state.active_team)
-	save_game()
+	state.selected_team=next_active_team
+	persist_current_team()
 	show_roster()
+
+func begin_roster_party_press(idx:int,origin:String,pointer_position:Vector2)->void:
+	roster_party_press_active=true;roster_party_press_index=idx;roster_party_press_origin=origin;roster_party_press_time=0.0;roster_party_press_start=pointer_position
+
+func update_roster_party_press(delta:float)->void:
+	if not roster_party_press_active or screen!="roster" or team_dragging:return
+	roster_party_press_time+=delta
+	if roster_party_press_time>=ROSTER_PARTY_HOLD_DURATION:start_team_drag(roster_party_press_index,roster_party_press_origin)
+
+func finish_roster_party_press(pointer_position:Vector2)->void:
+	if not roster_party_press_active:return
+	var hero_index:=roster_party_press_index
+	roster_party_press_active=false;roster_party_press_index=-1;roster_party_press_origin="";roster_party_press_time=0.0
+	if team_dragging:end_team_drag(pointer_position)
+	else:toggle_active_team_from_roster(hero_index)
+
+func open_victory_talent_choices()->bool:
+	return false
+
+func complete_victory_sequence_navigation()->void:
+	victory_sequence=false
+	if current_ashwood_encounter!="":show_ashwood_victory()
+	else:show_zone_map(dungeon_id)
+
+func attempt_victory_continue()->void:
+	if current_ashwood_encounter!="" and victory_timer<1.6:victory_timer=1.6;queue_redraw();return
+	if open_victory_talent_choices():return
+	complete_victory_sequence_navigation()
 
 func move_to_active_team(idx:int,target_slot:int=-1) -> void:
 	if team_has_member(idx):
@@ -153,11 +198,12 @@ func start_team_drag(idx:int, origin:String) -> void:
 	team_dragging = true
 	team_drag_index = idx
 	team_drag_origin = origin
-	var preview_size:=Vector2(180,100) if origin=="active" else Vector2(150,74)
-	team_drag_preview=Button.new(); team_drag_preview.text=team_card_text(idx); team_drag_preview.size=preview_size; team_drag_preview.mouse_filter=Control.MOUSE_FILTER_IGNORE; team_drag_preview.modulate=Color(1,1,1,.82); team_drag_preview.position=get_viewport().get_mouse_position()-preview_size*.5; ui.add_child(team_drag_preview)
+	var preview_size:=Vector2(58,48) if screen=="roster" else Vector2(180,100) if origin=="active" else Vector2(150,74)
+	team_drag_preview=Button.new(); team_drag_preview.text=role_glyph(str(state.heroes[idx].get("class",""))) if screen=="roster" else team_card_text(idx);team_drag_preview.add_theme_font_size_override("font_size",22 if screen=="roster" else 14);team_drag_preview.size=preview_size; team_drag_preview.mouse_filter=Control.MOUSE_FILTER_IGNORE; team_drag_preview.modulate=Color(1,1,1,.82); team_drag_preview.position=get_viewport().get_mouse_position()-preview_size*.5; ui.add_child(team_drag_preview)
 	queue_redraw()
 
 func _input(event:InputEvent) -> void:
+	if victory_talent_overlay!=null and is_instance_valid(victory_talent_overlay):return
 	if item_card_overlay!=null:
 		if event.is_action_pressed("ui_cancel"):
 			if not item_overlay_confirmation_active:navigate_item_overlay_back()
@@ -193,10 +239,8 @@ func _input(event:InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if victory_sequence and victory_phase>=5 and (event is InputEventMouseButton and event.pressed or event is InputEventKey and event.pressed or event is InputEventScreenTouch and event.pressed):
-		if current_ashwood_encounter!="" and victory_timer<1.6:victory_timer=1.6;queue_redraw();get_viewport().set_input_as_handled();return
-		victory_sequence=false
-		if current_ashwood_encounter!="":show_ashwood_victory()
-		else:show_zone_map(dungeon_id)
+		attempt_victory_continue()
+		get_viewport().set_input_as_handled()
 		return
 	if screen=="team" and event is InputEventKey and event.pressed and not (get_viewport().gui_get_focus_owner() is LineEdit):
 		if event.keycode==KEY_A: team_roster_page=max(0,team_roster_page-1); show_team()
@@ -210,6 +254,11 @@ func _input(event:InputEvent) -> void:
 			elif not event.pressed and team_swiping and not team_dragging: var dx=event.position.x-team_swipe_start.x; if abs(dx)>55: team_roster_page+=(-1 if dx>0 else 1); team_swiping=false; show_team()
 	# Mouse release is usually received by the drop zone, not the card that began
 	# the drag, so finish team drags at the viewport level.
+	if screen=="roster" and roster_party_press_active:
+		if event is InputEventMouseMotion and team_dragging and team_drag_preview!=null:team_drag_preview.position=event.position-team_drag_preview.size*.5
+		elif event is InputEventScreenDrag and team_dragging and team_drag_preview!=null:team_drag_preview.position=event.position-team_drag_preview.size*.5
+		elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed:finish_roster_party_press(event.position);get_viewport().set_input_as_handled();return
+		elif event is InputEventScreenTouch and not event.pressed:finish_roster_party_press(event.position);get_viewport().set_input_as_handled();return
 	if team_dragging and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 		end_team_drag(event.position)
 	elif team_dragging and event is InputEventMouseMotion and team_drag_preview!=null:
@@ -275,7 +324,8 @@ func end_team_drag(mouse_pos:Vector2) -> void:
 	team_drag_origin = ""
 	if team_drag_preview!=null: team_drag_preview.queue_free(); team_drag_preview=null
 	save_game()
-	show_team()
+	if screen=="roster":show_roster()
+	else:show_team()
 
 func begin_vault_press(entry_id:String,pointer_position:Vector2)->void:
 	if item_card_overlay!=null:return

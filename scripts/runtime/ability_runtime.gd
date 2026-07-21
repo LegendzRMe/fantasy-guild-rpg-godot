@@ -1,4 +1,4 @@
-extends "res://scripts/runtime/guardian_runtime.gd"
+extends "res://scripts/runtime/cleric_runtime.gd"
 
 func clamped_cast_point(hero:Dictionary,point:Vector2,range_limit:float)->Vector2:
 	if range_limit<=0:return hero.pos
@@ -25,6 +25,18 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 	if h["class"]=="Guardian":
 		cast_guardian_ability(slot,cast_position,item_repeat)
 		return
+	if h["class"]=="Cleric":
+		var cleric_cast_succeeded:=cast_cleric_ability(slot,item_repeat)
+		if cleric_cast_succeeded and not item_repeat:
+			if slot==0 and hero_has_passive(h,"twin_incantation"):
+				h.q_charges=int(h.q_charges)-1;h.q_charge_timers.append(float(ClericData.VALUES.q_cooldown));h.ability_cds[0]=0.0 if h.q_charges>0 else float(ClericData.VALUES.q_cooldown)
+			if slot==2 and hero_has_passive(h,"twin_incantation") and int(h.q_charges)<2:
+				h.q_charges=int(h.q_charges)+1
+				if not h.q_charge_timers.is_empty():h.q_charge_timers.remove_at(0)
+				h.ability_cds[0]=0.0;item_feedback("Q Charge Restored",h.pos,Color("b8d5ff"))
+			if slot<3 and hero_has_passive(h,"borrowed_time") and bool(h.get("borrowed_time_armed",false)):
+				h.borrowed_time_armed=false;h.borrowed_time_timer=0.0;h.pending_repeats.append({"remaining":0.4,"slot":slot,"position":h.pos,"enemy_target":ability_enemy_target,"assigned_target":int(h.target),"ally_target":int(h.heal_target)})
+		return
 	var ability_range=float(ABILITY_RANGES[h["class"]][slot])
 	var resolved_point=clamped_cast_point(h,cast_position,ability_range) if ability_range>0 else h.pos
 	if resolved_point.distance_to(h.pos)>1:h.facing_direction=h.pos.direction_to(resolved_point)
@@ -47,14 +59,6 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 				h.pos=resolved_point;h.dest=h.pos
 				for foe_rush in enemies:if foe_rush.hp>0 and foe_rush.pos.distance_to(h.pos)<105:deal_damage(h,foe_rush,scaled_ability_amount(h,38.0),ability_action,"physical",ABILITIES[h["class"]][slot])
 			else:for ally_bastion in heroes:if ally_bastion.hp>0:apply_unit_shield(h,ally_bastion,scaled_ability_amount(h,30.0),ABILITIES[h["class"]][slot])
-		"Cleric":
-			if slot==0:
-				var low=h.heal_target if h.heal_target>=0 and h.heal_target<heroes.size() else lowest_hero();if low>=0:deal_healing(h,heroes[low],scaled_ability_amount(h,72.0),ability_action,ABILITIES[h["class"]][slot])
-			elif slot==1:for ally_sanctuary in heroes:if ally_sanctuary.hp>0:deal_healing(h,ally_sanctuary,scaled_ability_amount(h,38.0),ability_action,ABILITIES[h["class"]][slot])
-			elif slot==2:
-				for ally_purify in heroes:if ally_purify.hp>0:deal_healing(h,ally_purify,scaled_ability_amount(h,24.0),ability_action,ABILITIES[h["class"]][slot])
-				for foe_purify in enemies:if foe_purify.hp>0 and foe_purify.pos.distance_to(h.pos)<180:deal_damage(h,foe_purify,scaled_ability_amount(h,30.0),ability_action,"magical",ABILITIES[h["class"]][slot])
-			else:for ally_renewal in heroes:if ally_renewal.hp>0:deal_healing(h,ally_renewal,scaled_ability_amount(h,110.0),ability_action,ABILITIES[h["class"]][slot])
 		"Ranger":
 			if slot==0 and ability_enemy_target>=0:deal_damage(h,enemies[ability_enemy_target],scaled_ability_amount(h,65.0),ability_action,ability_damage_type,ABILITIES[h["class"]][slot])
 			elif slot==1:h.pos=resolved_point;h.dest=h.pos

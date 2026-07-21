@@ -25,7 +25,7 @@ func tutorial_prompt()->String:
 		4:return "Touch and drag Sera onto Brann to order her to heal him." if mobile else "Drag Sera onto Brann and release to order her to heal him."
 		5:return "Sera will keep Brann as her healing target until you give different orders."
 		6:return "Protect Sera! Touch and drag Brann onto the creature." if mobile else "Protect Sera! Drag Brann onto the creature and defeat it."
-		7:return "Both heroes are hurt. Tap Sera, then tap Radiant Mend." if mobile else "Both heroes are hurt. Select Sera, then press Q or click Radiant Mend."
+		7:return "Both heroes are hurt. Tap Sera, then tap Healing Brew." if mobile else "Both heroes are hurt. Select Sera, then press Q or click Healing Brew."
 		8:return "Great work. Tap anywhere to continue." if mobile else "Great work. Click or press any key to continue."
 	return ""
 
@@ -38,7 +38,7 @@ func tutorial_rejection_message()->String:
 		4:return "Drag Sera directly onto Brann to set her healing target."
 		5:return "Watch Sera finish healing Brann."
 		6:return "Move Sera freely, or assign Brann to the Raider to continue."
-		7:return "Select Sera first." if selected!=1 else "Use Radiant Mend with Q or the highlighted button."
+		7:return "Select Sera first." if selected!=1 else "Use Healing Brew with Q or the highlighted button."
 	return "Follow the highlighted action to continue."
 
 func reject_tutorial_action(message:String="")->void:

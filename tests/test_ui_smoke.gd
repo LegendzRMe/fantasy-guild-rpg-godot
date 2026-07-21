@@ -55,6 +55,8 @@ static func run(main:Node) -> Array:
 	main.current_team_slot=-1
 	main.show_team()
 	await main.get_tree().process_frame
+	var team_selector:OptionButton=main.ui.find_child("TeamSelector",true,false)
+	TestSupport.check(errors,team_selector!=null and team_selector.item_count==5 and team_selector.get_item_text(0)=="Team 1" and team_selector.get_item_text(4)=="Team 5","Team Builder should expose five plainly named teams without a separate Active Party entry.")
 	var brann_team_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(180,100) and "Brann" in candidate.text)
 	var reserve_team_card:Button=main.make_team_card(0,"reserve")
 	var team_search:LineEdit=main.ui.find_children("*","LineEdit",true,false).filter(func(candidate):return candidate.placeholder_text=="Search" and candidate.custom_minimum_size.x>0)[0]
@@ -74,10 +76,25 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.state.selected_team==[1,0] and main.state.active_team==[1,0],"Dragging the first Active Party hero onto the second slot should reorder and persist the party.")
 	main.move_to_active_team(0,0)
 	TestSupport.check(errors,main.state.selected_team==[0,1] and main.state.active_team==[0,1],"Active Party order should support moving a hero back to the front slot.")
+	main.current_team_slot=0;main.state.active_team=[0];main.state.selected_team=[1,0]
 	main.show_roster()
 	await main.get_tree().process_frame
+	var roster_team_selector:OptionButton=main.ui.find_child("RosterTeamSelector",true,false)
+	TestSupport.check(errors,roster_team_selector!=null and roster_team_selector.item_count==5 and roster_team_selector.get_item_text(0)=="Team 1" and roster_team_selector.get_item_text(4)=="Team 5","Hero Roster should provide the same five-team selector as Team Builder.")
+	TestSupport.check(errors,main.hero_roster_section=="Abilities" and main.ui.find_child("RosterAbilityQ",true,false)!=null,"Hero Roster should open on the cleaner Abilities workspace by default.")
+	main.select_roster_section("Details")
+	await main.get_tree().process_frame
 	var active_stars:Array[Node]=main.ui.find_children("ActiveTeamStar","Button",true,false)
-	TestSupport.check(errors,active_stars.size()==main.state.heroes.size() and active_stars.all(func(star):return star.text=="★"),"Hero Roster cards should show a filled top-right star for every active-party member.")
+	TestSupport.check(errors,active_stars.size()==main.state.heroes.size() and active_stars.all(func(star):return star.text=="★"),"Hero Roster stars should reflect every member of the party currently selected in Team Builder, not only the default Active Party.")
+	TestSupport.check(errors,main.ui.find_child("RosterPartySummary",true,false)!=null and main.ui.find_children("RosterPartyMember*","Button",true,false).size()==main.state.selected_team.size(),"Hero Roster should keep every selected party member visible in its persistent party strip even when alphabetical paging places them elsewhere.")
+	main.begin_roster_party_press(1,"active",Vector2.ZERO)
+	main.update_roster_party_press(main.ROSTER_PARTY_HOLD_DURATION+.01)
+	TestSupport.check(errors,main.team_dragging and main.team_drag_index==1 and main.team_drag_preview!=null and main.team_drag_preview.size==Vector2(58,48),"Holding a Hero Roster party symbol should begin a compact drag that can reorder or remove that hero.")
+	main.roster_party_press_active=false;main.roster_party_press_index=-1;main.roster_party_press_origin="";main.team_dragging=false;main.team_drag_index=-1;main.team_drag_origin=""
+	if main.team_drag_preview!=null:main.team_drag_preview.queue_free();main.team_drag_preview=null
+	var pinned_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(150,74))
+	TestSupport.check(errors,pinned_cards.size()>=2 and "Sera" in pinned_cards[0].text and "Brann" in pinned_cards[1].text,"The selected party should be pinned to the front of the Hero Roster in party order so every active star stays on the first page.")
+	main.current_team_slot=-1;main.state.active_team=[0,1];main.state.selected_team=[0,1]
 	var compact_roster_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(150,74))
 	var compact_search:LineEdit=main.ui.find_children("*","LineEdit",true,false).filter(func(candidate):return candidate.placeholder_text=="Search" and candidate.custom_minimum_size.x>0)[0]
 	var roster_gap:Control=main.ui.find_child("RosterDetailGap",true,false)
@@ -87,7 +104,7 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,roster_label_texts.any(func(text):return str(text).begins_with("Prestige")) and ["HEALTH","POWER","ARMOR"].all(func(title):return title in roster_label_texts),"Hero Roster should show Prestige plus compact Health, Power, and Armor stat tiles.")
 	TestSupport.check(errors,not roster_label_texts.any(func(text):return "Member Type" in str(text) or "Hero Legacy" in str(text) or "Gear Score" in str(text) or "SPECIAL HERO" in str(text)),"Retired Hero Roster labels should no longer be displayed.")
 	var details_grid:GridContainer=main.ui.find_child("RosterDetailsGrid",true,false)
-	TestSupport.check(errors,details_grid!=null and details_grid.columns==2 and details_grid.get_child_count()==2 and ["RosterDetailsAction","RosterDetailsDefense","RosterDetailsCriticalHeading","RosterDetailsProficienciesHeading"].all(func(node_name):return main.ui.find_child(node_name,true,false)!=null),"Details should organize its four player-facing categories into two balanced information columns.")
+	TestSupport.check(errors,details_grid!=null and details_grid.columns==2 and details_grid.get_child_count()==4 and ["RosterDetailsAction","RosterDetailsDefense","RosterDetailsCritical","RosterDetailsProficiencies"].all(func(node_name):return main.ui.find_child(node_name,true,false)!=null),"Details should organize its four player-facing categories into a compact two-by-two grid.")
 	TestSupport.check(errors,["BASIC ATTACK","DEFENSE & MOVEMENT","CRITICALS","PROFICIENCIES"].all(func(title):return title in roster_label_texts) and not roster_label_texts.any(func(text):return "CURRENT ATTRIBUTES" in str(text) or "EQUIPMENT EFFECTS" in str(text) or "consolidated view" in str(text)),"Details should use clear category headings without the old unstructured attribute list or empty equipment copy.")
 	main.selected_roster_index=1;main.show_roster();await main.get_tree().process_frame
 	var cleric_action_heading:Label=main.ui.find_child("RosterDetailsActionHeading",true,false)
@@ -105,12 +122,12 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,hero_experience!=null and hero_experience.custom_minimum_size==Vector2(330,24) and hero_experience.get_parent().name=="HeroExperienceRow" and hero_experience.get_parent().custom_minimum_size.x==464 and hero_experience.get_parent().alignment==BoxContainer.ALIGNMENT_CENTER,"The restrained experience bar should sit on a portrait-centered compact row immediately beneath hero identity.")
 	TestSupport.check(errors,hero_portrait!=null and hero_stats_group!=null and hero_stats_group.custom_minimum_size==Vector2(230,54) and main.ui.find_children("HeroStat*Value","Label",true,false).size()==3,"Health, Power, and Armor should use three compact tiles aligned to the portrait width.")
 	TestSupport.check(errors,is_equal_approx(hero_experience.global_position.x+hero_experience.size.x*.5,hero_portrait.global_position.x+hero_portrait.size.x*.5) and is_equal_approx(hero_stats_group.global_position.x+hero_stats_group.size.x*.5,hero_portrait.global_position.x+hero_portrait.size.x*.5),"The experience bar and stat tiles should share the hero portrait's rendered horizontal center.")
-	TestSupport.check(errors,main.hero_roster_section=="Details" and main.ui.find_child("RosterWorkspacePanel",true,false)!=null,"Hero Roster should open its large right-side workspace on Details.")
+	TestSupport.check(errors,main.hero_roster_section=="Details" and main.ui.find_child("RosterWorkspacePanel",true,false)!=null,"Hero Roster should retain an explicitly chosen workspace while changing heroes.")
 	main.select_roster_section("Abilities")
 	await main.get_tree().process_frame
 	var abilities_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	TestSupport.check(errors,main.ui.find_child("RosterTrait",true,false)!=null and main.ui.find_children("RosterAbility*","PanelContainer",true,false).size()==4 and main.ui.find_children("AbilityKeyBadge","Control",true,false).size()==5 and abilities_content.get_child_count()==6,"The concise Abilities workspace should show visual Q/W/E/R/D rows, including a locked Heroic placeholder.")
-	TestSupport.check(errors,abilities_content.get_child(1).name=="RosterAbilityQ" and abilities_content.get_child(2).name=="RosterAbilityW" and abilities_content.get_child(3).name=="RosterAbilityE" and abilities_content.get_child(4).name=="RosterAbilityR" and abilities_content.get_child(5).name=="RosterTrait","Hero Roster abilities should follow the combat action-bar order: Q, W, E, R, then D.")
+	TestSupport.check(errors,main.ui.find_child("RosterTrait",true,false)!=null and main.ui.find_children("RosterAbility*","PanelContainer",true,false).size()==4 and main.ui.find_children("AbilityKeyBadge","Control",true,false).size()==5 and abilities_content.get_child_count()==5,"The concise Abilities workspace should show only its visual Q/W/E/R/D rows without repeating the selected tab title.")
+	TestSupport.check(errors,abilities_content.get_child(0).name=="RosterAbilityQ" and abilities_content.get_child(1).name=="RosterAbilityW" and abilities_content.get_child(2).name=="RosterAbilityE" and abilities_content.get_child(3).name=="RosterAbilityR" and abilities_content.get_child(4).name=="RosterTrait","Hero Roster abilities should follow the combat action-bar order: Q, W, E, R, then D.")
 	var locked_heroic_text:String="\n".join(main.ui.find_child("RosterAbilityR",true,false).find_children("*","Label",true,false).map(func(candidate):return candidate.text))
 	TestSupport.check(errors,locked_heroic_text.contains("Choose your Heroic at Level 15") and not locked_heroic_text.contains("Avatar") and not locked_heroic_text.contains("Haymaker"),"A Hero without a selected Heroic should see only a locked R placeholder and its unlock level.")
 	main.open_roster_ability_details(main.state.heroes[0],"Q");await main.get_tree().process_frame
@@ -125,20 +142,27 @@ static func run(main:Node) -> Array:
 	main.select_roster_section("Talents")
 	await main.get_tree().process_frame
 	var talents_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	TestSupport.check(errors,talents_content.get_child_count()==9 and main.ui.find_child("TalentOption_guardian_l15_r1",true,false)!=null and main.ui.find_child("TalentOption_guardian_l15_r2",true,false)!=null,"The visual Talent Tree should retain revealed Heroic choices even while Abilities hides an unselected R.")
-	main.ui.find_child("TalentOption_guardian_l9_2",true,false).emit_signal("pressed");await main.get_tree().process_frame
-	TestSupport.check(errors,main.state.heroes[0].planned_talents.get("tier_1","")=="guardian_l9_2" and main.ui.find_child("TalentOption_guardian_l9_2",true,false).text.contains("PLANNED"),"A revealed future talent should support one visible, changeable planned heart without granting its gameplay effect.")
+	TestSupport.check(errors,talents_content.get_child_count()==8 and main.ui.find_child("TalentOption_guardian_l15_r1",true,false)!=null and main.ui.find_child("TalentOption_guardian_l15_r2",true,false)!=null,"The visual Talent Tree should retain all eight tiers without repeating the selected tab title.")
+	var talent_scroll:ScrollContainer=main.ui.find_child("RosterSectionScroll",true,false);talent_scroll.scroll_vertical=220;await main.get_tree().process_frame
+	var planned_holder:Control=main.ui.find_child("TalentOption_guardian_l9_2",true,false);var planned_heart:Button=planned_holder.find_child("TalentPlanHeart",true,false);planned_heart.pressed.emit();await main.get_tree().process_frame;await main.get_tree().process_frame
+	planned_holder=main.ui.find_child("TalentOption_guardian_l9_2",true,false);planned_heart=planned_holder.find_child("TalentPlanHeart",true,false)
+	TestSupport.check(errors,main.state.heroes[0].planned_talents.get("tier_1","")=="guardian_l9_2" and planned_heart.text=="♥" and main.ui.find_child("RosterSectionScroll",true,false).scroll_vertical>=180,"Planning a future talent should update its top-right heart without resetting the Talent Tree to the top.")
 	main.state.heroes[0].level=30;main.select_roster_section("Talents");await main.get_tree().process_frame
-	main.ui.find_child("TalentOption_guardian_l9_1",true,false).emit_signal("pressed");await main.get_tree().process_frame
-	TestSupport.check(errors,main.state.heroes[0].selected_talents.get("tier_1","")=="guardian_l9_1" and main.ui.find_child("TalentOption_guardian_l9_1",true,false).text.contains("SELECTED"),"An unlocked talent card should be selectable and immediately show its selected state.")
-	main.ui.find_child("TalentOption_guardian_l15_r2",true,false).emit_signal("pressed");await main.get_tree().process_frame
-	var avatar_upgrade:Button=main.ui.find_child("TalentOption_guardian_l27_r1",true,false);var haymaker_upgrade:Button=main.ui.find_child("TalentOption_guardian_l27_r2",true,false)
-	TestSupport.check(errors,main.state.heroes[0].selected_heroic_id=="guardian_l15_r2" and avatar_upgrade.disabled and not haymaker_upgrade.disabled,"Choosing a Heroic should enable only its matching Level 27 upgrade.")
+	var tier_one_card:Button=main.ui.find_child("TalentOption_guardian_l9_1",true,false).find_child("TalentOptionCard",true,false);tier_one_card.button_down.emit();await main.get_tree().create_timer(.9).timeout;await main.get_tree().process_frame
+	var selected_badge:Label=main.ui.find_child("TalentOption_guardian_l9_1",true,false).find_child("TalentStateBadge",true,false)
+	TestSupport.check(errors,main.state.heroes[0].selected_talents.get("tier_1","")=="guardian_l9_1" and selected_badge.text=="SELECTED","An unlocked talent should require the explicit confirmation signal and immediately show its selected state.")
+	var heroic_view:Control=main.ui.find_child("TalentTier3",true,false);heroic_view.emit_signal("selection_confirmed","tier_3","guardian_l15_r2");await main.get_tree().process_frame
+	var avatar_upgrade:Control=main.ui.find_child("TalentOption_guardian_l27_r1",true,false);var haymaker_upgrade:Control=main.ui.find_child("TalentOption_guardian_l27_r2",true,false)
+	var avatar_card:Button=avatar_upgrade.find_child("TalentOptionCard",true,false);var haymaker_card:Button=haymaker_upgrade.find_child("TalentOptionCard",true,false)
+	TestSupport.check(errors,main.state.heroes[0].selected_heroic_id=="guardian_l15_r2" and not avatar_card.tooltip_text.begins_with("Hold") and haymaker_card.tooltip_text.begins_with("Hold") and avatar_upgrade.find_child("TalentStateBadge",true,false)==null and haymaker_upgrade.find_child("TalentStateBadge",true,false)==null,"Choosing a Heroic should enable only its matching Level 27 upgrade without adding per-card instruction labels.")
+	main.state.heroes[0]=TalentSystem.clear_all(main.state.heroes[0]);main.state.heroes[0].level=9;main.battle_hero_indices=[0];main.victory_level_ups=[{"slot":0,"level":9,"talent_tiers":["tier_1"]}];main.current_ashwood_encounter="";main.victory_talent_prompt_handled=false
+	TestSupport.check(errors,main.open_victory_talent_choices() and main.ui.find_child("VictoryTalentChoiceOverlay",true,false)!=null and main.ui.find_child("VictoryTalentDecideLater",true,false)!=null,"A newly unlocked tier should offer its talent choices on the Victory screen with an explicit Decide Later option.")
+	main.close_victory_talent_overlay();main.victory_talent_queue.clear();main.victory_talent_prompt_handled=false
 	main.state.heroes[0]=TalentSystem.clear_all(main.state.heroes[0]);main.state.heroes[0].level=1
 	main.select_roster_section("Professions")
 	await main.get_tree().process_frame
 	var professions_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	TestSupport.check(errors,professions_content.get_child_count()==1,"The empty Professions workspace should show only its title without implementation notes.")
+	TestSupport.check(errors,professions_content.get_child_count()==0,"The empty Professions workspace should not repeat the selected tab title or add placeholder copy.")
 	main.select_roster_section("Details")
 	await main.get_tree().process_frame
 	main.state.heroes[0].is_special_hero=true
@@ -175,7 +199,7 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.screen=="combat" and main.current_ashwood_encounter=="first_battle","Selecting Encounter 1 should skip previews and immediately begin combat.")
 	TestSupport.check(errors,main.heroes.size()==2 and main.heroes.map(func(hero):return hero["class"])==["Guardian","Cleric"],"Encounter 1 should deploy both founding heroes.")
 	TestSupport.check(errors,main.heroes[0].pos==Vector2(210,320) and main.heroes[1].pos==Vector2(145,215) and main.battle_formation_position(2)==Vector2(145,425) and main.battle_formation_position(3)==Vector2(90,320),"Combat should deploy ordered party slots as front, top, bottom, and back points of a diamond.")
-	TestSupport.check(errors,main.heroes[0].max_hp==2765.0 and main.heroes[1].max_hp==150.0,"Level-one heroes should begin at class base health without receiving the level-two health bonus early.")
+	TestSupport.check(errors,main.heroes[0].max_hp==2765.0 and main.heroes[1].max_hp==1500.0,"Level-one heroes should begin at class base health without receiving the level-two health bonus early.")
 	TestSupport.check(errors,main.objective_banner_time>0 and main.objective_combat_intro!="","Encounter 1 should briefly combine its story line and objective in the combat banner.")
 	main.spawn_enemy(Vector2(1050,250),"Swift")
 	main.spawn_enemy(Vector2(1050,420),"Stalker")
@@ -402,7 +426,7 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.ui.find_child("TestingResetStoryButton",true,false)!=null,"The testing World Map should expose the Ashwood story reset tool.")
 	TestSupport.check(errors,main.ui.find_child("TestingWorldRegion",true,false)!=null,"The testing World Map should expose its training range.")
 	main.show_roster();await main.get_tree().process_frame
-	var empty_head_slot:Button=main.ui.find_child("HeroEquipmentSlotHead",true,false);var empty_head_icon:Label=empty_head_slot.find_child("HeroEquipmentIcon",true,false) if empty_head_slot!=null else null;TestSupport.check(errors,empty_head_slot!=null and empty_head_slot.text=="" and empty_head_slot.tooltip_text=="" and empty_head_icon!=null and empty_head_icon.autowrap_mode==TextServer.AUTOWRAP_OFF and empty_head_icon.horizontal_alignment==HORIZONTAL_ALIGNMENT_CENTER and empty_head_icon.vertical_alignment==VERTICAL_ALIGNMENT_CENTER and empty_head_icon.get_theme_font_size("font_size")==16 and empty_head_slot.custom_minimum_size==Vector2(105,70),"Empty Hero equipment labels should be compact, unwrapped, and centered inside their slots.")
+	var empty_head_slot:Button=main.ui.find_child("HeroEquipmentSlotHead",true,false);var empty_head_icon:Control=empty_head_slot.find_child("HeroEquipmentIcon",true,false) if empty_head_slot!=null else null;TestSupport.check(errors,empty_head_slot!=null and empty_head_slot.text=="" and empty_head_slot.tooltip_text=="" and empty_head_icon!=null and empty_head_icon.get_script()==main.EquipmentSlotSilhouette and empty_head_slot.custom_minimum_size==Vector2(105,70),"Empty Hero equipment slots should use centered visual silhouettes without text labels.")
 	main.select_equipment_slot("weapon");await main.get_tree().process_frame
 	var carousel_card:Control=main.ui.find_child("EquipmentCarouselCard",true,false);var carousel_name:Label=main.ui.find_child("ItemCardName",true,false)
 	TestSupport.check(errors,main.ui.find_child("HeroEquipmentBrowser",true,false)==null and main.ui.find_child("ItemCardBackdrop",true,false)!=null and carousel_card!=null and main.ui.find_child("EquipmentCarouselTapTarget",true,false)!=null and carousel_name!=null and carousel_name.text=="STORMBREAKER" and main.item_carousel_items.all(func(item):return ItemData.compatibility_reason(item,GameData.CLASSES.Guardian,"Guardian")==""),"The Hero Roster slot should open a darkened, directly tappable compatible-item card carousel without replacing Details.")
@@ -438,7 +462,7 @@ static func run(main:Node) -> Array:
 	main.state.selected_team=[0,1,4,2];main.state.active_team=[0,1,4,2]
 	main.state.heroes[1].level=6
 	main.start_testing_zone()
-	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==6 and main.enemies.any(func(enemy):return bool(enemy.get("boss",false))),"The testing range should retain its dummy layout and add a Boss-control target without waves.")
+	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==7 and main.enemies.filter(func(enemy):return bool(enemy.get("boss",false))).size()==2 and main.enemies.any(func(enemy):return float(enemy.get("control_profile",{}).get("blind_duration_multiplier",0.0))==0.5),"The testing range should retain its dummy layout and include default-immune and partially Blind-vulnerable Boss targets without waves.")
 	var input_guardian:Dictionary=main.heroes[0];main.selected=0;input_guardian.selected_talents={"tier_6":"guardian_l24_2"};input_guardian.ability_cds[4]=0.0;main.begin_trait()
 	TestSupport.check(errors,input_guardian.guardian_runtime.stoneform_remaining==10.0 and input_guardian.ability_cds[4]==60.0,"The existing D Trait input should activate Stoneform and expose its cooldown without another action slot.")
 	input_guardian.guardian_runtime.stoneform_remaining=0.0

@@ -2,7 +2,9 @@ extends "res://scripts/runtime/app_core.gd"
 
 const AbilityKeyBadge = preload("res://scripts/ui/ability_key_badge.gd")
 const GuardianAbilityPresenter = preload("res://scripts/data/guardian_ability_presenter.gd")
+const ClericAbilityPresenter = preload("res://scripts/data/cleric_ability_presenter.gd")
 const TalentTierView = preload("res://scripts/ui/talent_tier_view.gd")
+const EquipmentSlotSilhouette = preload("res://scripts/ui/equipment_slot_silhouette.gd")
 
 func make_roster_ability_row(key_text:String,title:String,description:String,accent:Color,locked:bool=false,details_action:Callable=Callable())->PanelContainer:
 	var card:=PanelContainer.new();card.name="RosterTrait" if key_text=="D" else "RosterAbility%s"%key_text;card.custom_minimum_size=Vector2(600,58);card.add_theme_stylebox_override("panel",ui_box(Color("182334") if not locked else Color("151e2c"),6,Color("35445a"),1))
@@ -20,15 +22,28 @@ func make_roster_ability_row(key_text:String,title:String,description:String,acc
 func close_roster_ability_details(overlay:Control)->void:
 	if overlay!=null and is_instance_valid(overlay):overlay.queue_free()
 
+func fit_roster_ability_details(panel:PanelContainer,scroll:ScrollContainer,body:VBoxContainer)->void:
+	await get_tree().process_frame
+	if not is_instance_valid(panel) or not is_instance_valid(scroll) or not is_instance_valid(body):return
+	var body_height:=body.get_combined_minimum_size().y
+	var desired_height:=clampf(body_height+160.0,230.0,580.0)
+	panel.size=Vector2(680,desired_height)
+	panel.position=Vector2((W-panel.size.x)*.5,(H-panel.size.y)*.5)
+	scroll.custom_minimum_size.y=minf(body_height,desired_height-160.0)
+
 func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:String="")->void:
 	var details:Dictionary
 	if str(hero.get("class",""))=="Guardian":details=GuardianAbilityPresenter.details(hero,action_key,heroic_id,float(hero_final_stats(hero).power))
+	elif str(hero.get("class",""))=="Cleric":
+		var presenter_hero:=hero.duplicate(true);presenter_hero["power"]=float(hero_final_stats(hero).power)
+		if not presenter_hero.has("cleric_runtime"):ClericSystem.initialize_runtime(presenter_hero,false)
+		details=ClericAbilityPresenter.details(presenter_hero,action_key,heroic_id)
 	else:
 		var action_keys:Array=["Q","W","E","R"];var slot:=action_keys.find(action_key)
 		details={"key":action_key,"title":str(TRAITS[hero["class"]]) if action_key=="D" else str(ABILITIES[hero["class"]][slot]),"meta":"Passive Trait" if action_key=="D" else "Ability","description":"Passive Trait" if action_key=="D" else ability_tooltip(hero["class"],slot),"sections":[],"note":""}
 	var overlay:=Control.new();overlay.name="RosterAbilityDetailsOverlay";overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);overlay.mouse_filter=Control.MOUSE_FILTER_STOP;ui.add_child(overlay)
 	var backdrop:=Button.new();backdrop.name="RosterAbilityDetailsBackdrop";backdrop.flat=true;backdrop.focus_mode=Control.FOCUS_NONE;backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);backdrop.add_theme_stylebox_override("normal",ui_box(Color(0.01,0.02,0.04,.78),0));backdrop.pressed.connect(func():close_roster_ability_details(overlay));overlay.add_child(backdrop)
-	var panel:=PanelContainer.new();panel.name="RosterAbilityDetailsCard";panel.position=Vector2(300,70);panel.size=Vector2(680,580);panel.add_theme_stylebox_override("panel",ui_box(Color("1b283a"),10,CLASSES[hero["class"]].color,2));overlay.add_child(panel)
+	var panel:=PanelContainer.new();panel.name="RosterAbilityDetailsCard";panel.position=Vector2(300,230);panel.size=Vector2(680,260);panel.add_theme_stylebox_override("panel",ui_box(Color("1b283a"),10,CLASSES[hero["class"]].color,2));overlay.add_child(panel)
 	var margin:=MarginContainer.new();margin.add_theme_constant_override("margin_left",26);margin.add_theme_constant_override("margin_right",26);margin.add_theme_constant_override("margin_top",24);margin.add_theme_constant_override("margin_bottom",24);panel.add_child(margin)
 	var column:=VBoxContainer.new();column.add_theme_constant_override("separation",12);margin.add_child(column)
 	var header:=HBoxContainer.new();header.add_theme_constant_override("separation",16);column.add_child(header)
@@ -46,27 +61,129 @@ func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:Str
 	if str(details.note)!="":
 		body.add_child(rule())
 		var note:=label(str(details.note),12,C_MUTED);note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;body.add_child(note)
+	fit_roster_ability_details(panel,scroll,body)
 
 func guardian_talent_name(talent_id:String)->String:
+	if talent_id.begins_with("cleric_"):return str(ClericData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 	return str(GuardianData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 
 func roster_talent_description(hero_class:String,option_id:String)->String:
 	if hero_class=="Guardian":return str(GuardianData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
+	if hero_class=="Cleric":return str(ClericData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
 	return "Talent details are still being developed."
 
-func choose_or_plan_roster_talent(tier_id:String,option_id:String)->void:
-	if selected_roster_index<0 or selected_roster_index>=state.heroes.size():return
-	var hero:Dictionary=state.heroes[selected_roster_index];var definition:=GameData.class_definition(str(hero.get("class","")));var required_level:=int(TalentSystem.TIER_LEVELS.get(tier_id,999))
-	if int(hero.get("level",1))>=required_level:
-		var result:=TalentSystem.select_option(hero,definition,tier_id,option_id)
-		if not bool(result.get("success",false)):return
-		state.heroes[selected_roster_index]=result.hero
-	else:
-		var planned_id:=str(hero.get("planned_talents",{}).get(tier_id,""))
-		state.heroes[selected_roster_index]=TalentSystem.clear_planned_option(hero,tier_id) if planned_id==option_id else TalentSystem.plan_option(hero,definition,tier_id,option_id)
-	save_game();hero_roster_section="Talents";show_roster()
+func remember_roster_scroll()->void:
+	var scroll:=ui.find_child("RosterSectionScroll",true,false) as ScrollContainer
+	if scroll!=null:
+		hero_roster_scroll_positions["%d:%s"%[selected_roster_index,hero_roster_section]]=scroll.scroll_vertical
 
-func make_roster_talent_tier(hero:Dictionary,class_definition:Dictionary,class_id:String,discovery:Dictionary,tier_number:int)->Control:
+func restore_roster_scroll(scroll:ScrollContainer,key:String)->void:
+	await get_tree().process_frame
+	if is_instance_valid(scroll):scroll.scroll_vertical=int(hero_roster_scroll_positions.get(key,0))
+
+func refresh_roster_preserving_scroll()->void:
+	remember_roster_scroll();show_roster()
+
+func plan_roster_talent(hero_index:int,tier_id:String,option_id:String,refresh:bool=true)->void:
+	if hero_index<0 or hero_index>=state.heroes.size():return
+	var hero:Dictionary=state.heroes[hero_index];var definition:=GameData.class_definition(str(hero.get("class","")))
+	var planned_id:=str(hero.get("planned_talents",{}).get(tier_id,""))
+	state.heroes[hero_index]=TalentSystem.clear_planned_option(hero,tier_id) if planned_id==option_id else TalentSystem.plan_option(hero,definition,tier_id,option_id)
+	save_game()
+	if refresh:hero_roster_section="Talents";refresh_roster_preserving_scroll()
+
+func confirm_roster_talent(hero_index:int,tier_id:String,option_id:String,refresh:bool=true)->bool:
+	if hero_index<0 or hero_index>=state.heroes.size():return false
+	var hero:Dictionary=state.heroes[hero_index];var definition:=GameData.class_definition(str(hero.get("class","")))
+	var result:=TalentSystem.select_option(hero,definition,tier_id,option_id)
+	if not bool(result.get("success",false)):
+		flash(str(result.get("reason","That talent cannot be selected.")));return false
+	state.heroes[hero_index]=result.hero;save_game()
+	if refresh:hero_roster_section="Talents";refresh_roster_preserving_scroll()
+	return true
+
+func open_roster_talent_details(hero_index:int,tier_id:String,option_id:String)->void:
+	if hero_index<0 or hero_index>=state.heroes.size():return
+	var hero:Dictionary=state.heroes[hero_index]
+	var overlay:=Control.new();overlay.name="RosterTalentDetailsOverlay";overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);overlay.mouse_filter=Control.MOUSE_FILTER_STOP;ui.add_child(overlay)
+	var backdrop:=Button.new();backdrop.name="RosterTalentDetailsBackdrop";backdrop.flat=true;backdrop.focus_mode=Control.FOCUS_NONE;backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);backdrop.add_theme_stylebox_override("normal",ui_box(Color(0.01,0.02,0.04,.78),0));backdrop.pressed.connect(func():overlay.queue_free());overlay.add_child(backdrop)
+	var panel:=PanelContainer.new();panel.name="RosterTalentDetailsCard";panel.position=Vector2(340,145);panel.size=Vector2(600,430);panel.add_theme_stylebox_override("panel",ui_box(Color("1b283a"),10,CLASSES[hero["class"]].color,2));overlay.add_child(panel)
+	var margin:=MarginContainer.new()
+	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,24)
+	panel.add_child(margin)
+	var column:=VBoxContainer.new();column.add_theme_constant_override("separation",12);margin.add_child(column)
+	var tier_number:=int(tier_id.trim_prefix("tier_"));column.add_child(label("TIER %d  •  LEVEL %d"%[tier_number,int(TalentSystem.TIER_LEVELS.get(tier_id,0))],13,C_GOLD))
+	column.add_child(label(guardian_talent_name(option_id).to_upper(),25,CLASSES[hero["class"]].color));column.add_child(rule())
+	var description:=label(roster_talent_description(str(hero.get("class","")),option_id),16,C_TEXT);description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(description)
+	var selected:=str(hero.get("selected_talents",{}).get(tier_id,""))==option_id
+	var required_level:=int(TalentSystem.TIER_LEVELS.get(tier_id,999))
+	var footer_text:="SELECTED" if selected else "Hold this talent on the tree to choose it." if int(hero.get("level",1))>=required_level else "UNLOCKS AT LEVEL %d"%required_level
+	if footer_text!="":
+		var footer:=label(footer_text,14,C_GOLD if selected else C_MUTED);footer.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;column.add_child(footer)
+
+func victory_talent_unlocks()->Array:
+	var unlocks:Array=[]
+	var level_ups:Array=pending_victory.get("rewards",{}).get("level_ups",[]) if current_ashwood_encounter!="" else victory_level_ups
+	for level_up in level_ups:
+		var hero_index:=int(level_up.get("hero_index",-1))
+		if hero_index<0 and level_up.has("slot"):
+			var slot:=int(level_up.slot);hero_index=int(battle_hero_indices[slot]) if slot>=0 and slot<battle_hero_indices.size() else -1
+		if hero_index<0 or hero_index>=state.heroes.size():continue
+		for tier_id in level_up.get("talent_tiers",[]):
+			if str(state.heroes[hero_index].get("selected_talents",{}).get(str(tier_id),""))=="":unlocks.append({"hero_index":hero_index,"tier_id":str(tier_id)})
+	return unlocks
+
+func open_victory_talent_choices()->bool:
+	if victory_talent_prompt_handled:return false
+	victory_talent_prompt_handled=true;victory_talent_queue=victory_talent_unlocks();victory_talent_choice_index=0
+	if victory_talent_queue.is_empty():return false
+	show_victory_talent_choice();return true
+
+func close_victory_talent_overlay()->void:
+	if victory_talent_overlay!=null and is_instance_valid(victory_talent_overlay):victory_talent_overlay.queue_free()
+	victory_talent_overlay=null
+
+func advance_victory_talent_choice()->void:
+	victory_talent_choice_index+=1
+	if victory_talent_choice_index>=victory_talent_queue.size():
+		close_victory_talent_overlay();ui.visible=false;complete_victory_sequence_navigation();return
+	show_victory_talent_choice()
+
+func victory_plan_talent(hero_index:int,tier_id:String,option_id:String)->void:
+	plan_roster_talent(hero_index,tier_id,option_id,false);show_victory_talent_choice()
+
+func victory_confirm_talent(hero_index:int,tier_id:String,option_id:String)->void:
+	if confirm_roster_talent(hero_index,tier_id,option_id,false):advance_victory_talent_choice()
+
+func show_victory_talent_choice()->void:
+	close_victory_talent_overlay()
+	if victory_talent_choice_index<0 or victory_talent_choice_index>=victory_talent_queue.size():return
+	var entry:Dictionary=victory_talent_queue[victory_talent_choice_index];var hero_index:=int(entry.hero_index);var tier_id:=str(entry.tier_id);var hero:Dictionary=state.heroes[hero_index]
+	var class_definition:=GameData.class_definition(str(hero.get("class","")));var class_id:=str(class_definition.get("class_id",GameData.class_id_for(str(hero.get("class","")))));var tier_number:=int(tier_id.trim_prefix("tier_"))
+	ui.visible=true
+	var overlay:=Control.new();overlay.name="VictoryTalentChoiceOverlay";overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);overlay.mouse_filter=Control.MOUSE_FILTER_STOP;ui.add_child(overlay);victory_talent_overlay=overlay
+	var shade:=ColorRect.new();shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.color=Color(0.01,0.02,0.04,.82);shade.mouse_filter=Control.MOUSE_FILTER_STOP;overlay.add_child(shade)
+	var panel:=PanelContainer.new();panel.position=Vector2(210,105);panel.size=Vector2(860,510);panel.add_theme_stylebox_override("panel",ui_box(Color("172234"),10,CLASSES[hero["class"]].color,2));overlay.add_child(panel)
+	var margin:=MarginContainer.new()
+	for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,26)
+	panel.add_child(margin)
+	var column:=VBoxContainer.new();column.add_theme_constant_override("separation",14);margin.add_child(column)
+	var heading:=HBoxContainer.new();column.add_child(heading)
+	var heading_copy:=VBoxContainer.new();heading_copy.size_flags_horizontal=Control.SIZE_EXPAND_FILL;heading.add_child(heading_copy);heading_copy.add_child(label("NEW TALENT TIER",28,C_GOLD));heading_copy.add_child(label("%s  •  Level %d %s"%[str(hero.get("name","Hero")),int(hero.get("level",1)),str(hero.get("class",""))],16,C_MUTED))
+	var counter:=label("%d / %d"%[victory_talent_choice_index+1,victory_talent_queue.size()],14,C_MUTED);counter.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;heading.add_child(counter)
+	column.add_child(rule())
+	var tier_view:=make_roster_talent_tier(hero,class_definition,class_id,state.get("class_talent_discovery",{}),tier_number,hero_index) as TalentTierView
+	# Replace roster-refresh actions with victory-specific actions.
+	for connection in tier_view.plan_toggled.get_connections():tier_view.plan_toggled.disconnect(connection.callable)
+	for connection in tier_view.selection_confirmed.get_connections():tier_view.selection_confirmed.disconnect(connection.callable)
+	tier_view.plan_toggled.connect(func(requested_tier:String,requested_option:String):victory_plan_talent(hero_index,requested_tier,requested_option))
+	tier_view.selection_confirmed.connect(func(requested_tier:String,requested_option:String):victory_confirm_talent(hero_index,requested_tier,requested_option))
+	column.add_child(tier_view)
+	var help:=label("Tap a talent for details. Hold it until the bar fills to choose it.",14,C_MUTED);help.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;column.add_child(help)
+	var spacer:=Control.new();spacer.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(spacer)
+	var later:=compact_button("DECIDE LATER",advance_victory_talent_choice,190);later.name="VictoryTalentDecideLater";later.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;column.add_child(later)
+
+func make_roster_talent_tier(hero:Dictionary,class_definition:Dictionary,class_id:String,discovery:Dictionary,tier_number:int,hero_index:int=-1)->Control:
 	var tier_id:="tier_%d"%tier_number;var tier_definition:=TalentSystem.tier_definition(class_definition,tier_id)
 	if tier_definition.is_empty():return Control.new()
 	var required_level:=int(tier_definition.get("unlock_level",TalentSystem.TIER_LEVELS.get(tier_id,999)));var revealed:=TalentSystem.tier_is_revealed(discovery,class_id,tier_id,is_testing_save());var hero_level:=int(hero.get("level",1));var selected_id:=str(hero.get("selected_talents",{}).get(tier_id,""));var planned_id:=str(hero.get("planned_talents",{}).get(tier_id,""));var options:Array=[]
@@ -74,8 +191,13 @@ func make_roster_talent_tier(hero:Dictionary,class_definition:Dictionary,class_i
 		var option_id:=str(raw_option_id);var available:=true;var unavailable_reason:=""
 		if hero_level>=required_level:
 			var validation:=TalentSystem.validate_selection(hero,class_definition,tier_id,option_id);available=bool(validation.valid) or option_id==selected_id;unavailable_reason=str(validation.reason)
-		options.append({"id":option_id,"display_name":guardian_talent_name(option_id) if str(hero.get("class",""))=="Guardian" else option_id.replace("_"," ").capitalize(),"description":roster_talent_description(str(hero.get("class","")),option_id),"selected":option_id==selected_id,"planned":option_id==planned_id,"available":available,"unavailable_reason":unavailable_reason,"class_name":str(hero.get("class","Hero"))})
-	var view:=TalentTierView.new();view.configure(tier_id,tier_number,required_level,str(tier_definition.get("kind","talent")),hero_level,revealed,options,CLASSES[hero["class"]].color,C_TEXT,C_MUTED,C_GOLD);view.option_pressed.connect(choose_or_plan_roster_talent);return view
+		options.append({"id":option_id,"display_name":guardian_talent_name(option_id) if str(hero.get("class","")) in ["Guardian","Cleric"] else option_id.replace("_"," ").capitalize(),"description":roster_talent_description(str(hero.get("class","")),option_id),"selected":option_id==selected_id,"planned":option_id==planned_id,"available":available,"unavailable_reason":unavailable_reason,"class_name":str(hero.get("class","Hero"))})
+	var resolved_index:=selected_roster_index if hero_index<0 else hero_index
+	var view:=TalentTierView.new();view.configure(tier_id,tier_number,required_level,str(tier_definition.get("kind","talent")),hero_level,revealed,options,CLASSES[hero["class"]].color,C_TEXT,C_MUTED,C_GOLD)
+	view.details_requested.connect(func(requested_tier:String,requested_option:String):open_roster_talent_details(resolved_index,requested_tier,requested_option))
+	view.plan_toggled.connect(func(requested_tier:String,requested_option:String):plan_roster_talent(resolved_index,requested_tier,requested_option))
+	view.selection_confirmed.connect(func(requested_tier:String,requested_option:String):confirm_roster_talent(resolved_index,requested_tier,requested_option))
+	return view
 
 func make_roster_card(idx:int) -> Button:
 
@@ -83,10 +205,50 @@ func make_roster_card(idx:int) -> Button:
 	var card:=Button.new(); card.custom_minimum_size=Vector2(150,74); card.text="%s\n%s\n%s  •  Level %d" % [role_glyph(h["class"]),h["name"],h["class"],h["level"]];card.focus_mode=Control.FOCUS_NONE
 	card.add_theme_font_size_override("font_size",13); card.add_theme_color_override("font_color",CLASSES[h["class"]].color if idx==selected_roster_index else C_TEXT)
 	card.add_theme_stylebox_override("normal",ui_box(Color("202d42"),4,Color("35445a"),1));card.add_theme_stylebox_override("hover",ui_box(Color("293a53"),4,CLASSES[h["class"]].color,1));card.add_theme_stylebox_override("pressed",ui_box(Color("172131"),4,CLASSES[h["class"]].color,2))
-	var active_star:=Button.new();active_star.name="ActiveTeamStar";active_star.text="★" if hero_is_on_active_team(idx) else "☆";active_star.position=Vector2(114,0);active_star.size=Vector2(32,32);active_star.flat=true;active_star.focus_mode=Control.FOCUS_NONE;active_star.tooltip_text="Remove from Active Party" if hero_is_on_active_team(idx) else "Add to Active Party";active_star.add_theme_font_size_override("font_size",20);active_star.add_theme_color_override("font_color",C_GOLD if hero_is_on_active_team(idx) else C_MUTED);active_star.pressed.connect(func(i=idx):toggle_active_team_from_roster(i));card.add_child(active_star)
+	var is_party_member:=hero_is_on_active_team(idx)
+	var active_star:=Button.new();active_star.name="ActiveTeamStar";active_star.text="★" if is_party_member else "☆";active_star.position=Vector2(112,0);active_star.size=Vector2(36,34);active_star.flat=true;active_star.focus_mode=Control.FOCUS_NONE;active_star.tooltip_text="Remove from selected party" if is_party_member else "Add to selected party";active_star.add_theme_font_size_override("font_size",20);active_star.add_theme_color_override("font_color",C_GOLD if is_party_member else C_MUTED)
+	active_star.gui_input.connect(func(event,i=idx):
+		if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:begin_roster_party_press(i,"reserve",event.position)
+		elif event is InputEventScreenTouch and event.pressed:begin_roster_party_press(i,"reserve",event.position))
+	card.add_child(active_star)
 	if idx==selected_roster_index: card.add_theme_stylebox_override("normal",ui_box(Color("26384e"),4,CLASSES[h["class"]].color,2))
-	card.pressed.connect(func():selected_roster_index=idx;hero_roster_section="Details";show_roster())
+	card.pressed.connect(func():remember_roster_scroll();selected_roster_index=idx;show_roster())
 	return card
+
+func select_roster_team_option(option:int)->void:
+	current_team_slot=clampi(option,0,4)-1
+	state.selected_team=TeamManager.sanitize_team(state.active_team if current_team_slot<0 else state.saved_teams[current_team_slot],state.heroes)
+	if current_team_slot<0:state.active_team=state.selected_team.duplicate()
+	else:state.saved_teams[current_team_slot]=state.selected_team.duplicate()
+	hero_roster_page=0;save_game();show_roster()
+
+func make_roster_party_summary()->VBoxContainer:
+	var summary:=VBoxContainer.new();summary.name="RosterPartySummary";summary.custom_minimum_size.x=280;summary.add_theme_constant_override("separation",3)
+	var teams:=OptionButton.new();teams.name="RosterTeamSelector";teams.custom_minimum_size=Vector2(150,30);teams.size_flags_horizontal=Control.SIZE_SHRINK_END
+	for option_index in 5:teams.add_item(str(state.team_names[option_index]))
+	teams.select(clampi(current_team_slot+1,0,4));teams.item_selected.connect(select_roster_team_option);apply_sharp_compact_style(teams);summary.add_child(teams)
+	var party_name:=str(state.team_names[clampi(current_team_slot+1,0,4)]).to_upper()
+	var title:=label("★  %s  %d / 4"%[party_name,state.selected_team.size()],14,C_GOLD);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;summary.add_child(title)
+	var members:=HBoxContainer.new();members.name="RosterPartyMembers";members.alignment=BoxContainer.ALIGNMENT_END;members.add_theme_constant_override("separation",6);summary.add_child(members);team_active_zone=members;team_active_row=members
+	for hero_index_value in state.selected_team:
+		var hero_index:=int(hero_index_value)
+		if hero_index<0 or hero_index>=state.heroes.size():continue
+		var hero:Dictionary=state.heroes[hero_index]
+		var member:=Button.new();member.name="RosterPartyMember%d"%hero_index;member.text=role_glyph(str(hero.get("class","")));member.custom_minimum_size=Vector2(52,40);member.focus_mode=Control.FOCUS_NONE;member.tooltip_text="%s — click to remove, or hold and drag to reorder"%str(hero.get("name","Hero"));member.add_theme_font_size_override("font_size",18);member.add_theme_color_override("font_color",CLASSES[hero["class"]].color);member.add_theme_stylebox_override("normal",ui_box(Color("202d42"),4,CLASSES[hero["class"]].color,2));member.add_theme_stylebox_override("hover",ui_box(Color("293a53"),4,C_GOLD,2));member.gui_input.connect(func(event,i=hero_index):
+			if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:begin_roster_party_press(i,"active",event.position)
+			elif event is InputEventScreenTouch and event.pressed:begin_roster_party_press(i,"active",event.position));members.add_child(member)
+	for empty_slot in range(state.selected_team.size(),4):
+		var empty:=Button.new();empty.disabled=true;empty.custom_minimum_size=Vector2(52,40);empty.add_theme_stylebox_override("disabled",ui_box(Color("172131"),4,Color("35445a"),1));members.add_child(empty)
+	return summary
+
+func roster_display_indices()->Array:
+	var filtered_sorted:Array=sorted_hero_indices()
+	var party_members:Array=[]
+	for hero_index_value in state.selected_team:
+		var hero_index:=int(hero_index_value)
+		if hero_index in filtered_sorted and hero_index not in party_members:party_members.append(hero_index)
+	var reserves:Array=filtered_sorted.filter(func(hero_index):return int(hero_index) not in party_members)
+	return party_members+reserves
 
 func make_hero_experience_bar(hero:Dictionary,width:float=330,height:float=24) -> Control:
 	var experience_max:int=max(1,int(hero.level)*100)
@@ -97,6 +259,7 @@ func make_hero_experience_bar(hero:Dictionary,width:float=330,height:float=24) -
 	return container
 
 func select_roster_section(section:String) -> void:
+	remember_roster_scroll()
 	hero_roster_section=section
 	show_roster()
 
@@ -395,15 +558,15 @@ func confirm_item_equip(instance_id:String,hero_index:int,origin:String)->void:
 	else:show_vault()
 
 func make_roster_detail_row(caption:String,value:String,value_color:Color=C_TEXT)->HBoxContainer:
-	var row:=HBoxContainer.new();row.name="RosterDetailRow"+caption.replace(" ","").replace("&","");row.custom_minimum_size.y=25;row.add_theme_constant_override("separation",12)
-	var caption_label:=label(caption,13,C_MUTED);caption_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;caption_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;row.add_child(caption_label)
-	var value_label:=label(value,15,value_color);value_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;value_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;value_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;value_label.custom_minimum_size.x=105;row.add_child(value_label)
+	var row:=HBoxContainer.new();row.name="RosterDetailRow"+caption.replace(" ","").replace("&","");row.custom_minimum_size.y=21;row.add_theme_constant_override("separation",8)
+	var caption_label:=label(caption,12,C_MUTED);caption_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;caption_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;row.add_child(caption_label)
+	var value_label:=label(value,13,value_color);value_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;value_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;value_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;value_label.custom_minimum_size.x=90;row.add_child(value_label)
 	return row
 
 func make_roster_detail_card(card_name:String,title:String,rows:Array)->PanelContainer:
 	var card:=PanelContainer.new();card.name="RosterDetails"+card_name;card.size_flags_horizontal=Control.SIZE_EXPAND_FILL;card.custom_minimum_size=Vector2(280,0);card.add_theme_stylebox_override("panel",ui_box(Color("1b283a"),6,Color("35445a"),1))
-	var card_content:=VBoxContainer.new();card_content.add_theme_constant_override("separation",5);card.add_child(card_content)
-	var heading:=label(title,15,C_GOLD);heading.name="RosterDetails"+card_name+"Heading";heading.add_theme_color_override("font_outline_color",Color("111827"));heading.add_theme_constant_override("outline_size",2);card_content.add_child(heading)
+	var card_content:=VBoxContainer.new();card_content.add_theme_constant_override("separation",3);card.add_child(card_content)
+	var heading:=label(title,13,C_GOLD);heading.name="RosterDetails"+card_name+"Heading";heading.add_theme_color_override("font_outline_color",Color("111827"));heading.add_theme_constant_override("outline_size",2);card_content.add_child(heading)
 	card_content.add_child(rule())
 	for row_data in rows:card_content.add_child(make_roster_detail_row(str(row_data.caption),str(row_data.value),row_data.get("color",C_TEXT)))
 	return card
@@ -419,9 +582,12 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 	content.add_theme_constant_override("separation",10)
 	match hero_roster_section:
 		"Abilities":
-			content.add_child(label("ABILITIES",20,C_GOLD))
 			var trait_name:String="Stoneform" if hero["class"]=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2") else str(TRAITS[hero["class"]])
+			if hero["class"]=="Cleric" and ClericSystem.has_talent(hero,"cleric_l12_2"):trait_name="Safety Sprint"
+			elif hero["class"]=="Cleric" and ClericSystem.has_talent(hero,"cleric_l12_3"):trait_name="Let's Go!"
 			var trait_text:String=GuardianData.TALENT_DESCRIPTIONS.guardian_l24_2 if trait_name=="Stoneform" else "Passive Trait"
+			if hero["class"]=="Cleric" and trait_name=="Safety Sprint":trait_text=str(ClericData.TALENT_DESCRIPTIONS.cleric_l12_2)
+			elif hero["class"]=="Cleric" and trait_name=="Let's Go!":trait_text=str(ClericData.TALENT_DESCRIPTIONS.cleric_l12_3)
 			var class_color:Color=CLASSES[hero["class"]].color
 			for slot in 3:
 				var required_level:=int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]);var locked:=int(hero.get("level",1))<required_level;var description:=ability_tooltip(hero["class"],slot)
@@ -430,23 +596,18 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 				content.add_child(make_roster_ability_row(action_key,str(ABILITIES[hero["class"]][slot]),description,class_color,locked,func(key=action_key):open_roster_ability_details(hero,key)))
 			var selected_heroic_id:=str(hero.get("selected_heroic_id",""));var heroic_unlocked:=TalentSystem.ability_is_unlocked(int(hero.get("level",1)),3)
 			if heroic_unlocked and selected_heroic_id!="":
-				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"]=="Guardian" else str(ABILITIES[hero["class"]][3])
-				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else ability_tooltip(hero["class"],3)
+				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"] in ["Guardian","Cleric"] else str(ABILITIES[hero["class"]][3])
+				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else str(ClericData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Cleric" else ability_tooltip(hero["class"],3)
 				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color,false,func(heroic=selected_heroic_id):open_roster_ability_details(hero,"R",heroic)))
 			else:
 				content.add_child(make_roster_ability_row("R","Heroic Ability","Choose your Heroic at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[3]),class_color,true))
 			content.add_child(make_roster_ability_row("D",trait_name,trait_text,class_color,false,func():open_roster_ability_details(hero,"D")))
 		"Talents":
-			var talent_heading:=HBoxContainer.new();talent_heading.add_theme_constant_override("separation",12);content.add_child(talent_heading)
-			var talent_title:=label("TALENT TREE",20,C_GOLD);talent_title.size_flags_horizontal=Control.SIZE_EXPAND_FILL;talent_heading.add_child(talent_title)
-			var unlocked_count:=TalentSystem.unlocked_tier_ids(int(hero.get("level",1))).size();talent_heading.add_child(label("LEVEL %d  •  %d / 8 TIERS"%[int(hero.get("level",1)),unlocked_count],13,C_MUTED))
 			var class_definition:Dictionary=GameData.class_definition(str(hero["class"]));var class_id:=str(class_definition.get("class_id",GameData.class_id_for(str(hero["class"]))));var discovery:Dictionary=state.get("class_talent_discovery",{})
-			for tier_number in range(1,9):
-				content.add_child(make_roster_talent_tier(hero,class_definition,class_id,discovery,tier_number))
+			for tier_number in range(1,9):content.add_child(make_roster_talent_tier(hero,class_definition,class_id,discovery,tier_number,selected_roster_index))
 		"Professions":
-			content.add_child(label("PROFESSIONS",20,C_GOLD))
+			pass
 		_:
-			content.add_child(label("DETAILS",20,C_GOLD))
 			var action_is_heal:bool=str(resolved_stats.basic_action_type)=="heal";var action_title:="BASIC HEAL" if action_is_heal else "BASIC ATTACK"
 			var action_rows:Array=[{"caption":"Healing" if action_is_heal else "Damage","value":str(int(floor(float(resolved_stats.basic_action_amount)))),"color":C_GREEN if action_is_heal else C_TEXT},{"caption":"Interval","value":"%.2f sec"%resolved_stats.basic_action_interval},{"caption":"Range","value":str(int(resolved_stats.basic_action_range))}]
 			if not action_is_heal:action_rows.append({"caption":"Damage Type","value":str(resolved_stats.basic_action_damage_type).capitalize()})
@@ -456,10 +617,11 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 			var concise_weapon_names:Dictionary={"weapon_and_shield":"Shield","one_handed":"1-Handed","two_handed":"2-Handed","dual_wield":"Dual Wield"}
 			var weapon_names:Array=resolved_stats.weapon_proficiencies.map(func(weapon):return str(concise_weapon_names.get(str(weapon),str(weapon).replace("_"," ").capitalize())))
 			var proficiency_rows:Array=[{"caption":"Armor","value":str(resolved_stats.armor_family).capitalize()},{"caption":"Weapons","value":", ".join(weapon_names)}]
-			var details_grid:=GridContainer.new();details_grid.name="RosterDetailsGrid";details_grid.columns=2;details_grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL;details_grid.add_theme_constant_override("h_separation",12);details_grid.add_theme_constant_override("v_separation",12);content.add_child(details_grid)
-			var action_card:=make_roster_detail_card("Action",action_title,action_rows);append_roster_detail_group(action_card,"Critical","CRITICALS",critical_rows);details_grid.add_child(action_card)
-
-			var defense_card:=make_roster_detail_card("Defense","DEFENSE & MOVEMENT",defense_rows);append_roster_detail_group(defense_card,"Proficiencies","PROFICIENCIES",proficiency_rows);details_grid.add_child(defense_card)
+			var details_grid:=GridContainer.new();details_grid.name="RosterDetailsGrid";details_grid.columns=2;details_grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL;details_grid.add_theme_constant_override("h_separation",10);details_grid.add_theme_constant_override("v_separation",8);content.add_child(details_grid)
+			details_grid.add_child(make_roster_detail_card("Action",action_title,action_rows))
+			details_grid.add_child(make_roster_detail_card("Defense","DEFENSE & MOVEMENT",defense_rows))
+			details_grid.add_child(make_roster_detail_card("Critical","CRITICALS",critical_rows))
+			details_grid.add_child(make_roster_detail_card("Proficiencies","PROFICIENCIES",proficiency_rows))
 			var equipped:=hero_equipped_items(hero)
 			if not equipped.is_empty():
 				content.add_child(label("ACTIVE ITEM EFFECTS",14,C_GOLD))
@@ -483,8 +645,7 @@ func make_roster_equipment_slot(hero:Dictionary,slot:String)->Button:
 	gear.add_theme_stylebox_override("normal",ui_box(Color("202d42"),4,frame_color,2 if not equipped_item.is_empty() else 1));gear.add_theme_stylebox_override("hover",ui_box(Color("26364e"),4,frame_color,3 if not equipped_item.is_empty() else 2))
 	var slot_icon:Control
 	if equipped_item.is_empty():
-		var empty_label:=label(InventorySystem.fallback_glyph(slot),16,C_MUTED);empty_label.autowrap_mode=TextServer.AUTOWRAP_OFF;empty_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;empty_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;empty_label.clip_text=true;empty_label.modulate=Color(1,1,1,.42);slot_icon=empty_label
-		slot_icon.position=Vector2(5,5);slot_icon.size=Vector2(95,60)
+		var silhouette:=EquipmentSlotSilhouette.new();silhouette.configure(slot);slot_icon=silhouette;slot_icon.position=Vector2(13,5);slot_icon.size=Vector2(78,60)
 	else:
 		slot_icon=item_icon_control(equipped_item,Vector2(78,60));slot_icon.position=Vector2(13,5);slot_icon.size=Vector2(78,60)
 	slot_icon.name="HeroEquipmentIcon";slot_icon.mouse_filter=Control.MOUSE_FILTER_IGNORE;gear.add_child(slot_icon)
@@ -494,11 +655,11 @@ func show_roster() -> void:
 	screen="roster"; var root=base_screen("Hero Roster")
 	var roster_toolbar:=HBoxContainer.new();roster_toolbar.add_theme_constant_override("separation",12);root.add_child(roster_toolbar)
 	var roster_filters:=filter_bar(show_roster,true,true,true);roster_filters.size_flags_horizontal=Control.SIZE_EXPAND_FILL;roster_toolbar.add_child(roster_filters)
-	var active_legend:=label("★  ACTIVE PARTY",14,C_GOLD);active_legend.custom_minimum_size.x=150;active_legend.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;active_legend.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;active_legend.tooltip_text="Toggle the star on any hero card to update the Active Party.";roster_toolbar.add_child(active_legend)
-	var carousel:=HBoxContainer.new(); carousel.add_theme_constant_override("separation",8); root.add_child(carousel)
+	roster_toolbar.add_child(make_roster_party_summary())
+	var carousel:=HBoxContainer.new(); carousel.add_theme_constant_override("separation",8); root.add_child(carousel);team_reserve_zone=carousel
 	var previous_page:=compact_button("←",func():hero_roster_page=max(0,hero_roster_page-1);show_roster(),42);apply_sharp_compact_style(previous_page);carousel.add_child(previous_page)
-	var cards:=GridContainer.new(); cards.columns=6; cards.add_theme_constant_override("h_separation",10); cards.size_flags_horizontal=Control.SIZE_EXPAND_FILL; carousel.add_child(cards)
-	var indices=sorted_hero_indices(); var pages=max(1,int(ceil(indices.size()/6.0))); hero_roster_page=clampi(hero_roster_page,0,pages-1)
+	var cards:=GridContainer.new(); cards.columns=6; cards.custom_minimum_size.x=950;cards.add_theme_constant_override("h_separation",10); cards.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN; carousel.add_child(cards)
+	var indices=roster_display_indices(); var pages=max(1,int(ceil(indices.size()/6.0))); hero_roster_page=clampi(hero_roster_page,0,pages-1)
 	if not indices.is_empty() and not indices.has(selected_roster_index):selected_roster_index=indices[0]
 	for card_index in range(hero_roster_page*6,min(indices.size(),hero_roster_page*6+6)):cards.add_child(make_roster_card(indices[card_index]))
 	var next_page:=compact_button("→",func():hero_roster_page=min(pages-1,hero_roster_page+1);show_roster(),42);apply_sharp_compact_style(next_page);carousel.add_child(next_page)
@@ -538,5 +699,6 @@ func show_roster() -> void:
 	for section in ["Details","Talents","Abilities","Professions"]:tabs.add_child(make_roster_section_button(section))
 	var workspace_panel:=PanelContainer.new();workspace_panel.name="RosterWorkspacePanel";workspace_panel.size_flags_vertical=Control.SIZE_EXPAND_FILL;workspace_panel.add_theme_stylebox_override("panel",ui_box(Color("172234"),4,Color("35445a"),1));workspace.add_child(workspace_panel)
 	var workspace_margin:=MarginContainer.new();workspace_margin.add_theme_constant_override("margin_left",18);workspace_margin.add_theme_constant_override("margin_right",18);workspace_margin.add_theme_constant_override("margin_top",14);workspace_margin.add_theme_constant_override("margin_bottom",14);workspace_panel.add_child(workspace_margin)
-	var section_scroll:=ScrollContainer.new();section_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;section_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL;section_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;workspace_margin.add_child(section_scroll)
+	var section_scroll:=ScrollContainer.new();section_scroll.name="RosterSectionScroll";section_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;section_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL;section_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;workspace_margin.add_child(section_scroll)
 	var section_content:=VBoxContainer.new();section_content.name="RosterSectionContent";section_content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;section_scroll.add_child(section_content);populate_roster_workspace(section_content,hero,info)
+	restore_roster_scroll(section_scroll,"%d:%s"%[selected_roster_index,hero_roster_section])

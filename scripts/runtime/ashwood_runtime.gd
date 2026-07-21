@@ -143,6 +143,7 @@ func centered_victory_position(hero_index:int,hero_count:int,spacing:float,y_pos
 func start_ashwood_victory_sequence() -> void:
 	screen="combat"
 	ui.visible=false
+	victory_talent_prompt_handled=false;victory_talent_queue.clear();victory_talent_choice_index=0;close_victory_talent_overlay()
 	victory_sequence=true;victory_phase=0;victory_timer=0.0
 	dragging_hero=false;drag_target_type="ground";drag_target_index=-1
 	rune_active=false;objective_notice="";objective_notice_time=0;objective_banner_time=0

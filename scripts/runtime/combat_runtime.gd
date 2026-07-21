@@ -1,6 +1,7 @@
 extends "res://scripts/runtime/combat_input_runtime.gd"
 
 func _process(delta:float) -> void:
+	if screen=="roster":update_roster_party_press(delta)
 	if screen=="vault" and vault_press_active:
 		vault_press_time+=delta
 		if not vault_dragging and vault_press_time>=InventorySystem.LONG_PRESS_DURATION:begin_vault_drag()
@@ -26,12 +27,16 @@ func _process(delta:float) -> void:
 	effects=effects.filter(func(fx):return fx.life>0)
 	update_combat_projectiles(delta)
 	update_guardian_runtime(delta)
+	update_cleric_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	for i in heroes.size():
 		var h=heroes[i]
 		h.last_hit=max(0,h.last_hit-delta)
-		for slot in 5: h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta)
+		for slot in 5:
+			var cooldown_rate:=1.0
+			if str(h.get("class",""))=="Cleric" and not h.get("cleric_runtime",{}).is_empty() and slot<3:cooldown_rate=ClericSystem.w_cooldown_rate(h) if slot==1 else ClericSystem.qwe_cooldown_rate(h)
+			h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta*cooldown_rate)
 		if h.hp>0:update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):finish_battle(false);return
@@ -87,7 +92,9 @@ func _process(delta:float) -> void:
 						damage_battle_objective(float(e.damage),e.pos)
 					elif ti<heroes.size() and heroes[ti].hp>0:
 						if bool(e.get("ranged",false)) and str(e.get("basic_attack_damage_type","physical"))=="physical":spawn_basic_projectile(e,heroes[ti],float(e.damage),str(e.basic_attack_damage_type),"enemy_basic_attack")
-						else:var basic_result:=deal_damage(e,heroes[ti],e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");heroes[ti].last_hit=3.0;apply_hit_nudge(e,heroes[ti]);add_effect("hit",e.pos,heroes[ti].pos,"-%d"%int(basic_result.health_damage+basic_result.shield_damage),C_RED)
+						else:
+							if CombatSystem.is_blinded(e):record_blind_miss(e,heroes[ti])
+							else:var basic_result:=deal_damage(e,heroes[ti],e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");heroes[ti].last_hit=3.0;apply_hit_nudge(e,heroes[ti]);add_effect("hit",e.pos,heroes[ti].pos,"-%d"%int(basic_result.health_damage+basic_result.shield_damage),C_RED)
 				elif e.special=="charge":e.pos=e.pos.move_toward(e.danger_pos,220);for hero_charge in heroes:if hero_charge.hp>0 and hero_charge.pos.distance_to(e.pos)<65:var charge_result:=deal_damage(e,hero_charge,e.damage*1.25,"basic_ability",e.basic_attack_damage_type,"boss_charge");add_effect("hit",e.pos,hero_charge.pos,"-%d"%int(charge_result.health_damage+charge_result.shield_damage),C_RED)
 				else:
 					var impact=e.danger_pos if e.special=="danger" else e.pos; var radius=78.0 if e.special=="danger" else 115.0

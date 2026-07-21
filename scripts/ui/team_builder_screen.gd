@@ -13,16 +13,17 @@ func select_team_slot(option:int) -> void:
 	save_game(); show_team()
 
 func rename_current_team(value:String) -> void:
-	if current_team_slot>=0 and value.strip_edges()!="": state.team_names[current_team_slot]=value.strip_edges(); save_game()
+	var name_index:=clampi(current_team_slot+1,0,4)
+	if value.strip_edges()!="":state.team_names[name_index]=value.strip_edges();save_game()
 
 func show_team() -> void:
+	current_team_slot=clampi(current_team_slot,-1,3)
 	screen="team"; var root=base_screen("Team Builder")
 	var chooser:=HBoxContainer.new(); chooser.add_theme_constant_override("separation",10); root.add_child(chooser)
-	var teams:=OptionButton.new(); teams.custom_minimum_size=Vector2(260,44); teams.add_item("Active Party")
-	for team_name in state.team_names: teams.add_item(team_name)
-	teams.select(current_team_slot+1); teams.item_selected.connect(select_team_slot); chooser.add_child(teams)
-	if current_team_slot>=0:
-		var rename:=LineEdit.new(); rename.placeholder_text="Team name"; rename.text=state.team_names[current_team_slot]; rename.custom_minimum_size=Vector2(220,44); rename.text_submitted.connect(func(value): rename_current_team(value); show_team()); chooser.add_child(rename)
+	var teams:=OptionButton.new(); teams.name="TeamSelector"; teams.custom_minimum_size=Vector2(260,44)
+	for option_index in 5:teams.add_item(str(state.team_names[option_index]))
+	teams.select(clampi(current_team_slot+1,0,4)); teams.item_selected.connect(select_team_slot); chooser.add_child(teams)
+	var rename:=LineEdit.new(); rename.placeholder_text="Team name"; rename.text=state.team_names[clampi(current_team_slot+1,0,4)]; rename.custom_minimum_size=Vector2(220,44); rename.text_submitted.connect(func(value): rename_current_team(value); show_team()); chooser.add_child(rename)
 	var chooser_space:=Control.new(); chooser_space.size_flags_horizontal=Control.SIZE_EXPAND_FILL; chooser.add_child(chooser_space)
 	var party_count:=label("%d / 4" % state.selected_team.size(),18,C_GOLD); party_count.custom_minimum_size.x=60; party_count.autowrap_mode=TextServer.AUTOWRAP_OFF; party_count.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT; chooser.add_child(party_count)
 	team_active_zone=VBoxContainer.new(); team_active_zone.custom_minimum_size=Vector2(1160,100); root.add_child(team_active_zone)

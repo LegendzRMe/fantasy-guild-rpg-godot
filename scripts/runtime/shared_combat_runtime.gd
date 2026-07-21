@@ -52,6 +52,8 @@ func begin_unit_cast(unit:Dictionary,slot:int,duration:float,is_heroic:bool=fals
 	unit.active_cast={"slot":slot,"remaining":duration,"duration":duration,"is_heroic":is_heroic,"channel_duration":channel_duration,"requires_line_of_sight":requires_line_of_sight,"full_cooldown":resolved_cooldown,"target_id":str(unit.get("preserved_target_id","")),"released":false}
 
 func interrupt_unit_action(unit:Dictionary,reason:String)->bool:
+	if str(unit.get("class",""))=="Cleric" and bool(unit.get("cleric_runtime",{}).get("jug_active",false)):
+		unit.ability_cds[3]=ClericSystem.stop_jug(unit);CombatRulesV1.restore_preserved_command(unit,true);unit.last_command_failure="channel interrupted: %s"%reason;return true
 	if not unit.get("active_cast",{}).is_empty():
 		var cast:Dictionary=unit.active_cast
 		if bool(cast.get("uninterruptible",false)):return false
@@ -84,9 +86,15 @@ func apply_hit_nudge(source:Dictionary,target:Dictionary)->void:
 	target.pos=CombatGeometry.apply_nudge(target.pos,source.get("pos",target.pos),CombatRulesV1.DEFAULT_HIT_NUDGE_DISTANCE,42.0,combat_blockers)
 	if int(target.get("command_state",CombatRulesV1.CommandState.IDLE))==CombatRulesV1.CommandState.MOVE:target.dest=target.move_destination
 
+func record_blind_miss(source:Dictionary,target:Dictionary)->void:
+	combat_events.append_array(CombatSystem.event_bundle_for_basic_action_miss(source,target,{"damage_type":str(source.get("basic_attack_damage_type","physical")),"origin":"blind"}))
+	if str(source.get("class",""))=="Cleric" and not source.get("cleric_runtime",{}).is_empty():ClericSystem.telemetry_add(source,"blind_misses");ClericSystem.telemetry_add(source,"offensive_basic_attacks")
+	call("add_effect","hit",source.get("pos",Vector2.ZERO),target.get("pos",Vector2.ZERO),"MISS",C_MUTED)
+
 func spawn_basic_projectile(source:Dictionary,target:Dictionary,amount:float,damage_type:String,origin:String)->void:
 	var projectile_id:="projectile:%d"%next_projectile_combat_id;next_projectile_combat_id+=1
-	combat_projectiles.append(CombatProjectile.create(projectile_id,str(source.combat_id),str(target.combat_id),source.pos,target.pos,CombatRulesV1.DEFAULT_PROJECTILE_SPEED,{"amount":amount,"damage_type":damage_type,"origin":origin,"obstacle_damage":amount}))
+	var will_miss:=CombatSystem.is_blinded(source)
+	combat_projectiles.append(CombatProjectile.create(projectile_id,str(source.combat_id),str(target.combat_id),source.pos,target.pos,CombatRulesV1.DEFAULT_PROJECTILE_SPEED,{"amount":amount,"damage_type":damage_type,"origin":origin,"obstacle_damage":0.0 if will_miss else amount,"will_miss":will_miss}))
 
 func update_combat_projectiles(delta:float)->void:
 	for index in range(combat_projectiles.size()-1,-1,-1):
@@ -99,7 +107,9 @@ func update_combat_projectiles(delta:float)->void:
 		if CombatProjectile.arrived(projectile):
 			var source=unit_by_combat_id(str(projectile.source_id));var target=unit_by_combat_id(str(projectile.target_id))
 			if source!=null and target_is_valid_for(source,target,"enemy") and target.pos.distance_to(projectile.destination)<=58.0:
-				var result:Dictionary=call("deal_damage",source,target,float(projectile.payload.amount),"basic_attack",str(projectile.payload.damage_type),str(projectile.payload.origin));apply_hit_nudge(source,target);call("add_effect","hit",source.pos,target.pos,"-%d"%int(result.health_damage+result.shield_damage),C_RED)
+				if bool(projectile.payload.get("will_miss",false)):record_blind_miss(source,target)
+				else:
+					var result:Dictionary=call("deal_damage",source,target,float(projectile.payload.amount),"basic_attack",str(projectile.payload.damage_type),str(projectile.payload.origin));apply_hit_nudge(source,target);call("add_effect","hit",source.pos,target.pos,"-%d"%int(result.health_damage+result.shield_damage),C_RED)
 			combat_projectiles.remove_at(index)
 
 func release_basic_action(unit:Dictionary)->void:
@@ -107,10 +117,13 @@ func release_basic_action(unit:Dictionary)->void:
 	if not target_is_valid_for(unit,target,kind):return
 	if not CombatGeometry.has_line_of_sight(unit.pos,target.pos,combat_blockers):return
 	if kind=="ally":
-		var healing_result:Dictionary=call("deal_healing",unit,target,float(unit.get("basic_heal_amount",unit.get("basic_action_amount",0.0))),"basic_heal","cleric_basic_heal")
+		var healing_result:Dictionary=call("deal_healing",unit,target,float(unit.get("basic_heal_amount",unit.get("basic_action_amount",0.0))),"basic_heal","cleric_basic_action")
+		if str(unit.get("class",""))=="Cleric" and not unit.get("cleric_runtime",{}).is_empty():ClericSystem.telemetry_add(unit,"basic_heals");ClericSystem.telemetry_add(unit,"basic_heal_effective",float(healing_result.effective_amount));ClericSystem.telemetry_add(unit,"basic_heal_overhealing",float(healing_result.overhealing))
 		call("add_effect","heal",unit.pos,target.pos,"+%d"%int(healing_result.effective_amount),C_GREEN)
 	elif float(unit.get("range",0.0))>100.0:
 		spawn_basic_projectile(unit,target,float(unit.get("damage",0.0)),str(unit.get("basic_attack_damage_type","physical")),"basic_attack")
+	elif CombatSystem.is_blinded(unit):
+		record_blind_miss(unit,target)
 	else:
 		var damage_result:Dictionary=call("deal_damage",unit,target,float(unit.get("damage",0.0)),"basic_attack",str(unit.get("basic_attack_damage_type","physical")),"basic_attack");apply_hit_nudge(unit,target);call("add_effect","slash",unit.pos,target.pos,"-%d"%int(damage_result.health_damage+damage_result.shield_damage),CLASSES.get(str(unit.get("class","Guardian")),{"color":C_TEXT}).color)
 
@@ -127,6 +140,8 @@ func idle_defense_target(hero:Dictionary):
 
 func update_shared_hero(hero:Dictionary,delta:float)->void:
 	ensure_combat_runtime_fields(hero,"hero:%d"%int(hero.get("battle_index",heroes.find(hero))),"player")
+	var has_true_control:bool=hero.get("active_effects",[]).any(func(effect):return str(effect.get("control_type","")) in ["stun","root","silence"] and float(effect.get("remaining_duration",0.0))>0.0)
+	if has_true_control and (not hero.get("active_cast",{}).is_empty() or not hero.get("active_channel",{}).is_empty() or bool(hero.get("cleric_runtime",{}).get("jug_active",false))):interrupt_unit_action(hero,"crowd control")
 	if hero.hp<=0.0:
 		if not bool(hero.get("incapacitated",false)):
 			interrupt_unit_action(hero,"incapacitated");CombatRulesV1.incapacitate(hero)
@@ -142,7 +157,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 			if enemies[enemy_index].hp>0 and hero.pos.distance_to(enemies[enemy_index].pos)<automatic_distance:automatic_enemy_index=enemy_index;automatic_distance=hero.pos.distance_to(enemies[enemy_index].pos)
 		if automatic_enemy_index>=0:assign_hero_enemy(int(hero.get("battle_index",heroes.find(hero))),automatic_enemy_index)
 	if int(hero.command_state)==CombatRulesV1.CommandState.MOVE:
-		var before:Vector2=hero.pos;hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*delta,42.0,combat_blockers);hero.dest=hero.move_destination
+		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else 1.0)*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers);hero.dest=hero.move_destination
 		if hero.pos.distance_to(hero.move_destination)<=4.0:hero.command_state=CombatRulesV1.CommandState.IDLE;hero.dest=hero.pos
 		elif hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"movement path blocked")
 		else:hero.path_failure_timer=0.0;hero.facing_direction=before.direction_to(hero.pos)
@@ -154,12 +169,12 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 		if bool(hero.assignment_had_line_of_sight) and not has_los:clear_hero_command(hero,"line of sight lost");return
 		var usable_range:=float(hero.range)-CombatRulesV1.RANGE_TOLERANCE;var distance:float=hero.pos.distance_to(target.pos)
 		if not has_los:
-			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*delta,42.0,combat_blockers)
+			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else 1.0)*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers)
 			if hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"no reachable line of sight")
 			return
 		hero.assignment_had_line_of_sight=true;hero.path_failure_timer=0.0
 		if distance>usable_range:
-			var stop_point:Vector2=target.pos+target.pos.direction_to(hero.pos)*usable_range;var before:Vector2=hero.pos;hero.pos=CombatGeometry.move_toward_safe(hero.pos,stop_point,float(hero.movement_speed)*delta,42.0,combat_blockers);hero.facing_direction=before.direction_to(hero.pos);return
+			var stop_point:Vector2=target.pos+target.pos.direction_to(hero.pos)*usable_range;var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else 1.0)*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,stop_point,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers);hero.facing_direction=before.direction_to(hero.pos);return
 		hero.facing_direction=hero.pos.direction_to(target.pos);CombatRulesV1.begin_basic_action(hero,str(target.combat_id),kind,battle_time);return
 	if int(hero.command_state)==CombatRulesV1.CommandState.IDLE:
 		var defense_target=idle_defense_target(hero)
@@ -182,3 +197,4 @@ func add_first_recruit_to_battle()->void:pass
 func complete_ashwood_ritual()->void:pass
 func finish_battle(_win:bool)->void:pass
 func update_victory(_delta:float)->void:pass
+func cleric_host_movement_multiplier(_target:Dictionary)->float:return 1.0

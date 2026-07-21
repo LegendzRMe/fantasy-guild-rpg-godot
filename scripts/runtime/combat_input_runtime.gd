@@ -62,6 +62,9 @@ func begin_trait()->void:
 	if str(hero.get("class",""))=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2"):
 		if not use_guardian_trait(hero):flash("Stoneform is not ready.")
 		queue_redraw()
+	elif str(hero.get("class",""))=="Cleric":
+		if not use_cleric_trait(hero):flash("Fast Feet talent action is unavailable or not ready.")
+		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -94,7 +97,7 @@ func tutorial_pointer_press(point:Vector2,device:String="pc")->void:
 			return
 		if point.y>635 and point.x>445 and point.x<523:
 			if selected==1:tutorial_record_valid_action();begin_ability(0,device)
-			else:reject_tutorial_action("Select Sera before using Radiant Mend.")
+			else:reject_tutorial_action("Select Sera before using Healing Brew.")
 			return
 	for hero_index in heroes.size():
 		if heroes[hero_index].pos.distance_to(point)<58 and tutorial_allows_hero(hero_index):
@@ -149,6 +152,7 @@ func finish_hero_drag()->void:
 
 func _unhandled_input(event:InputEvent) -> void:
 	if screen!="combat":return
+	if victory_talent_overlay!=null and is_instance_valid(victory_talent_overlay):return
 	if tutorial_active:
 		if event is InputEventScreenTouch or event is InputEventScreenDrag:tutorial_input_device="mobile"
 		elif not OS.has_feature("mobile") and (event is InputEventMouseButton or event is InputEventMouseMotion or event is InputEventKey):tutorial_input_device="pc"
@@ -156,11 +160,7 @@ func _unhandled_input(event:InputEvent) -> void:
 		tutorial_active=false;show_hall();return
 	if victory_sequence:
 		if victory_phase>=5 and ((event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey) and event.pressed):
-			if current_ashwood_encounter!="" and victory_timer<1.6:victory_timer=1.6;queue_redraw();return
-
-			victory_sequence=false
-			if current_ashwood_encounter!="":show_ashwood_victory()
-			else:show_zone_map(dungeon_id)
+			attempt_victory_continue()
 		return
 	if battle_over:
 		if event is InputEventKey and event.pressed:
@@ -193,6 +193,14 @@ func _unhandled_input(event:InputEvent) -> void:
 		if event.keycode==KEY_F6 and testing_zone_active:
 			for hero in heroes:
 				if str(hero.get("class",""))=="Guardian":hero.selected_talents={"tier_1":"guardian_l9_1","tier_2":"guardian_l12_2","tier_3":guardian_heroic_id(hero),"tier_4":"guardian_l18_2","tier_5":"guardian_l21_2","tier_6":"guardian_l24_1","tier_7":"guardian_l27_r1" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l27_r2","tier_8":"guardian_l30_1"};hero.guardian_runtime.ability_charges=GuardianSystem.default_charges(hero);flash("Guardian test talents loaded")
+			return
+		if event.keycode==KEY_F7 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Cleric":hero.selected_heroic_id="cleric_l15_r1";hero.selected_talents={"tier_1":"cleric_l9_1","tier_2":"cleric_l12_2","tier_3":"cleric_l15_r1","tier_4":"cleric_l18_1","tier_5":"cleric_l21_2","tier_6":"cleric_l24_1","tier_7":"cleric_l27_r1","tier_8":"cleric_l30_1"};ClericSystem.initialize_runtime(hero,true);flash("Cleric Jug test build loaded")
+			return
+		if event.keycode==KEY_F8 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Cleric":hero.selected_heroic_id="cleric_l15_r2";hero.selected_talents={"tier_1":"cleric_l9_2","tier_2":"cleric_l12_3","tier_3":"cleric_l15_r2","tier_4":"cleric_l18_2","tier_5":"cleric_l21_1","tier_6":"cleric_l24_3","tier_7":"cleric_l27_r2","tier_8":"cleric_l30_2"};ClericSystem.initialize_runtime(hero,true);flash("Cleric Dragon test build loaded")
 			return
 		if event.keycode==KEY_SPACE:paused=!paused;queue_redraw()
 		if event.keycode==KEY_TAB and not event.echo:
