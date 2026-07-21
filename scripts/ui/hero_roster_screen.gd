@@ -428,7 +428,11 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 		"Abilities":
 			content.add_child(label("ABILITIES",20,C_GOLD))
 			var trait_name:String="Stoneform" if hero["class"]=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2") else str(TRAITS[hero["class"]])
+			if hero["class"]=="Cleric" and ClericSystem.has_talent(hero,"cleric_l12_2"):trait_name="Safety Sprint"
+			elif hero["class"]=="Cleric" and ClericSystem.has_talent(hero,"cleric_l12_3"):trait_name="Let's Go!"
 			var trait_text:String=GuardianData.TALENT_DESCRIPTIONS.guardian_l24_2 if trait_name=="Stoneform" else "Passive Trait"
+			if hero["class"]=="Cleric" and trait_name=="Safety Sprint":trait_text=str(ClericData.TALENT_DESCRIPTIONS.cleric_l12_2)
+			elif hero["class"]=="Cleric" and trait_name=="Let's Go!":trait_text=str(ClericData.TALENT_DESCRIPTIONS.cleric_l12_3)
 			var class_color:Color=CLASSES[hero["class"]].color
 			for slot in 3:
 				var required_level:=int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]);var locked:=int(hero.get("level",1))<required_level;var description:=ability_tooltip(hero["class"],slot)

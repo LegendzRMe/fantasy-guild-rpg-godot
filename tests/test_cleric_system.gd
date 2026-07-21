@@ -32,4 +32,6 @@ static func run()->Array:
 	TestSupport.check(errors,ClericSystem.lowest_wounded_indices(allies,2,Vector2.ZERO,100.0)==[1,0],"Automatic Cleric targeting should deterministically break equal Health and distance ties by stable combat ID.")
 	var details:=ClericAbilityPresenter.details(hero,"E")
 	TestSupport.check(errors,str(details.description).contains("133") and not str(details.description).contains("133."),"Cleric roster details should show current whole-number damage without decimal noise.")
+	var safety:=cleric(["cleric_l9_1","cleric_l12_2"]);var lets_go:=cleric(["cleric_l9_1","cleric_l12_3"])
+	TestSupport.check(errors,ClericAbilityPresenter.details(safety,"D").title=="Safety Sprint" and ClericAbilityPresenter.details(lets_go,"D").title=="Let's Go!","The roster should present the selected Level 12 Trait action in D without adding a new slot.")
 	return errors
