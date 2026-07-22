@@ -25,6 +25,7 @@ func _process(delta:float) -> void:
 	for fx in effects: fx.life-=delta
 	effects=effects.filter(func(fx):return fx.life>0)
 	update_combat_projectiles(delta)
+	update_guardian_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	for i in heroes.size():
@@ -55,6 +56,7 @@ func _process(delta:float) -> void:
 			continue
 		if e.type=="Dummy":continue
 		if bool(e.get("passive_test_enemy",false)):continue
+		if CombatSystem.is_stunned(e):continue
 		if e.type=="Defense Dummy" and not testing_dummy_attacks_enabled:continue
 		e.cooldown=max(0,e.cooldown-delta);e.taunt_time=max(0.0,float(e.get("taunt_time",0.0))-delta)
 		if e.type=="Shaman" and e.cooldown<=0:
@@ -91,9 +93,10 @@ func _process(delta:float) -> void:
 					var impact=e.danger_pos if e.special=="danger" else e.pos; var radius=78.0 if e.special=="danger" else 115.0
 					for struck_hero in heroes:
 						if struck_hero.hp>0 and struck_hero.pos.distance_to(impact)<radius:var area_result:=deal_damage(e,struck_hero,e.damage*1.4,"basic_ability",e.basic_attack_damage_type,"boss_area");add_effect("hit",impact,struck_hero.pos,"-%d"%int(area_result.health_damage+area_result.shield_damage),C_RED)
-				e.cooldown=e.basic_attack_interval*(.68 if e.enraged else 1.0)
+				var attack_speed_reduction:=clampf(CombatSystem.control_amount(e,"attack_speed"),0.0,0.9)
+				e.cooldown=e.basic_attack_interval*(.68 if e.enraged else 1.0)/maxf(0.1,1.0-attack_speed_reduction)
 		elif dist>e.range:
-			var enemy_speed=float(e.movement_speed);e.facing_direction=e.pos.direction_to(target_pos);e.pos=e.pos.move_toward(target_pos,enemy_speed*delta)
+			var enemy_speed=float(e.movement_speed)*(1.0-CombatSystem.control_amount(e,"slow"));e.facing_direction=e.pos.direction_to(target_pos);e.pos=e.pos.move_toward(target_pos,enemy_speed*delta)
 		elif e.cooldown<=0:
 			e.facing_direction=e.pos.direction_to(target_pos)
 			e.special="basic"; e.telegraph=.48; e.danger_pos=target_pos

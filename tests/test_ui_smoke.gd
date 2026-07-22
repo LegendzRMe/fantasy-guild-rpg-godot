@@ -4,6 +4,7 @@ const SaveManager = preload("res://scripts/systems/save_manager.gd")
 const GameData = preload("res://scripts/data/game_data.gd")
 const ItemData = preload("res://scripts/data/item_data.gd")
 const InventorySystem = preload("res://scripts/systems/inventory_system.gd")
+const TalentSystem = preload("res://scripts/systems/talent_system.gd")
 const TestSupport = preload("res://tests/test_support.gd")
 
 static func run(main:Node) -> Array:
@@ -108,11 +109,32 @@ static func run(main:Node) -> Array:
 	main.select_roster_section("Abilities")
 	await main.get_tree().process_frame
 	var abilities_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	TestSupport.check(errors,main.ui.find_children("RosterAbility*","Button",true,false).size()==4 and abilities_content.get_child_count()==5,"The concise Abilities workspace should contain only its title and four ability cards.")
+	TestSupport.check(errors,main.ui.find_child("RosterTrait",true,false)!=null and main.ui.find_children("RosterAbility*","PanelContainer",true,false).size()==4 and main.ui.find_children("AbilityKeyBadge","Control",true,false).size()==5 and abilities_content.get_child_count()==6,"The concise Abilities workspace should show visual Q/W/E/R/D rows, including a locked Heroic placeholder.")
+	TestSupport.check(errors,abilities_content.get_child(1).name=="RosterAbilityQ" and abilities_content.get_child(2).name=="RosterAbilityW" and abilities_content.get_child(3).name=="RosterAbilityE" and abilities_content.get_child(4).name=="RosterAbilityR" and abilities_content.get_child(5).name=="RosterTrait","Hero Roster abilities should follow the combat action-bar order: Q, W, E, R, then D.")
+	var locked_heroic_text:String="\n".join(main.ui.find_child("RosterAbilityR",true,false).find_children("*","Label",true,false).map(func(candidate):return candidate.text))
+	TestSupport.check(errors,locked_heroic_text.contains("Choose your Heroic at Level 15") and not locked_heroic_text.contains("Avatar") and not locked_heroic_text.contains("Haymaker"),"A Hero without a selected Heroic should see only a locked R placeholder and its unlock level.")
+	main.open_roster_ability_details(main.state.heroes[0],"Q");await main.get_tree().process_frame
+	var ability_detail_text:String="\n".join(main.ui.find_child("RosterAbilityDetailsCard",true,false).find_children("*","Label",true,false).map(func(candidate):return candidate.text))
+	TestSupport.check(errors,ability_detail_text.contains("Storm Bolt") and ability_detail_text.contains("PER-BATTLE QUEST") and ability_detail_text.contains("45-STACK REWARD") and ability_detail_text.contains("resets when the battle ends"),"Tapping a Guardian ability should open its complete, battle-accurate detail card.")
+	main.ui.find_child("RosterAbilityDetailsBackdrop",true,false).emit_signal("pressed");await main.get_tree().process_frame
+	main.state.heroes[0].level=15;main.state.heroes[0].selected_heroic_id="guardian_l15_r2";main.state.heroes[0].selected_talents["tier_3"]="guardian_l15_r2";main.select_roster_section("Abilities");await main.get_tree().process_frame
+	var heroic_row:PanelContainer=main.ui.find_child("RosterAbilityR",true,false);var heroic_text:String="\n".join(heroic_row.find_children("*","Label",true,false).map(func(candidate):return candidate.text)) if heroic_row!=null else ""
+	TestSupport.check(errors,heroic_row!=null and heroic_text.contains("Haymaker") and not heroic_text.contains("Avatar"),"Abilities should show only the Heroic that the Hero has unlocked and selected.")
+	main.state.heroes[0].level=1;main.state.heroes[0].selected_heroic_id="";main.state.heroes[0].selected_talents.erase("tier_3")
+	main.state.class_talent_discovery["guardian"]=30
 	main.select_roster_section("Talents")
 	await main.get_tree().process_frame
 	var talents_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
-	TestSupport.check(errors,talents_content.get_child_count()==1,"The empty Talents workspace should show only its title without implementation notes.")
+	TestSupport.check(errors,talents_content.get_child_count()==9 and main.ui.find_child("TalentOption_guardian_l15_r1",true,false)!=null and main.ui.find_child("TalentOption_guardian_l15_r2",true,false)!=null,"The visual Talent Tree should retain revealed Heroic choices even while Abilities hides an unselected R.")
+	main.ui.find_child("TalentOption_guardian_l9_2",true,false).emit_signal("pressed");await main.get_tree().process_frame
+	TestSupport.check(errors,main.state.heroes[0].planned_talents.get("tier_1","")=="guardian_l9_2" and main.ui.find_child("TalentOption_guardian_l9_2",true,false).text.contains("PLANNED"),"A revealed future talent should support one visible, changeable planned heart without granting its gameplay effect.")
+	main.state.heroes[0].level=30;main.select_roster_section("Talents");await main.get_tree().process_frame
+	main.ui.find_child("TalentOption_guardian_l9_1",true,false).emit_signal("pressed");await main.get_tree().process_frame
+	TestSupport.check(errors,main.state.heroes[0].selected_talents.get("tier_1","")=="guardian_l9_1" and main.ui.find_child("TalentOption_guardian_l9_1",true,false).text.contains("SELECTED"),"An unlocked talent card should be selectable and immediately show its selected state.")
+	main.ui.find_child("TalentOption_guardian_l15_r2",true,false).emit_signal("pressed");await main.get_tree().process_frame
+	var avatar_upgrade:Button=main.ui.find_child("TalentOption_guardian_l27_r1",true,false);var haymaker_upgrade:Button=main.ui.find_child("TalentOption_guardian_l27_r2",true,false)
+	TestSupport.check(errors,main.state.heroes[0].selected_heroic_id=="guardian_l15_r2" and avatar_upgrade.disabled and not haymaker_upgrade.disabled,"Choosing a Heroic should enable only its matching Level 27 upgrade.")
+	main.state.heroes[0]=TalentSystem.clear_all(main.state.heroes[0]);main.state.heroes[0].level=1
 	main.select_roster_section("Professions")
 	await main.get_tree().process_frame
 	var professions_content:VBoxContainer=main.ui.find_child("RosterSectionContent",true,false)
@@ -153,7 +175,7 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.screen=="combat" and main.current_ashwood_encounter=="first_battle","Selecting Encounter 1 should skip previews and immediately begin combat.")
 	TestSupport.check(errors,main.heroes.size()==2 and main.heroes.map(func(hero):return hero["class"])==["Guardian","Cleric"],"Encounter 1 should deploy both founding heroes.")
 	TestSupport.check(errors,main.heroes[0].pos==Vector2(210,320) and main.heroes[1].pos==Vector2(145,215) and main.battle_formation_position(2)==Vector2(145,425) and main.battle_formation_position(3)==Vector2(90,320),"Combat should deploy ordered party slots as front, top, bottom, and back points of a diamond.")
-	TestSupport.check(errors,main.heroes[0].max_hp==230.0 and main.heroes[1].max_hp==150.0,"Level-one heroes should begin at class base health without receiving the level-two health bonus early.")
+	TestSupport.check(errors,main.heroes[0].max_hp==2765.0 and main.heroes[1].max_hp==150.0,"Level-one heroes should begin at class base health without receiving the level-two health bonus early.")
 	TestSupport.check(errors,main.objective_banner_time>0 and main.objective_combat_intro!="","Encounter 1 should briefly combine its story line and objective in the combat banner.")
 	main.spawn_enemy(Vector2(1050,250),"Swift")
 	main.spawn_enemy(Vector2(1050,420),"Stalker")
@@ -416,7 +438,18 @@ static func run(main:Node) -> Array:
 	main.state.selected_team=[0,1,4,2];main.state.active_team=[0,1,4,2]
 	main.state.heroes[1].level=6
 	main.start_testing_zone()
-	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==5,"The testing range should create its single, AoE, and defense dummy layout without waves.")
+	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==6 and main.enemies.any(func(enemy):return bool(enemy.get("boss",false))),"The testing range should retain its dummy layout and add a Boss-control target without waves.")
+	var input_guardian:Dictionary=main.heroes[0];main.selected=0;input_guardian.selected_talents={"tier_6":"guardian_l24_2"};input_guardian.ability_cds[4]=0.0;main.begin_trait()
+	TestSupport.check(errors,input_guardian.guardian_runtime.stoneform_remaining==10.0 and input_guardian.ability_cds[4]==60.0,"The existing D Trait input should activate Stoneform and expose its cooldown without another action slot.")
+	input_guardian.guardian_runtime.stoneform_remaining=0.0
+	input_guardian.selected_talents={"tier_8":"guardian_l30_3"};input_guardian.ability_cds[2]=0.0;var invalid_toss:bool=bool(main.cast_guardian_ability(2,Vector2(55,320)))
+	TestSupport.check(errors,not invalid_toss and input_guardian.ability_cds[2]==0.0 and main.GuardianSystem.rewind_sequence_count(input_guardian,main.battle_time)==0,"An invalid Dwarf Toss should consume no cooldown and should not count toward Rewind.")
+	var original_enemy_positions:Array=main.enemies.map(func(enemy):return enemy.pos)
+	for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=Vector2(1100,100+enemy_index*70)
+	input_guardian.ability_cds[1]=0.0
+	var thunder_clap_cast:bool=bool(main.cast_guardian_ability(1,input_guardian.pos))
+	TestSupport.check(errors,thunder_clap_cast and input_guardian.guardian_runtime.telemetry.thunder_clap_casts[-1]==0,"Thunder Clap should complete safely and record its per-cast target count without a telemetry type crash.")
+	for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=original_enemy_positions[enemy_index]
 	var defense_dummy:Dictionary=main.enemies[-1]
 	main.heroes[0].pos=defense_dummy.pos+Vector2(100,0);main.heroes[0].dest=main.heroes[0].pos;main.heroes[0].suppress_auto_target=true
 	var defense_health_before:float=main.heroes[0].hp

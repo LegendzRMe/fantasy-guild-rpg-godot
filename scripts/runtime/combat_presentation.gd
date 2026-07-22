@@ -221,13 +221,19 @@ func _draw() -> void:
 				draw_role_icon(center-Vector2(0,4),heroes[hero_index]["class"],icon_color)
 				draw_string(ThemeDB.fallback_font,center+Vector2(-8,20),str(i+1),HORIZONTAL_ALIGNMENT_CENTER,16,11,C_GOLD if is_selected else C_MUTED)
 		if tutorial_should_show_ability_bar():
-			var active=heroes[selected];var keys=["Q","W","E","R",""];var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
+			var active=heroes[selected];var keys=["Q","W","E","R","D"];var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
 			var visible_slots:Array=[0,4]
 			for ability_slot in [1,2,3]:
 				if TalentSystem.ability_is_unlocked(hero_level,ability_slot):visible_slots.insert(visible_slots.size()-1,ability_slot)
 			for slot in visible_slots:
-				var center=Vector2(484+slot*78,674); draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3); draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),(ABILITIES[active["class"]][slot] if slot<4 else TRAITS[active["class"]]).substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT); draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
-				if slot<4 and active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
+				var center=Vector2(484+slot*78,674);var action_name:String=str(ABILITIES[active["class"]][slot]) if slot<4 else "Stoneform" if active["class"]=="Guardian" and GuardianSystem.has_talent(active,"guardian_l24_2") else str(TRAITS[active["class"]]);draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3);draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
+				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
+			if active["class"]=="Guardian" and not active.get("guardian_runtime",{}).is_empty():
+				var status_parts:Array=[]
+				if GuardianSystem.has_talent(active,"guardian_l24_3"):status_parts.append("PRESENCE READY" if battle_time>=float(active.guardian_runtime.imposing_ready_at) else "PRESENCE %.0fs"%(float(active.guardian_runtime.imposing_ready_at)-battle_time))
+				if GuardianSystem.has_talent(active,"guardian_l30_2"):status_parts.append("SHIELD READY" if battle_time>=float(active.guardian_runtime.hardened_ready_at) else "SHIELD %.0fs"%(float(active.guardian_runtime.hardened_ready_at)-battle_time))
+				if GuardianSystem.has_talent(active,"guardian_l30_3"):status_parts.append("REWIND %d/3"%GuardianSystem.rewind_sequence_count(active,battle_time) if battle_time>=float(active.guardian_runtime.rewind_ready_at) else "REWIND %.0fs"%(float(active.guardian_runtime.rewind_ready_at)-battle_time))
+				if not status_parts.is_empty():draw_string(ThemeDB.fallback_font,Vector2(450,620),"  •  ".join(status_parts),HORIZONTAL_ALIGNMENT_CENTER,390,11,C_MUTED)
 		draw_string(ThemeDB.fallback_font,Vector2(1080,50),"●  %d"%state.gold,HORIZONTAL_ALIGNMENT_RIGHT,115,20,C_GOLD);draw_circle(Vector2(1235,42),25,Color(0.08,.11,.16,.9)); draw_string(ThemeDB.fallback_font,Vector2(1222,50),"Ⅱ",HORIZONTAL_ALIGNMENT_LEFT,-1,22,C_TEXT)
 
 	if tutorial_active and tutorial_step==4:

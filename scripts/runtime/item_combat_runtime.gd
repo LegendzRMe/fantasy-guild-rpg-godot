@@ -77,6 +77,9 @@ func apply_passive_trigger(owner:Dictionary,event:Dictionary,target:Dictionary)-
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var resolved_amount:=amount;var retribution_bonus:float=0.0
+	var guardian_basic_result:={}
+	if str(source.get("class",""))=="Guardian" and source_action=="basic_attack" and not source.get("guardian_runtime",{}).is_empty():
+		guardian_basic_result=GuardianSystem.on_basic_attack(source,target,battle_time);resolved_amount*=float(guardian_basic_result.damage_multiplier);resolved_amount+=amount*float(guardian_basic_result.bonus_damage_multiplier)
 	if source_action=="basic_attack":
 		for effect_index in range(source.get("active_effects",[]).size()-1,-1,-1):
 			var active_effect:Dictionary=source.active_effects[effect_index]
@@ -85,8 +88,23 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 			retribution_bonus=float(source.retribution_charges.pop_front().amount)
 	var before_ratio:float=float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))
 	var damage_request:={"amount":resolved_amount,"source_action":source_action,"damage_type":damage_type,"damage_taken_multiplier":current_damage_taken_multiplier(target)}
+	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
+		var armor_sources:Array=target.guardian_runtime.temporary_armor_sources.duplicate(true)
+		if damage_type=="physical" and source_action=="basic_attack" and int(target.guardian_runtime.block_charges)>0:armor_sources.append({"id":"dwarf_block","armor":GuardianData.VALUES.block_armor,"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
+		damage_request["armor_sources"]=armor_sources
 	if can_crit_override!=null:damage_request["can_crit"]=bool(can_crit_override)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request)
+	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
+		var consumed:=GuardianSystem.consume_block(target,damage_type,source_action,float(result.raw_amount))
+		if consumed:GuardianSystem.telemetry_add(target,"block_prevented",float(result.armor_prevented))
+		elif float(result.armor_prevented)>0.0:GuardianSystem.telemetry_add(target,"temporary_armor_prevented",float(result.armor_prevented))
+		if float(result.resolved_damage)>0.0:GuardianSystem.note_damage(target,float(result.resolved_damage))
+		if source_action=="basic_attack" and float(result.resolved_damage)>0.0:
+			var imposing_amount:=GuardianSystem.imposing_presence_amount(target,battle_time)
+			if imposing_amount>0.0:CombatSystem.apply_control(source,"attack_speed",2.5,imposing_amount)
+		var after_ratio:float=float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))
+		GuardianSystem.try_hardened_shield(target,before_ratio,after_ratio,float(result.resolved_damage),battle_time)
+	if not guardian_basic_result.is_empty() and float(guardian_basic_result.stun)>0.0:CombatSystem.apply_control(target,"stun",float(guardian_basic_result.stun))
 	if testing_zone_active and "training" in target.get("combat_tags",[]) and float(result.get("resolved_damage",0.0))>0.0:target["seconds_since_damage"]=0.0
 	var crossed_below_half:bool=before_ratio>0.50 and float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))<0.50
 	var context:={"source_action":source_action,"damage_type":damage_type,"action_tags":[source_action],"origin":origin,"source_is_summon":source_is_summon,"originating_effect_id":originating_effect_id,"trigger_chain":trigger_chain,"crossed_below_half":crossed_below_half}
@@ -109,6 +127,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var defeat_event:=CombatSystem.create_event("unit_defeated",source,target,result,context)
 		for hero in heroes:
 			if hero.hp>0:apply_passive_trigger(hero,defeat_event,target)
+			if str(hero.get("class",""))=="Guardian" and not hero.get("guardian_runtime",{}).is_empty():GuardianSystem.process_marked_death(hero,str(target.get("combat_id","")),battle_time);GuardianSystem.process_haymaker_death(hero,str(target.get("combat_id","")),battle_time)
 	return result
 
 func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="")->Dictionary:

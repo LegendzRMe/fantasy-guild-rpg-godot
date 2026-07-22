@@ -46,6 +46,7 @@ func begin_ability(slot:int,device:String="pc")->void:
 	var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
 	if not TalentSystem.ability_is_unlocked(hero_level,slot):flash("This ability unlocks at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]));return
 	var category=ABILITY_TARGETING[heroes[selected]["class"]][slot]
+	if heroes[selected]["class"]=="Guardian" and slot==3 and guardian_heroic_id(heroes[selected])=="guardian_l15_r2":category="enemy"
 	var mode="instant" if category=="self" else str(state.casting_settings[device].get(category,"cursor"))
 	if mode=="instant" or mode=="cursor" or mode=="facing" or mode=="target":
 		if (category=="enemy" and combat_enemy_target()<0) or (category=="ally" and (heroes[selected].heal_target<0 or heroes[selected].heal_target>=heroes.size())):
@@ -54,6 +55,13 @@ func begin_ability(slot:int,device:String="pc")->void:
 		if mode=="facing":cast_point=heroes[selected].pos+heroes[selected].facing_direction*ABILITY_RANGES[heroes[selected]["class"]][slot]
 		use_ability(slot,cast_point);return
 	ability_aiming=true;aimed_ability_slot=slot;aimed_ability_category=category;aimed_cast_mode=mode;aimed_from_touch=device=="mobile";ability_button_held=mode=="release";ability_aim_point=get_global_mouse_position();queue_redraw()
+
+func begin_trait()->void:
+	if selected<0 or selected>=heroes.size() or bool(heroes[selected].get("independent",false)):return
+	var hero:Dictionary=heroes[selected]
+	if str(hero.get("class",""))=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2"):
+		if not use_guardian_trait(hero):flash("Stoneform is not ready.")
+		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -174,6 +182,18 @@ func _unhandled_input(event:InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
 		if event.keycode==KEY_ESCAPE and ability_aiming:cancel_ability_aim();get_viewport().set_input_as_handled();return
 		if event.keycode==KEY_F3 and testing_zone_active:debug_combat_overlay=not debug_combat_overlay;queue_redraw();return
+		if event.keycode==KEY_F4 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Guardian":GuardianSystem.add_quest(hero,45,"testing_control",battle_time);flash("Guardian quest +45")
+			return
+		if event.keycode==KEY_F5 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Guardian":hero.selected_heroic_id="guardian_l15_r2" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l15_r1";hero.selected_talents["tier_3"]=hero.selected_heroic_id;flash("Heroic: %s"%GuardianData.WORKING_NAMES[hero.selected_heroic_id])
+			return
+		if event.keycode==KEY_F6 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Guardian":hero.selected_talents={"tier_1":"guardian_l9_1","tier_2":"guardian_l12_2","tier_3":guardian_heroic_id(hero),"tier_4":"guardian_l18_2","tier_5":"guardian_l21_2","tier_6":"guardian_l24_1","tier_7":"guardian_l27_r1" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l27_r2","tier_8":"guardian_l30_1"};hero.guardian_runtime.ability_charges=GuardianSystem.default_charges(hero);flash("Guardian test talents loaded")
+			return
 		if event.keycode==KEY_SPACE:paused=!paused;queue_redraw()
 		if event.keycode==KEY_TAB and not event.echo:
 			cycle_selected_enemy()
@@ -186,6 +206,7 @@ func _unhandled_input(event:InputEvent) -> void:
 		if not event.echo and event.keycode==KEY_W:begin_ability(1)
 		if not event.echo and event.keycode==KEY_E:begin_ability(2)
 		if not event.echo and event.keycode==KEY_R:begin_ability(3)
+		if not event.echo and event.keycode==KEY_D:begin_trait()
 	if event is InputEventKey and not event.pressed and ability_aiming and aimed_cast_mode=="release":
 		var released_slot={KEY_Q:0,KEY_W:1,KEY_E:2,KEY_R:3}.get(event.keycode,-1)
 		if released_slot==aimed_ability_slot:confirm_aim_at(get_global_mouse_position());return
@@ -222,7 +243,11 @@ func _unhandled_input(event:InputEvent) -> void:
 			var requested_slot:int=clampi(int((p.x-424)/54),0,7)
 			if requested_slot<selectable_heroes.size():selected=selectable_heroes[requested_slot];queue_redraw()
 			return
-		if p.y>635 and p.x>445 and p.x<835:begin_ability(clampi(int((p.x-445)/78),0,4));return
+		if p.y>635 and p.x>445 and p.x<835:
+			var action_slot:=clampi(int((p.x-445)/78),0,4)
+			if action_slot==4:begin_trait()
+			else:begin_ability(action_slot)
+			return
 		for i in heroes.size():
 			if not bool(heroes[i].get("independent",false)) and heroes[i].pos.distance_to(p)<58:
 				selected=i;if tutorial_active and tutorial_step==3:tutorial_hero_clicked=true
@@ -239,7 +264,11 @@ func _unhandled_input(event:InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event.pressed and ability_aiming and aimed_cast_mode=="confirm":confirm_aim_at(event.position);return
-		if event.pressed and event.position.y>635 and event.position.x>445 and event.position.x<835:begin_ability(clampi(int((event.position.x-445)/78),0,4),"mobile");return
+		if event.pressed and event.position.y>635 and event.position.x>445 and event.position.x<835:
+			var action_slot:=clampi(int((event.position.x-445)/78),0,4)
+			if action_slot==4:begin_trait()
+			else:begin_ability(action_slot,"mobile")
+			return
 		if not event.pressed and ability_aiming and aimed_cast_mode=="release":confirm_aim_at(event.position);return
 		if event.pressed and not paused and event.position.y<635:clear_selected_combat_target()
 	if event is InputEventScreenDrag and tutorial_active and dragging_hero:update_hero_drag(event.position);return

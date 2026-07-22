@@ -12,18 +12,18 @@ static func unit(hp:float=100.0,armor:float=0.0,crit:float=0.0)->Dictionary:
 static func run()->Array:
 	var errors:=[]
 	TestSupport.check(errors,CombatSystem.LEVEL_CAP==30 and CombatSystem.clamp_level(99)==30,"The combat level cap should be centralized at 30.")
-	var expected_level_four_health:=230.0*pow(1.03,3)
-	var expected_level_four_power:=10.0*pow(1.03,3)
+	var expected_level_four_health:=2765.0*pow(1.04,3)
+	var expected_level_four_power:=88.0*pow(1.04,3)
 	var level_stats:=CombatSystem.calculate_final_stats(GameData.CLASSES.Guardian,4,[])
-	TestSupport.check(errors,is_equal_approx(level_stats.health,expected_level_four_health) and is_equal_approx(level_stats.power,expected_level_four_power),"Health and Power should use centralized three-percent exponential level growth.")
+	TestSupport.check(errors,is_equal_approx(level_stats.health,expected_level_four_health) and is_equal_approx(level_stats.power,expected_level_four_power),"Guardian Health and Power should use its source four-percent exponential level growth.")
 	var capped_stats:=CombatSystem.calculate_final_stats(GameData.CLASSES.Guardian,99,[])
-	TestSupport.check(errors,capped_stats.level==30 and is_equal_approx(capped_stats.health,230.0*pow(1.03,29)),"Final stat calculation should clamp levels before applying growth.")
+	TestSupport.check(errors,capped_stats.level==30 and is_equal_approx(capped_stats.health,2765.0*pow(1.04,29)),"Final stat calculation should clamp levels before applying growth.")
 
 	var bulwark:=ItemData.create_instance("ashwood_bulwark","bulwark_test")
 	var guardian_stats:=CombatSystem.calculate_final_stats(GameData.CLASSES.Guardian,1,[bulwark])
-	TestSupport.check(errors,guardian_stats.health==230.0 and guardian_stats.power==10.0 and guardian_stats.armor==38.0,"Final stats should combine class bases and equipment modifiers.")
+	TestSupport.check(errors,guardian_stats.health==2765.0 and guardian_stats.power==88.0 and guardian_stats.armor==20.0,"Final stats should combine Guardian source bases and equipment modifiers.")
 	var layered_stats:=CombatSystem.calculate_final_stats(GameData.CLASSES.Guardian,1,[bulwark],[{"stat_modifiers":{"power":2.0,"movement_speed_multiplier":1.1}}],[{"stat_modifiers":{"armor":5.0,"movement_speed_multiplier":0.8}}])
-	TestSupport.check(errors,layered_stats.power==12.0 and layered_stats.armor==33.0 and is_equal_approx(layered_stats.movement_speed,118.8) and layered_stats.basic_action_amount==12.0,"Equipment, buffs, and debuffs should resolve before derived Basic Action values.")
+	TestSupport.check(errors,layered_stats.power==90.0 and layered_stats.armor==15.0 and is_equal_approx(layered_stats.movement_speed,118.8) and layered_stats.basic_action_amount==90.0,"Equipment, buffs, and debuffs should resolve before derived Basic Action values.")
 
 	var ashfang:=ItemData.create_instance("test_ashfang_knives","ashfang_test")
 	var stormbreaker:=ItemData.create_instance("test_stormbreaker","stormbreaker_test")

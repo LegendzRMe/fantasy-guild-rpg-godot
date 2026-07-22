@@ -27,6 +27,7 @@ Owns mutable application, menu, map, tutorial, item-overlay, and combat state de
 - `scripts/runtime/tutorial_controller.gd`: tutorial steps, prompts, recovery, and progression checks.
 - `scripts/runtime/shared_combat_runtime.gd`: stable combat-ID lookup, explicit hero commands, Basic Action timing, casts/channels, projectiles, hit nudges, incapacitation, revive hooks, and narrow extension contracts.
 - `scripts/runtime/item_combat_runtime.gd`: damage, healing, shields, threat creation, timed item effects, and passive item triggers.
+- `scripts/runtime/guardian_runtime.gd`: Guardian V1 ability execution, world projectiles, delayed effects, Heroics, and class-specific testing hooks. It delegates reusable damage, Armor, control, geometry, command, and projectile rules to shared systems.
 - `scripts/runtime/enemy_combat_runtime.gd`: waves, spawning, encounter objectives, enemy target selection, and combat lookup helpers.
 - `scripts/runtime/ability_runtime.gd`: temporary class ability execution and cast-position resolution.
 - `scripts/runtime/combat_input_runtime.gd`: combat selection, drag commands, ability aiming, keyboard, mouse, touch, and tutorial input gates.
@@ -51,6 +52,8 @@ Runtime progress does not belong in this file.
 ### `scripts/data/class_data.gd`
 
 Owns the editable class and archetype authoring surface: stable IDs, roles, Basic Actions, traits, Q/W/E/Heroic IDs, combat chassis, AI tags, proficiencies, and temporary ability presentation. New class design should begin here without editing combat, saves, roster UI, or world data.
+
+Guardian's larger conversion surface is isolated in `scripts/data/guardian_data.gd`; its source values, conversion constants, stable IDs, working-name metadata, and exact talent tiers do not enlarge generic class data.
 
 ### `scripts/data/talent_data.gd`
 
@@ -127,7 +130,7 @@ Combat terminology is deliberately split between exact action sources and reusab
 
 Combat invariants:
 
-- The level cap is 30. Health and Power use three-percent exponential growth from level one.
+- The level cap is 30. Health and Power use each class definition's exponential growth rate; legacy prototype classes remain at three percent while Guardian V1 uses its locked four-percent source scaling.
 - Weapon families modify only Basic Action amount and interval; Basic Abilities and Heroics scale from Power without inheriting weapon profiles.
 - Armor reduction is `Armor / (Armor + 100 + 10 * attacker level)`, capped at 75 percent. True Damage bypasses Armor.
 - Shields are removed before Health and preserve their creator so absorbed damage can generate creator threat.
