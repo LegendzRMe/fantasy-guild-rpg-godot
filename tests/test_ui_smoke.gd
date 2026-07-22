@@ -548,6 +548,9 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,int(item_cleric.q_charges)==1 and item_cleric.q_charge_timers.size()==1,"Casting E should restore one missing Twin Incantation Q charge.")
 	main.update_item_runtime(item_cleric,8.1);item_cleric.ability_cds[1]=0.0;main.use_ability(1,item_cleric.pos)
 	TestSupport.check(errors,item_cleric.pending_repeats.size()==1 and not item_cleric.borrowed_time_armed,"Borrowed Time should arm after eight seconds and schedule one non-recursive repeat.")
+	main.update_cleric_runtime(.01)
+	TestSupport.check(errors,main.effects.any(func(effect):return effect.kind=="cloud_serpent_projectile"),"An active Cloud Serpent attack should launch its own visible projectile from the host marker.")
+	main.effects.clear()
 	# Ranger V1 deals substantially more Basic Attack damage than the old placeholder;
 	# keep this item-proc fixture alive through all three attacks.
 	item_dummy.max_hp=maxf(float(item_dummy.max_hp),5000.0);item_dummy.hp=item_dummy.max_hp;item_rogue.thousand_cuts_count=0
