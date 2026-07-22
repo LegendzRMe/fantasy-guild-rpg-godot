@@ -466,9 +466,16 @@ static func run(main:Node) -> Array:
 	var ranger_battle_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Ranger")
 	if ranger_battle_index>=0:
 		var visual_ranger:Dictionary=main.heroes[ranger_battle_index];main.selected=ranger_battle_index
-		main.cast_ranger_q(visual_ranger,visual_ranger.pos+Vector2.RIGHT*400.0);main.cast_ranger_w(visual_ranger,visual_ranger.pos+Vector2.RIGHT*280.0)
-		TestSupport.check(errors,main.effects.any(func(effect):return effect.kind=="ranger_arrow") and main.effects.any(func(effect):return effect.kind=="multishot"),"Hungering Arrow and Multishot should create distinct readable battlefield effects.")
-		main.effects.clear()
+		var visual_enemy_states:Array=main.enemies.map(func(enemy):return {"pos":enemy.pos,"hp":enemy.hp});for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=Vector2(1100,100+enemy_index*70)
+		var travel_dummy:Dictionary=main.enemies[0];travel_dummy.pos=visual_ranger.pos+Vector2.RIGHT*150.0;travel_dummy.hp=travel_dummy.max_hp;var q_health_before:float=travel_dummy.hp
+		main.cast_ranger_q(visual_ranger,visual_ranger.pos+Vector2.RIGHT*400.0);main.update_ranger_runtime(.05)
+		TestSupport.check(errors,is_equal_approx(travel_dummy.hp,q_health_before),"Hungering Arrow should not deal damage before its researched initial projectile travel time elapses.")
+		main.update_ranger_runtime(.30);TestSupport.check(errors,travel_dummy.hp<q_health_before,"Hungering Arrow should resolve damage when its traveling projectile reaches the target.")
+		visual_ranger.ranger_runtime.delayed_effects.clear();travel_dummy.hp=travel_dummy.max_hp;travel_dummy.pos=visual_ranger.pos+Vector2.RIGHT*100.0;var w_health_before:float=travel_dummy.hp
+		main.cast_ranger_w(visual_ranger,visual_ranger.pos+Vector2.RIGHT*280.0);main.update_ranger_runtime(.05)
+		TestSupport.check(errors,is_equal_approx(travel_dummy.hp,w_health_before),"Multishot should not deal damage before its expanding cone reaches the target.")
+		main.update_ranger_runtime(.20);TestSupport.check(errors,travel_dummy.hp<w_health_before and main.effects.any(func(effect):return effect.kind=="ranger_arrow") and main.effects.any(func(effect):return effect.kind=="multishot"),"Ranger projectiles should synchronize readable battlefield effects with delayed impact damage.")
+		main.effects.clear();visual_ranger.ranger_runtime.delayed_effects.clear();for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=visual_enemy_states[enemy_index].pos;main.enemies[enemy_index].hp=visual_enemy_states[enemy_index].hp
 	else:TestSupport.check(errors,false,"The testing party should include a Ranger for combat-presentation coverage.")
 	var input_guardian:Dictionary=main.heroes[0];main.selected=0;input_guardian.selected_talents={"tier_6":"guardian_l24_2"};input_guardian.ability_cds[4]=0.0;main.begin_trait()
 	TestSupport.check(errors,input_guardian.guardian_runtime.stoneform_remaining==10.0 and input_guardian.ability_cds[4]==60.0,"The existing D Trait input should activate Stoneform and expose its cooldown without another action slot.")

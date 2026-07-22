@@ -361,10 +361,10 @@ func draw_combat_effect(fx:Dictionary)->void:
 			if arrow_direction==Vector2.ZERO:
 				draw_arc(fx.to,12+progress*16,0,TAU,24,col,3)
 			else:
-				var arrow_position:Vector2=fx.from.lerp(fx.to,clampf(progress*1.65,0.0,1.0));var arrow_tip:=arrow_position+arrow_direction*8.0
+				var arrow_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var arrow_tip:=arrow_position+arrow_direction*8.0
 				draw_line(arrow_position-arrow_direction*18.0,arrow_tip,col,4);draw_line(arrow_tip,arrow_tip-arrow_direction.rotated(.55)*10.0,col,3);draw_line(arrow_tip,arrow_tip-arrow_direction.rotated(-.55)*10.0,col,3)
 		"multishot":
-			var fan_direction:Vector2=fx.from.direction_to(fx.to);var fan_distance:float=fx.from.distance_to(fx.to)*clampf(progress*1.55,0.0,1.0)
+			var fan_direction:Vector2=fx.from.direction_to(fx.to);var fan_distance:float=fx.from.distance_to(fx.to)*clampf(progress,0.0,1.0)
 			for arrow_index in range(-3,4):
 				var shot_direction:=fan_direction.rotated(deg_to_rad(float(arrow_index)*8.0));var shot_tip:Vector2=fx.from+shot_direction*fan_distance
 				draw_line(shot_tip-shot_direction*15.0,shot_tip,Color(col,.88),3)
