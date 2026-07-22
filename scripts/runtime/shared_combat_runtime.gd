@@ -83,6 +83,7 @@ func update_unit_casts(unit:Dictionary,delta:float)->void:
 		if unit.active_channel.remaining<=0.0:unit.active_channel={};CombatRulesV1.restore_preserved_command(unit,target_is_valid_for(unit,unit_by_combat_id(str(unit.get("preserved_target_id",""))),str(unit.get("preserved_target_kind",""))))
 
 func apply_hit_nudge(source:Dictionary,target:Dictionary)->void:
+	if not bool(CombatSystem.default_control_profile(target).get("displacement",true)):return
 	target.pos=CombatGeometry.apply_nudge(target.pos,source.get("pos",target.pos),CombatRulesV1.DEFAULT_HIT_NUDGE_DISTANCE,42.0,combat_blockers)
 	if int(target.get("command_state",CombatRulesV1.CommandState.IDLE))==CombatRulesV1.CommandState.MOVE:target.dest=target.move_destination
 
