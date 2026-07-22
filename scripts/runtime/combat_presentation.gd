@@ -14,6 +14,19 @@ func draw_octagon_health(center:Vector2,radius:float,ratio:float) -> void:
 		var fraction=clamp(edge_progress-edge,0.0,1.0)
 		if fraction>0:draw_line(points[edge],points[edge].lerp(points[(edge+1)%8],fraction),C_GREEN,4)
 
+func draw_octagon_vertical_fill(center:Vector2,radius:float,ratio:float,color:Color)->void:
+	var points:=octagon_points(center,radius);var min_y:=points[0].y;var max_y:=points[0].y
+	for point in points:min_y=minf(min_y,point.y);max_y=maxf(max_y,point.y)
+	var cutoff:=lerpf(max_y,min_y,clampf(ratio,0.0,1.0));var clipped:=PackedVector2Array();var previous:=points[-1];var previous_inside:=previous.y>=cutoff
+	for current in points:
+		var current_inside:bool=current.y>=cutoff
+		if current_inside!=previous_inside:
+			var crossing:float=(cutoff-previous.y)/(current.y-previous.y)
+			clipped.append(previous.lerp(current,crossing))
+		if current_inside:clipped.append(current)
+		previous=current;previous_inside=current_inside
+	if clipped.size()>=3:draw_colored_polygon(clipped,color)
+
 func draw_tutorial_dotted_path(from:Vector2,to:Vector2)->void:
 	var length=from.distance_to(to)
 	if length<1:return
@@ -239,12 +252,17 @@ func _draw() -> void:
 				elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
 				var cleric_trait_active:bool=false
 				if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
-				if cleric_trait_active:
-					var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES["Cleric"].color)
+				var hatred_ratio:float=0.0
+				if slot==4 and str(active.get("class",""))=="Ranger" and not active.get("ranger_runtime",{}).is_empty():hatred_ratio=clampf(float(active.ranger_runtime.hatred)/float(RangerData.VALUES.hatred_max),0.0,1.0)
+				var ranger_hatred_full:bool=hatred_ratio>=1.0
+				if cleric_trait_active or ranger_hatred_full:
+					var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 					draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
-				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3);draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
+				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
+				if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
+				draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
-				if cleric_trait_active:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+				if cleric_trait_active or ranger_hatred_full:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
 				if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
 					var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
 					draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[charge_state.charges,charge_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
@@ -257,8 +275,6 @@ func _draw() -> void:
 			elif active["class"]=="Cleric" and not active.get("cleric_runtime",{}).is_empty() and testing_zone_active:
 				var cleric_status:="FAST FEET  Q/E %.2fx  W %.2fx"%[ClericSystem.qwe_cooldown_rate(active),ClericSystem.w_cooldown_rate(active)] if ClericSystem.fast_feet_active(active) else "FAST FEET READY"
 				draw_string(ThemeDB.fallback_font,Vector2(450,620),cleric_status,HORIZONTAL_ALIGNMENT_CENTER,390,11,C_MUTED)
-			elif active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty():
-				draw_string(ThemeDB.fallback_font,Vector2(450,620),"HATRED  %d / %d"%[int(active.ranger_runtime.hatred),int(RangerData.VALUES.hatred_max)],HORIZONTAL_ALIGNMENT_CENTER,390,11,C_GOLD)
 		draw_string(ThemeDB.fallback_font,Vector2(1080,50),"●  %d"%state.gold,HORIZONTAL_ALIGNMENT_RIGHT,115,20,C_GOLD);draw_circle(Vector2(1235,42),25,Color(0.08,.11,.16,.9)); draw_string(ThemeDB.fallback_font,Vector2(1222,50),"Ⅱ",HORIZONTAL_ALIGNMENT_LEFT,-1,22,C_TEXT)
 
 	if tutorial_active and tutorial_step==4:
@@ -340,6 +356,18 @@ func draw_combat_effect(fx:Dictionary)->void:
 	match fx.kind:
 		"projectile":
 			var p=fx.from.lerp(fx.to,clamp(progress*1.8,0.0,1.0));draw_line(p-Vector2(12,0),p+Vector2(8,0),col,5);draw_circle(p,5,Color.WHITE)
+		"ranger_arrow":
+			var arrow_direction:Vector2=fx.from.direction_to(fx.to)
+			if arrow_direction==Vector2.ZERO:
+				draw_arc(fx.to,12+progress*16,0,TAU,24,col,3)
+			else:
+				var arrow_position:Vector2=fx.from.lerp(fx.to,clampf(progress*1.65,0.0,1.0));var arrow_tip:=arrow_position+arrow_direction*8.0
+				draw_line(arrow_position-arrow_direction*18.0,arrow_tip,col,4);draw_line(arrow_tip,arrow_tip-arrow_direction.rotated(.55)*10.0,col,3);draw_line(arrow_tip,arrow_tip-arrow_direction.rotated(-.55)*10.0,col,3)
+		"multishot":
+			var fan_direction:Vector2=fx.from.direction_to(fx.to);var fan_distance:float=fx.from.distance_to(fx.to)*clampf(progress*1.55,0.0,1.0)
+			for arrow_index in range(-3,4):
+				var shot_direction:=fan_direction.rotated(deg_to_rad(float(arrow_index)*8.0));var shot_tip:Vector2=fx.from+shot_direction*fan_distance
+				draw_line(shot_tip-shot_direction*15.0,shot_tip,Color(col,.88),3)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":

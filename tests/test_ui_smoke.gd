@@ -463,6 +463,13 @@ static func run(main:Node) -> Array:
 	main.state.heroes[1].level=6
 	main.start_testing_zone()
 	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==7 and main.enemies.filter(func(enemy):return bool(enemy.get("boss",false))).size()==2 and main.enemies.any(func(enemy):return float(enemy.get("control_profile",{}).get("blind_duration_multiplier",0.0))==0.5),"The testing range should retain its dummy layout and include default-immune and partially Blind-vulnerable Boss targets without waves.")
+	var ranger_battle_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Ranger")
+	if ranger_battle_index>=0:
+		var visual_ranger:Dictionary=main.heroes[ranger_battle_index];main.selected=ranger_battle_index
+		main.cast_ranger_q(visual_ranger,visual_ranger.pos+Vector2.RIGHT*400.0);main.cast_ranger_w(visual_ranger,visual_ranger.pos+Vector2.RIGHT*280.0)
+		TestSupport.check(errors,main.effects.any(func(effect):return effect.kind=="ranger_arrow") and main.effects.any(func(effect):return effect.kind=="multishot"),"Hungering Arrow and Multishot should create distinct readable battlefield effects.")
+		main.effects.clear()
+	else:TestSupport.check(errors,false,"The testing party should include a Ranger for combat-presentation coverage.")
 	var input_guardian:Dictionary=main.heroes[0];main.selected=0;input_guardian.selected_talents={"tier_6":"guardian_l24_2"};input_guardian.ability_cds[4]=0.0;main.begin_trait()
 	TestSupport.check(errors,input_guardian.guardian_runtime.stoneform_remaining==10.0 and input_guardian.ability_cds[4]==60.0,"The existing D Trait input should activate Stoneform and expose its cooldown without another action slot.")
 	input_guardian.guardian_runtime.stoneform_remaining=0.0

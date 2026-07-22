@@ -21,14 +21,16 @@ func ranger_damage(hero:Dictionary,target:Dictionary,amount:float,action:String,
 
 func cast_ranger_q(hero:Dictionary,point:Vector2)->bool:
 	var direction:Vector2=hero.pos.direction_to(point);if direction==Vector2.ZERO:direction=hero.facing_direction
+	var maximum_arrow_point:Vector2=hero.pos+direction*float(RangerData.SPACE.q_range)
 	var candidates:Array=[]
 	for foe in enemies:
 		if foe.hp<=0:continue
 		var projection:float=(foe.pos-hero.pos).dot(direction)
 		if projection>=0.0 and projection<=float(RangerData.SPACE.q_range) and foe.pos.distance_to(hero.pos+direction*projection)<=float(RangerData.SPACE.q_hitbox):candidates.append(foe)
-	if candidates.is_empty():hero.ability_cds[0]=float(RangerData.VALUES.q_cooldown);RangerSystem.telemetry_add(hero,"q_casts");return true
+	if candidates.is_empty():add_effect("ranger_arrow",hero.pos,maximum_arrow_point,"",CLASSES["Ranger"].color);hero.ability_cds[0]=float(RangerData.VALUES.q_cooldown);RangerSystem.telemetry_add(hero,"q_casts");return true
 	candidates.sort_custom(func(a,b):return hero.pos.distance_squared_to(a.pos)<hero.pos.distance_squared_to(b.pos) or hero.pos.distance_squared_to(a.pos)==hero.pos.distance_squared_to(b.pos) and str(a.combat_id)<str(b.combat_id))
 	var target:Dictionary=candidates[0];var initial:=ranger_scaled(hero,float(RangerData.VALUES.q_initial_damage))+float(hero.ranger_runtime.q_encounter_bonus)
+	add_effect("ranger_arrow",hero.pos,target.pos,"",CLASSES["Ranger"].color)
 	if RangerSystem.has_talent(hero,"ranger_l18_1") and not bool(target.get("boss",false)):initial*=2.0
 	if RangerSystem.has_talent(hero,"ranger_l18_2") and CombatSystem.control_amount(target,"slow")>0.0:initial*=1.25
 	var result:=ranger_damage(hero,target,initial,"basic_ability","Hungering Arrow");RangerSystem.telemetry_add(hero,"q_hits")
@@ -45,6 +47,7 @@ func cast_ranger_q(hero:Dictionary,point:Vector2)->bool:
 		var seek_amount:=ranger_scaled(hero,float(RangerData.VALUES.q_seek_damage))+float(hero.ranger_runtime.q_encounter_bonus)
 		if RangerSystem.has_talent(hero,"ranger_l18_1") and not bool(next.get("boss",false)):seek_amount*=2.0
 		if RangerSystem.has_talent(hero,"ranger_l18_2") and CombatSystem.control_amount(next,"slow")>0.0:seek_amount*=1.25
+		add_effect("ranger_arrow",seek_source.pos,next.pos,"",CLASSES["Ranger"].color)
 		var seek_result:=ranger_damage(hero,next,seek_amount,"basic_ability","Hungering Arrow Seek");RangerSystem.telemetry_add(hero,"q_hits");RangerSystem.telemetry_add(hero,"q_seeks")
 		if RangerSystem.has_talent(hero,"ranger_l21_1") and seek_result.resolved_damage>0:deal_healing(hero,hero,float(hero.max_hp)*0.04,"basic_ability","Siphoning Arrow")
 		seek_source=next
@@ -53,6 +56,7 @@ func cast_ranger_q(hero:Dictionary,point:Vector2)->bool:
 func cast_ranger_w(hero:Dictionary,point:Vector2)->bool:
 	var direction:Vector2=Vector2(hero.pos).direction_to(point);if direction==Vector2.ZERO:direction=Vector2(hero.facing_direction)
 	var range_limit:=float(RangerData.SPACE.w_end_radius)*(1.2 if RangerSystem.has_talent(hero,"ranger_l12_1") else 1.0);var hit_count:=0
+	add_effect("multishot",hero.pos,hero.pos+direction*range_limit,"",CLASSES["Ranger"].color)
 	for foe in enemies:
 		if foe.hp<=0:continue
 		var offset:Vector2=foe.pos-hero.pos;var angle:=absf(rad_to_deg(direction.angle_to(offset.normalized())))
