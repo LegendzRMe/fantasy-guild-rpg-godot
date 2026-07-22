@@ -118,6 +118,14 @@ static func active_armor(hero:Dictionary)->float:
 	if hero.get("active_effects",[]).any(func(effect):return str(effect.get("id",""))=="shake_it_off_armor" and float(effect.get("remaining_duration",0.0))>0.0):strongest=maxf(strongest,35.0)
 	return strongest
 
+static func active_serpent_count(clerics:Array,host_id:String)->int:
+	var count:=0
+	for cleric in clerics:
+		if str(cleric.get("class",""))!="Cleric" or float(cleric.get("hp",0.0))<=0.0:continue
+		for serpent in cleric.get("cleric_runtime",{}).get("serpents",[]):
+			if str(serpent.get("host_id",""))==host_id and float(serpent.get("remaining",0.0))>0.0:count+=1
+	return count
+
 static func begin_jug(hero:Dictionary)->void:
 	hero.cleric_runtime.jug_active=true
 	hero.cleric_runtime.jug_remaining=float(ClericData.VALUES.r1_duration)

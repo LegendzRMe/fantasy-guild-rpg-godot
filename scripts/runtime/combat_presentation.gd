@@ -166,6 +166,11 @@ func _draw() -> void:
 			draw_circle(h.pos,66,Color(C_GOLD,.18));draw_circle(h.pos,59,C_GOLD,4)
 		if h.shield>0 and not victory_sequence:draw_circle(h.pos,63,Color("5fa8ff"),4)
 		draw_circle(h.pos,48,col);draw_role_icon(h.pos,h["class"]);if not victory_sequence and (h.hp<h.max_hp or h.last_hit>0 or h.shield>0):health_bar_with_shield(h.pos+Vector2(-54,-70),108,h)
+		if not victory_sequence:
+			var serpent_count:=ClericSystem.active_serpent_count(heroes,str(h.get("combat_id","")))
+			for serpent_marker_index in mini(serpent_count,2):
+				var marker_offset:=Vector2(-34,-49) if serpent_marker_index==0 else Vector2(34,-49)
+				draw_circle(h.pos+marker_offset,7,Color("263142"));draw_circle(h.pos+marker_offset,4.5,Color.WHITE)
 		if bool(h.get("independent",false)) and not victory_sequence:draw_string(ThemeDB.fallback_font,h.pos+Vector2(-42,-62),"ALLIED NPC",HORIZONTAL_ALIGNMENT_CENTER,84,12,C_GREEN)
 		if testing_zone_active and not victory_sequence:
 			var status_parts:Array[String]=[]

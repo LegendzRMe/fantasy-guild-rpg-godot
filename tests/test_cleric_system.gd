@@ -34,4 +34,6 @@ static func run()->Array:
 	TestSupport.check(errors,str(details.description).contains("133") and not str(details.description).contains("133."),"Cleric roster details should show current whole-number damage without decimal noise.")
 	var safety:=cleric(["cleric_l9_1","cleric_l12_2"]);var lets_go:=cleric(["cleric_l9_1","cleric_l12_3"])
 	TestSupport.check(errors,ClericAbilityPresenter.details(safety,"D").title=="Safety Sprint" and ClericAbilityPresenter.details(lets_go,"D").title=="Let's Go!","The roster should present the selected Level 12 Trait action in D without adding a new slot.")
+	var marker_cleric:=cleric();marker_cleric.combat_id="cleric:marker";marker_cleric.cleric_runtime.serpents=[{"host_id":"hero:host","remaining":8.0},{"host_id":"hero:host","remaining":4.0},{"host_id":"hero:other","remaining":8.0},{"host_id":"hero:host","remaining":0.0}]
+	TestSupport.check(errors,ClericSystem.active_serpent_count([marker_cleric],"hero:host")==2,"Cloud Serpent presentation should count only currently active Serpents attached to the displayed ally.")
 	return errors
