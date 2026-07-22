@@ -86,7 +86,9 @@ static func run(main:Node) -> Array:
 	await main.get_tree().process_frame
 	var active_stars:Array[Node]=main.ui.find_children("ActiveTeamStar","Button",true,false)
 	TestSupport.check(errors,active_stars.size()==main.state.heroes.size() and active_stars.all(func(star):return star.text=="★"),"Hero Roster stars should reflect every member of the party currently selected in Team Builder, not only the default Active Party.")
-	TestSupport.check(errors,main.ui.find_child("RosterPartySummary",true,false)!=null and main.ui.find_children("RosterPartyMember*","Button",true,false).size()==main.state.selected_team.size(),"Hero Roster should keep every selected party member visible in its persistent party strip even when alphabetical paging places them elsewhere.")
+	var roster_party_summary:Control=main.ui.find_child("RosterPartySummary",true,false);var roster_party_members:Control=main.ui.find_child("RosterPartyMembers",true,false)
+	TestSupport.check(errors,roster_party_summary!=null and main.ui.find_children("RosterPartyMember*","Button",true,false).size()==main.state.selected_team.size(),"Hero Roster should keep every selected party member visible in its persistent party strip even when alphabetical paging places them elsewhere.")
+	TestSupport.check(errors,roster_party_summary.position.x+roster_party_summary.size.x<=1216.0 and roster_party_members.get_combined_minimum_size().x<=roster_party_summary.size.x,"The Hero Roster team selector and all four party slots should fit inside the top-right safe area.")
 	main.begin_roster_party_press(1,"active",Vector2.ZERO)
 	main.update_roster_party_press(main.ROSTER_PARTY_HOLD_DURATION+.01)
 	TestSupport.check(errors,main.team_dragging and main.team_drag_index==1 and main.team_drag_preview!=null and main.team_drag_preview.size==Vector2(58,48),"Holding a Hero Roster party symbol should begin a compact drag that can reorder or remove that hero.")

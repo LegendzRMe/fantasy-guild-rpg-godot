@@ -230,22 +230,22 @@ func select_roster_team_option(option:int)->void:
 	hero_roster_page=0;save_game();show_roster()
 
 func make_roster_party_summary()->VBoxContainer:
-	var summary:=VBoxContainer.new();summary.name="RosterPartySummary";summary.custom_minimum_size.x=280;summary.add_theme_constant_override("separation",3)
-	var teams:=OptionButton.new();teams.name="RosterTeamSelector";teams.custom_minimum_size=Vector2(150,30);teams.size_flags_horizontal=Control.SIZE_SHRINK_END
+	var summary:=VBoxContainer.new();summary.name="RosterPartySummary";summary.custom_minimum_size.x=220;summary.add_theme_constant_override("separation",3)
+	var teams:=OptionButton.new();teams.name="RosterTeamSelector";teams.custom_minimum_size=Vector2(142,30);teams.size_flags_horizontal=Control.SIZE_SHRINK_END
 	for option_index in 5:teams.add_item(str(state.team_names[option_index]))
 	teams.select(clampi(current_team_slot+1,0,4));teams.item_selected.connect(select_roster_team_option);apply_sharp_compact_style(teams);summary.add_child(teams)
 	var party_name:=str(state.team_names[clampi(current_team_slot+1,0,4)]).to_upper()
 	var title:=label("★  %s  %d / 4"%[party_name,state.selected_team.size()],14,C_GOLD);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;summary.add_child(title)
-	var members:=HBoxContainer.new();members.name="RosterPartyMembers";members.alignment=BoxContainer.ALIGNMENT_END;members.add_theme_constant_override("separation",6);summary.add_child(members);team_active_zone=members;team_active_row=members
+	var members:=HBoxContainer.new();members.name="RosterPartyMembers";members.alignment=BoxContainer.ALIGNMENT_END;members.add_theme_constant_override("separation",5);summary.add_child(members);team_active_zone=members;team_active_row=members
 	for hero_index_value in state.selected_team:
 		var hero_index:=int(hero_index_value)
 		if hero_index<0 or hero_index>=state.heroes.size():continue
 		var hero:Dictionary=state.heroes[hero_index]
-		var member:=Button.new();member.name="RosterPartyMember%d"%hero_index;member.text=role_glyph(str(hero.get("class","")));member.custom_minimum_size=Vector2(52,40);member.focus_mode=Control.FOCUS_NONE;member.tooltip_text="%s — click to remove, or hold and drag to reorder"%str(hero.get("name","Hero"));member.add_theme_font_size_override("font_size",18);member.add_theme_color_override("font_color",CLASSES[hero["class"]].color);member.add_theme_stylebox_override("normal",ui_box(Color("202d42"),4,CLASSES[hero["class"]].color,2));member.add_theme_stylebox_override("hover",ui_box(Color("293a53"),4,C_GOLD,2));member.gui_input.connect(func(event,i=hero_index):
+		var member:=Button.new();member.name="RosterPartyMember%d"%hero_index;member.text=role_glyph(str(hero.get("class","")));member.custom_minimum_size=Vector2(46,40);member.focus_mode=Control.FOCUS_NONE;member.tooltip_text="%s — click to remove, or hold and drag to reorder"%str(hero.get("name","Hero"));member.add_theme_font_size_override("font_size",17);member.add_theme_color_override("font_color",CLASSES[hero["class"]].color);member.add_theme_stylebox_override("normal",ui_box(Color("202d42"),4,CLASSES[hero["class"]].color,2));member.add_theme_stylebox_override("hover",ui_box(Color("293a53"),4,C_GOLD,2));member.gui_input.connect(func(event,i=hero_index):
 			if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:begin_roster_party_press(i,"active",event.position)
 			elif event is InputEventScreenTouch and event.pressed:begin_roster_party_press(i,"active",event.position));members.add_child(member)
 	for empty_slot in range(state.selected_team.size(),4):
-		var empty:=Button.new();empty.disabled=true;empty.custom_minimum_size=Vector2(52,40);empty.add_theme_stylebox_override("disabled",ui_box(Color("172131"),4,Color("35445a"),1));members.add_child(empty)
+		var empty:=Button.new();empty.disabled=true;empty.custom_minimum_size=Vector2(46,40);empty.add_theme_stylebox_override("disabled",ui_box(Color("172131"),4,Color("35445a"),1));members.add_child(empty)
 	return summary
 
 func roster_display_indices()->Array:
@@ -663,7 +663,7 @@ func show_roster() -> void:
 	var roster_header:=Control.new();roster_header.name="RosterHeader";roster_header.custom_minimum_size.y=140;root.add_child(roster_header)
 	var roster_filters:=filter_bar(show_roster,true,true,true);roster_filters.position=Vector2.ZERO;roster_filters.size=Vector2(826,32);roster_header.add_child(roster_filters)
 	for filter_control in roster_filters.get_children():filter_control.size_flags_vertical=Control.SIZE_SHRINK_CENTER
-	var party_summary:=make_roster_party_summary();party_summary.position=Vector2(990,0);party_summary.size=Vector2(226,116);roster_header.add_child(party_summary)
+	var party_summary:=make_roster_party_summary();party_summary.position=Vector2(996,0);party_summary.size=Vector2(220,116);roster_header.add_child(party_summary)
 	var carousel:=HBoxContainer.new(); carousel.position=Vector2(0,54);carousel.size=Vector2(940,74);carousel.add_theme_constant_override("separation",8); roster_header.add_child(carousel);team_reserve_zone=carousel
 	var previous_page:=compact_button("←",func():hero_roster_page=max(0,hero_roster_page-1);show_roster(),42);apply_sharp_compact_style(previous_page);carousel.add_child(previous_page)
 	var cards:=GridContainer.new(); cards.columns=6; cards.custom_minimum_size.x=832;cards.add_theme_constant_override("h_separation",8); cards.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN; carousel.add_child(cards)
