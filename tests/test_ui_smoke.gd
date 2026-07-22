@@ -86,22 +86,24 @@ static func run(main:Node) -> Array:
 	await main.get_tree().process_frame
 	var active_stars:Array[Node]=main.ui.find_children("ActiveTeamStar","Button",true,false)
 	TestSupport.check(errors,active_stars.size()==main.state.heroes.size() and active_stars.all(func(star):return star.text=="★"),"Hero Roster stars should reflect every member of the party currently selected in Team Builder, not only the default Active Party.")
-	TestSupport.check(errors,main.ui.find_child("RosterPartySummary",true,false)!=null and main.ui.find_children("RosterPartyMember*","Button",true,false).size()==main.state.selected_team.size(),"Hero Roster should keep every selected party member visible in its persistent party strip even when alphabetical paging places them elsewhere.")
+	var roster_party_summary:Control=main.ui.find_child("RosterPartySummary",true,false);var roster_party_members:Control=main.ui.find_child("RosterPartyMembers",true,false)
+	TestSupport.check(errors,roster_party_summary!=null and main.ui.find_children("RosterPartyMember*","Button",true,false).size()==main.state.selected_team.size(),"Hero Roster should keep every selected party member visible in its persistent party strip even when alphabetical paging places them elsewhere.")
+	TestSupport.check(errors,roster_party_summary.position.x+roster_party_summary.size.x<=1216.0 and roster_party_members.get_combined_minimum_size().x<=roster_party_summary.size.x,"The Hero Roster team selector and all four party slots should fit inside the top-right safe area.")
 	main.begin_roster_party_press(1,"active",Vector2.ZERO)
 	main.update_roster_party_press(main.ROSTER_PARTY_HOLD_DURATION+.01)
 	TestSupport.check(errors,main.team_dragging and main.team_drag_index==1 and main.team_drag_preview!=null and main.team_drag_preview.size==Vector2(58,48),"Holding a Hero Roster party symbol should begin a compact drag that can reorder or remove that hero.")
 	main.roster_party_press_active=false;main.roster_party_press_index=-1;main.roster_party_press_origin="";main.team_dragging=false;main.team_drag_index=-1;main.team_drag_origin=""
 	if main.team_drag_preview!=null:main.team_drag_preview.queue_free();main.team_drag_preview=null
-	var pinned_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(150,74))
+	var pinned_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(132,74))
 	TestSupport.check(errors,pinned_cards.size()>=2 and "Sera" in pinned_cards[0].text and "Brann" in pinned_cards[1].text,"The selected party should be pinned to the front of the Hero Roster in party order so every active star stays on the first page.")
 	main.current_team_slot=-1;main.state.active_team=[0,1];main.state.selected_team=[0,1]
-	var compact_roster_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(150,74))
+	var compact_roster_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(132,74))
 	var compact_search:LineEdit=main.ui.find_children("*","LineEdit",true,false).filter(func(candidate):return candidate.placeholder_text=="Search" and candidate.custom_minimum_size.x>0)[0]
 	var roster_gap:Control=main.ui.find_child("RosterDetailGap",true,false)
 	TestSupport.check(errors,compact_roster_cards.size()==main.state.heroes.size() and compact_roster_cards.all(func(card):return card.focus_mode==Control.FOCUS_NONE and card.get_theme_stylebox("normal").corner_radius_top_left==4) and compact_search.custom_minimum_size==Vector2(190,32) and roster_gap!=null and roster_gap.custom_minimum_size.y==16,"Hero Roster should use narrower sharp filters and compact cards, avoid focus outlines, and keep a clear details gap.")
 	var roster_label_texts:Array=main.ui.find_children("*","Label",true,false).map(func(candidate):return candidate.text)
 	TestSupport.check(errors,main.ui.find_child("HeroExperienceBar",true,false)!=null and main.ui.find_child("HeroExperienceText",true,false)!=null,"Hero Roster should show experience as a numbered progress bar.")
-	TestSupport.check(errors,roster_label_texts.any(func(text):return str(text).begins_with("Prestige")) and ["HEALTH","POWER","ARMOR"].all(func(title):return title in roster_label_texts),"Hero Roster should show Prestige plus compact Health, Power, and Armor stat tiles.")
+	TestSupport.check(errors,["HEALTH","POWER","ARMOR"].all(func(title):return title in roster_label_texts),"Hero Roster should show compact Health, Power, and Armor stat tiles without a redundant Prestige caption.")
 	TestSupport.check(errors,not roster_label_texts.any(func(text):return "Member Type" in str(text) or "Hero Legacy" in str(text) or "Gear Score" in str(text) or "SPECIAL HERO" in str(text)),"Retired Hero Roster labels should no longer be displayed.")
 	var details_grid:GridContainer=main.ui.find_child("RosterDetailsGrid",true,false)
 	TestSupport.check(errors,details_grid!=null and details_grid.columns==2 and details_grid.get_child_count()==4 and ["RosterDetailsAction","RosterDetailsDefense","RosterDetailsCritical","RosterDetailsProficiencies"].all(func(node_name):return main.ui.find_child(node_name,true,false)!=null),"Details should organize its four player-facing categories into a compact two-by-two grid.")
@@ -174,7 +176,7 @@ static func run(main:Node) -> Array:
 	main.selected_roster_index=1
 	main.show_roster()
 	await main.get_tree().process_frame
-	var unselected_special_card:Button=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(150,74) and "Brann" in candidate.text)[0]
+	var unselected_special_card:Button=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(132,74) and "Brann" in candidate.text)[0]
 	var unselected_special_style:StyleBoxFlat=unselected_special_card.get_theme_stylebox("normal")
 	TestSupport.check(errors,unselected_special_style.border_color!=main.C_GOLD,"An unselected special hero card should not retain the selected hero's gold outline.")
 	main.state.heroes[0].is_special_hero=false
@@ -463,6 +465,20 @@ static func run(main:Node) -> Array:
 	main.state.heroes[1].level=6
 	main.start_testing_zone()
 	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==7 and main.enemies.filter(func(enemy):return bool(enemy.get("boss",false))).size()==2 and main.enemies.any(func(enemy):return float(enemy.get("control_profile",{}).get("blind_duration_multiplier",0.0))==0.5),"The testing range should retain its dummy layout and include default-immune and partially Blind-vulnerable Boss targets without waves.")
+	var ranger_battle_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Ranger")
+	if ranger_battle_index>=0:
+		var visual_ranger:Dictionary=main.heroes[ranger_battle_index];main.selected=ranger_battle_index
+		var visual_enemy_states:Array=main.enemies.map(func(enemy):return {"pos":enemy.pos,"hp":enemy.hp});for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=Vector2(1100,100+enemy_index*70)
+		var travel_dummy:Dictionary=main.enemies[0];travel_dummy.pos=visual_ranger.pos+Vector2.RIGHT*150.0;travel_dummy.hp=travel_dummy.max_hp;var q_health_before:float=travel_dummy.hp
+		main.cast_ranger_q(visual_ranger,visual_ranger.pos+Vector2.RIGHT*400.0);main.update_ranger_runtime(.05)
+		TestSupport.check(errors,is_equal_approx(travel_dummy.hp,q_health_before),"Hungering Arrow should not deal damage before its researched initial projectile travel time elapses.")
+		main.update_ranger_runtime(.30);TestSupport.check(errors,travel_dummy.hp<q_health_before,"Hungering Arrow should resolve damage when its traveling projectile reaches the target.")
+		visual_ranger.ranger_runtime.delayed_effects.clear();travel_dummy.hp=travel_dummy.max_hp;travel_dummy.pos=visual_ranger.pos+Vector2.RIGHT*100.0;var w_health_before:float=travel_dummy.hp
+		main.cast_ranger_w(visual_ranger,visual_ranger.pos+Vector2.RIGHT*280.0);main.update_ranger_runtime(.05)
+		TestSupport.check(errors,is_equal_approx(travel_dummy.hp,w_health_before),"Multishot should not deal damage before its expanding cone reaches the target.")
+		main.update_ranger_runtime(.20);TestSupport.check(errors,travel_dummy.hp<w_health_before and main.effects.any(func(effect):return effect.kind=="ranger_arrow") and main.effects.any(func(effect):return effect.kind=="multishot"),"Ranger projectiles should synchronize readable battlefield effects with delayed impact damage.")
+		main.effects.clear();visual_ranger.ranger_runtime.delayed_effects.clear();for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=visual_enemy_states[enemy_index].pos;main.enemies[enemy_index].hp=visual_enemy_states[enemy_index].hp
+	else:TestSupport.check(errors,false,"The testing party should include a Ranger for combat-presentation coverage.")
 	var input_guardian:Dictionary=main.heroes[0];main.selected=0;input_guardian.selected_talents={"tier_6":"guardian_l24_2"};input_guardian.ability_cds[4]=0.0;main.begin_trait()
 	TestSupport.check(errors,input_guardian.guardian_runtime.stoneform_remaining==10.0 and input_guardian.ability_cds[4]==60.0,"The existing D Trait input should activate Stoneform and expose its cooldown without another action slot.")
 	input_guardian.guardian_runtime.stoneform_remaining=0.0
@@ -534,7 +550,12 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,int(item_cleric.q_charges)==1 and item_cleric.q_charge_timers.size()==1,"Casting E should restore one missing Twin Incantation Q charge.")
 	main.update_item_runtime(item_cleric,8.1);item_cleric.ability_cds[1]=0.0;main.use_ability(1,item_cleric.pos)
 	TestSupport.check(errors,item_cleric.pending_repeats.size()==1 and not item_cleric.borrowed_time_armed,"Borrowed Time should arm after eight seconds and schedule one non-recursive repeat.")
-	item_dummy.hp=item_dummy.max_hp;item_rogue.thousand_cuts_count=0
+	main.update_cleric_runtime(.01)
+	TestSupport.check(errors,main.effects.any(func(effect):return effect.kind=="cloud_serpent_projectile"),"An active Cloud Serpent attack should launch its own visible projectile from the host marker.")
+	main.effects.clear()
+	# Ranger V1 deals substantially more Basic Attack damage than the old placeholder;
+	# keep this item-proc fixture alive through all three attacks.
+	item_dummy.max_hp=maxf(float(item_dummy.max_hp),5000.0);item_dummy.hp=item_dummy.max_hp;item_rogue.thousand_cuts_count=0
 	var hp_before_three:float=item_dummy.hp
 	main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_one");main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_two")
 	var hp_before_third:float=item_dummy.hp;main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_three")

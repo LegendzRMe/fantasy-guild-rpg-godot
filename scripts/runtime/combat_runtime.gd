@@ -28,6 +28,7 @@ func _process(delta:float) -> void:
 	update_combat_projectiles(delta)
 	update_guardian_runtime(delta)
 	update_cleric_runtime(delta)
+	update_ranger_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	for i in heroes.size():
@@ -36,6 +37,7 @@ func _process(delta:float) -> void:
 		for slot in 5:
 			var cooldown_rate:=1.0
 			if str(h.get("class",""))=="Cleric" and not h.get("cleric_runtime",{}).is_empty() and slot<3:cooldown_rate=ClericSystem.w_cooldown_rate(h) if slot==1 else ClericSystem.qwe_cooldown_rate(h)
+			elif str(h.get("class",""))=="Ranger" and not h.get("ranger_runtime",{}).is_empty() and slot==1 and RangerSystem.has_talent(h,"ranger_l24_1") and int(h.ranger_runtime.hatred)>=int(RangerData.VALUES.hatred_max):cooldown_rate=1.5
 			h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta*cooldown_rate)
 		if h.hp>0:update_item_runtime(h,delta)
 		update_shared_hero(h,delta)

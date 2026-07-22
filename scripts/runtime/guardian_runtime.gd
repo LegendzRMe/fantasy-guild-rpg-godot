@@ -97,7 +97,7 @@ func cast_haymaker(hero:Dictionary)->bool:
 	deal_damage(hero,target,amount,"heroic","physical","Haymaker");CombatSystem.apply_control(target,"stun",0.25)
 	if GuardianSystem.has_talent(hero,"guardian_l27_r2"):GuardianSystem.mark_haymaker(hero,str(target.combat_id),battle_time)
 	if bool(target.get("boss",false)):CombatSystem.apply_control(target,"stagger",float(GuardianData.VALUES.haymaker_stagger));GuardianSystem.telemetry_add(hero,"haymaker_boss_staggers")
-	else:target.pos=CombatGeometry.move_toward_safe(target.pos,target.pos+hero.pos.direction_to(target.pos)*float(GuardianData.SPACE.haymaker_launch),float(GuardianData.SPACE.haymaker_launch),float(target.get("combat_radius",28.0)),combat_blockers)
+	elif bool(CombatSystem.default_control_profile(target).get("displacement",true)):target.pos=CombatGeometry.move_toward_safe(target.pos,target.pos+hero.pos.direction_to(target.pos)*float(GuardianData.SPACE.haymaker_launch),float(GuardianData.SPACE.haymaker_launch),float(target.get("combat_radius",28.0)),combat_blockers)
 	hero.ability_cds[3]=float(GuardianData.VALUES.haymaker_cooldown);GuardianSystem.telemetry_add(hero,"haymaker_uses");return true
 
 func use_guardian_trait(hero:Dictionary)->bool:

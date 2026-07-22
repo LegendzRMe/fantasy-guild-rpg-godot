@@ -27,6 +27,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		heroes[-1]["combat_radius"]=42.0
 		if str(heroes[-1].get("class",""))=="Guardian":GuardianSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Cleric":ClericSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Ranger":RangerSystem.initialize_runtime(heroes[-1],is_testing_save())
 	queue_redraw()
 
 func start_testing_zone() -> void:
@@ -40,6 +41,7 @@ func start_testing_zone() -> void:
 	for hero in heroes:
 		if str(hero.get("class",""))=="Guardian":hero.guardian_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Cleric":hero.cleric_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Ranger":hero.ranger_runtime.telemetry_enabled=true
 	testing_dummy_attacks_enabled=true
 	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
 	spawn_enemy(Vector2(650,120),"Dummy");enemies[-1]["passive_test_enemy"]=true

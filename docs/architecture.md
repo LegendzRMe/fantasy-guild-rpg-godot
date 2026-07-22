@@ -259,3 +259,6 @@ The validator performs:
 - Reformat only the functions being changed; avoid repository-wide formatting diffs.
 - Keep gameplay tuning, tutorial flow, controls, visual layout, and save migration outside cleanup-only changes.
 - Track each `.gd.uid` file with its corresponding GDScript so Godot resource identities remain stable.
+# Class conversion modules
+
+Mechanics-heavy class conversions are split into `scripts/data/<class>_data.gd`, `scripts/systems/<class>_system.gd`, `scripts/runtime/<class>_runtime.gd`, and a focused ability presenter. Shared mechanics such as charges and percentage-health requests live in class-neutral systems. This keeps future hero/talent work searchable without expanding the generic ability runtime.

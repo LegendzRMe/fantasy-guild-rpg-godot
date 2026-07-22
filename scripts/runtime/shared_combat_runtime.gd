@@ -42,7 +42,7 @@ func clear_hero_command(hero:Dictionary,reason:String="")->void:
 	CombatRulesV1.clear_assignment(hero,reason);hero.target=-1;hero.heal_target=-1;hero.dest=hero.pos
 
 func issue_hero_move(hero:Dictionary,destination:Vector2)->void:
-	interrupt_unit_action(hero,"movement")
+	if not (str(hero.get("class",""))=="Ranger" and float(hero.get("ranger_runtime",{}).get("strafe_remaining",0.0))>0.0):interrupt_unit_action(hero,"movement")
 	CombatRulesV1.issue_move(hero,destination);hero.target=-1;hero.heal_target=-1
 
 func begin_unit_cast(unit:Dictionary,slot:int,duration:float,is_heroic:bool=false,channel_duration:float=0.0,requires_line_of_sight:bool=true,full_cooldown:float=-1.0)->void:
@@ -83,6 +83,7 @@ func update_unit_casts(unit:Dictionary,delta:float)->void:
 		if unit.active_channel.remaining<=0.0:unit.active_channel={};CombatRulesV1.restore_preserved_command(unit,target_is_valid_for(unit,unit_by_combat_id(str(unit.get("preserved_target_id",""))),str(unit.get("preserved_target_kind",""))))
 
 func apply_hit_nudge(source:Dictionary,target:Dictionary)->void:
+	if not bool(CombatSystem.default_control_profile(target).get("displacement",true)):return
 	target.pos=CombatGeometry.apply_nudge(target.pos,source.get("pos",target.pos),CombatRulesV1.DEFAULT_HIT_NUDGE_DISTANCE,42.0,combat_blockers)
 	if int(target.get("command_state",CombatRulesV1.CommandState.IDLE))==CombatRulesV1.CommandState.MOVE:target.dest=target.move_destination
 
@@ -157,7 +158,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 			if enemies[enemy_index].hp>0 and hero.pos.distance_to(enemies[enemy_index].pos)<automatic_distance:automatic_enemy_index=enemy_index;automatic_distance=hero.pos.distance_to(enemies[enemy_index].pos)
 		if automatic_enemy_index>=0:assign_hero_enemy(int(hero.get("battle_index",heroes.find(hero))),automatic_enemy_index)
 	if int(hero.command_state)==CombatRulesV1.CommandState.MOVE:
-		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else 1.0)*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers);hero.dest=hero.move_destination
+		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers);hero.dest=hero.move_destination
 		if hero.pos.distance_to(hero.move_destination)<=4.0:hero.command_state=CombatRulesV1.CommandState.IDLE;hero.dest=hero.pos
 		elif hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"movement path blocked")
 		else:hero.path_failure_timer=0.0;hero.facing_direction=before.direction_to(hero.pos)
@@ -169,7 +170,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 		if bool(hero.assignment_had_line_of_sight) and not has_los:clear_hero_command(hero,"line of sight lost");return
 		var usable_range:=float(hero.range)-CombatRulesV1.RANGE_TOLERANCE;var distance:float=hero.pos.distance_to(target.pos)
 		if not has_los:
-			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else 1.0)*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers)
+			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers)
 			if hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"no reachable line of sight")
 			return
 		hero.assignment_had_line_of_sight=true;hero.path_failure_timer=0.0

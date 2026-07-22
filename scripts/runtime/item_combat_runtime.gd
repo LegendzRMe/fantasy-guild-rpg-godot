@@ -77,6 +77,9 @@ func apply_passive_trigger(owner:Dictionary,event:Dictionary,target:Dictionary)-
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var resolved_amount:=amount;var retribution_bonus:float=0.0
+	var ranger_basic_result:={}
+	if str(source.get("class",""))=="Ranger" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("ranger_runtime",{}).is_empty():
+		ranger_basic_result=RangerSystem.on_basic_attack_released(source,target);resolved_amount*=float(ranger_basic_result.multiplier)
 	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and ClericSystem.has_talent(source,"cleric_l21_2") and CombatSystem.is_blinded(target):resolved_amount*=2.0
 	var guardian_basic_result:={}
 	if str(source.get("class",""))=="Guardian" and source_action=="basic_attack" and not source.get("guardian_runtime",{}).is_empty():
@@ -96,6 +99,10 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	elif str(target.get("class",""))=="Cleric" and not target.get("cleric_runtime",{}).is_empty():
 		var cleric_armor:=ClericSystem.active_armor(target)
 		if cleric_armor>0.0:damage_request["armor_sources"]=[{"id":"safety_sprint","armor":cleric_armor,"remaining":1.0}]
+	elif str(target.get("class",""))=="Ranger" and not target.get("ranger_runtime",{}).is_empty():
+		var ranger_armor:=RangerSystem.trait_armor(target)
+		if ranger_armor>0.0:damage_request["armor_sources"]=[{"id":"gloom","armor":ranger_armor,"remaining":1.0}]
+	if source_action=="percentage_health":damage_request["outgoing_multiplier"]=1.0;damage_request["can_crit"]=false
 	if can_crit_override!=null:damage_request["can_crit"]=bool(can_crit_override)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request)
 	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
@@ -111,6 +118,13 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(target.get("class",""))=="Cleric" and not target.get("cleric_runtime",{}).is_empty() and float(result.resolved_damage)>0.0:ClericSystem.note_hostile_damage(target,float(result.resolved_damage))
 	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and float(result.resolved_damage)>0.0:ClericSystem.reduce_mistweaver(source,1.0)
 	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and not source.get("cleric_runtime",{}).is_empty():ClericSystem.telemetry_add(source,"offensive_basic_attacks");if float(result.resolved_damage)>0.0:ClericSystem.telemetry_add(source,"offensive_basic_attack_hits")
+	if not ranger_basic_result.is_empty():
+		RangerSystem.on_basic_attack_resolved(source,result,bool(result.get("defeated",false)),bool(ranger_basic_result.empowered))
+		if RangerSystem.has_talent(source,"ranger_l21_2") and float(result.resolved_damage)>0.0:
+			var life_fraction:=0.10+0.02*int(source.ranger_runtime.hatred);var life_result:=deal_healing(source,source,float(result.resolved_damage)*life_fraction,"basic_heal","Tempered by Discipline");RangerSystem.telemetry_add(source,"healing",float(life_result.effective_amount))
+		var percent_request:Dictionary=ranger_basic_result.percent_request
+		if not percent_request.is_empty() and target.hp>0.0:
+			var percent_result:=deal_damage(source,target,float(percent_request.amount),"percentage_health","physical","Manticore",false,"ranger_manticore",[],false);RangerSystem.telemetry_add(source,"percentage_damage",float(percent_result.resolved_damage))
 	if not guardian_basic_result.is_empty() and float(guardian_basic_result.stun)>0.0:CombatSystem.apply_control(target,"stun",float(guardian_basic_result.stun))
 	if testing_zone_active and "training" in target.get("combat_tags",[]) and float(result.get("resolved_damage",0.0))>0.0:target["seconds_since_damage"]=0.0
 	var crossed_below_half:bool=before_ratio>0.50 and float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))<0.50

@@ -23,6 +23,10 @@ func cleric_heal(hero:Dictionary,target:Dictionary,base_amount:float,origin:Stri
 	add_effect("heal",hero.pos,target.pos,"+%d"%int(result.effective_amount),C_GREEN)
 	return result
 
+func add_cloud_serpent_projectile(from:Vector2,to:Vector2)->void:
+	var duration:=clampf(from.distance_to(to)/440.0,.16,.8)
+	effects.append({"kind":"cloud_serpent_projectile","from":from,"to":to,"text":"","color":Color("dffcff"),"life":duration,"max_life":duration})
+
 func cast_cleric_q(hero:Dictionary)->bool:
 	var target_limit:=2 if ClericSystem.has_talent(hero,"cleric_l24_1") else 1
 	var targets:=ClericSystem.lowest_wounded_indices(heroes,target_limit,hero.pos,float(hero.get("range",220.0)))
@@ -158,8 +162,10 @@ func update_cleric_runtime(delta:float)->void:
 				serpent.tick+=0.75 if ClericSystem.has_talent(hero,"cleric_l18_2") else 1.0
 				var targets:=ClericSystem.nearest_enemy_indices(host.pos,enemies,3 if ClericSystem.has_talent(hero,"cleric_l21_1") else 1)
 				if not targets.is_empty():
+					var serpent_marker_offset:=Vector2(-34,-49) if serpent_index%2==0 else Vector2(34,-49);var primary_target:Dictionary=enemies[targets[0]]
+					add_cloud_serpent_projectile(host.pos+serpent_marker_offset,primary_target.pos)
 					var serpent_damage:=deal_damage(hero,enemies[targets[0]],ClericSystem.scaled_amount(hero,float(ClericData.VALUES.w_attack)),"basic_ability","magical","Cloud Serpent");var serpent_heal:=cleric_heal(hero,host,float(ClericData.VALUES.w_heal),"Cloud Serpent");ClericSystem.telemetry_add(hero,"serpent_attacks");ClericSystem.telemetry_add(hero,"serpent_damage",float(serpent_damage.resolved_damage));ClericSystem.telemetry_add(hero,"serpent_healing",float(serpent_heal.effective_amount))
-					for bounce_index in targets.slice(1):deal_damage(hero,enemies[bounce_index],ClericSystem.scaled_amount(hero,13.0),"basic_ability","magical","Lightning Serpent");cleric_heal(hero,host,10.0,"Lightning Serpent")
+					for bounce_index in targets.slice(1):add_cloud_serpent_projectile(primary_target.pos,enemies[bounce_index].pos);deal_damage(hero,enemies[bounce_index],ClericSystem.scaled_amount(hero,13.0),"basic_ability","magical","Lightning Serpent");cleric_heal(hero,host,10.0,"Lightning Serpent")
 					ClericSystem.telemetry_add(hero,"serpent_bounces",maxi(0,targets.size()-1))
 					if ClericSystem.has_talent(hero,"cleric_l24_3"):deal_healing(hero,host,float(host.max_hp)*0.005,"basic_ability","Blessings of Yu'lon")
 					ClericSystem.reduce_mistweaver(hero,1.0)

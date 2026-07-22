@@ -14,6 +14,19 @@ func draw_octagon_health(center:Vector2,radius:float,ratio:float) -> void:
 		var fraction=clamp(edge_progress-edge,0.0,1.0)
 		if fraction>0:draw_line(points[edge],points[edge].lerp(points[(edge+1)%8],fraction),C_GREEN,4)
 
+func draw_octagon_vertical_fill(center:Vector2,radius:float,ratio:float,color:Color)->void:
+	var points:=octagon_points(center,radius);var min_y:=points[0].y;var max_y:=points[0].y
+	for point in points:min_y=minf(min_y,point.y);max_y=maxf(max_y,point.y)
+	var cutoff:=lerpf(max_y,min_y,clampf(ratio,0.0,1.0));var clipped:=PackedVector2Array();var previous:=points[-1];var previous_inside:=previous.y>=cutoff
+	for current in points:
+		var current_inside:bool=current.y>=cutoff
+		if current_inside!=previous_inside:
+			var crossing:float=(cutoff-previous.y)/(current.y-previous.y)
+			clipped.append(previous.lerp(current,crossing))
+		if current_inside:clipped.append(current)
+		previous=current;previous_inside=current_inside
+	if clipped.size()>=3:draw_colored_polygon(clipped,color)
+
 func draw_tutorial_dotted_path(from:Vector2,to:Vector2)->void:
 	var length=from.distance_to(to)
 	if length<1:return
@@ -166,6 +179,11 @@ func _draw() -> void:
 			draw_circle(h.pos,66,Color(C_GOLD,.18));draw_circle(h.pos,59,C_GOLD,4)
 		if h.shield>0 and not victory_sequence:draw_circle(h.pos,63,Color("5fa8ff"),4)
 		draw_circle(h.pos,48,col);draw_role_icon(h.pos,h["class"]);if not victory_sequence and (h.hp<h.max_hp or h.last_hit>0 or h.shield>0):health_bar_with_shield(h.pos+Vector2(-54,-70),108,h)
+		if not victory_sequence:
+			var serpent_count:=ClericSystem.active_serpent_count(heroes,str(h.get("combat_id","")))
+			for serpent_marker_index in mini(serpent_count,2):
+				var marker_offset:=Vector2(-34,-49) if serpent_marker_index==0 else Vector2(34,-49)
+				draw_circle(h.pos+marker_offset,7,Color("263142"));draw_circle(h.pos+marker_offset,4.5,Color.WHITE)
 		if bool(h.get("independent",false)) and not victory_sequence:draw_string(ThemeDB.fallback_font,h.pos+Vector2(-42,-62),"ALLIED NPC",HORIZONTAL_ALIGNMENT_CENTER,84,12,C_GREEN)
 		if testing_zone_active and not victory_sequence:
 			var status_parts:Array[String]=[]
@@ -230,8 +248,24 @@ func _draw() -> void:
 				if slot==3 and active["class"]=="Cleric":action_name=str(ClericData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_2"):action_name="Safety Sprint"
 				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_3"):action_name="Let's Go!"
-				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3);draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
+				elif slot==3 and active["class"]=="Ranger":action_name=str(RangerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+				elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
+				var cleric_trait_active:bool=false
+				if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
+				var hatred_ratio:float=0.0
+				if slot==4 and str(active.get("class",""))=="Ranger" and not active.get("ranger_runtime",{}).is_empty():hatred_ratio=clampf(float(active.ranger_runtime.hatred)/float(RangerData.VALUES.hatred_max),0.0,1.0)
+				var ranger_hatred_full:bool=hatred_ratio>=1.0
+				if cleric_trait_active or ranger_hatred_full:
+					var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
+					draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
+				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
+				if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
+				draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
+				if cleric_trait_active or ranger_hatred_full:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+				if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
+					var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
+					draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[charge_state.charges,charge_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 			if active["class"]=="Guardian" and not active.get("guardian_runtime",{}).is_empty():
 				var status_parts:Array=[]
 				if GuardianSystem.has_talent(active,"guardian_l24_3"):status_parts.append("PRESENCE READY" if battle_time>=float(active.guardian_runtime.imposing_ready_at) else "PRESENCE %.0fs"%(float(active.guardian_runtime.imposing_ready_at)-battle_time))
@@ -322,6 +356,21 @@ func draw_combat_effect(fx:Dictionary)->void:
 	match fx.kind:
 		"projectile":
 			var p=fx.from.lerp(fx.to,clamp(progress*1.8,0.0,1.0));draw_line(p-Vector2(12,0),p+Vector2(8,0),col,5);draw_circle(p,5,Color.WHITE)
+		"ranger_arrow":
+			var arrow_direction:Vector2=fx.from.direction_to(fx.to)
+			if arrow_direction==Vector2.ZERO:
+				draw_arc(fx.to,12+progress*16,0,TAU,24,col,3)
+			else:
+				var arrow_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var arrow_tip:=arrow_position+arrow_direction*8.0
+				draw_line(arrow_position-arrow_direction*18.0,arrow_tip,col,4);draw_line(arrow_tip,arrow_tip-arrow_direction.rotated(.55)*10.0,col,3);draw_line(arrow_tip,arrow_tip-arrow_direction.rotated(-.55)*10.0,col,3)
+		"multishot":
+			var fan_direction:Vector2=fx.from.direction_to(fx.to);var fan_distance:float=fx.from.distance_to(fx.to)*clampf(progress,0.0,1.0)
+			for arrow_index in range(-3,4):
+				var shot_direction:=fan_direction.rotated(deg_to_rad(float(arrow_index)*8.0));var shot_tip:Vector2=fx.from+shot_direction*fan_distance
+				draw_line(shot_tip-shot_direction*15.0,shot_tip,Color(col,.88),3)
+		"cloud_serpent_projectile":
+			var serpent_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var serpent_direction:Vector2=fx.from.direction_to(fx.to)
+			draw_line(serpent_position-serpent_direction*20.0,serpent_position,Color("79dfe8",alpha*.58),4);draw_circle(serpent_position,8,Color("8feaf2",alpha*.26));draw_circle(serpent_position,4.5,col);draw_circle(serpent_position,2,Color.WHITE)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":
