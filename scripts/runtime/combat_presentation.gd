@@ -237,8 +237,14 @@ func _draw() -> void:
 				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_3"):action_name="Let's Go!"
 				elif slot==3 and active["class"]=="Ranger":action_name=str(RangerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
+				var cleric_trait_active:bool=false
+				if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
+				if cleric_trait_active:
+					var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES["Cleric"].color)
+					draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
 				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3);draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
+				if cleric_trait_active:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
 				if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
 					var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
 					draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[charge_state.charges,charge_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
