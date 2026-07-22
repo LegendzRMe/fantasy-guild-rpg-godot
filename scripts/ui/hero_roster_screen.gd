@@ -209,11 +209,11 @@ func make_roster_talent_tier(hero:Dictionary,class_definition:Dictionary,class_i
 func make_roster_card(idx:int) -> Button:
 
 	var h=state.heroes[idx]
-	var card:=Button.new(); card.custom_minimum_size=Vector2(150,74); card.text="%s\n%s\n%s  •  Level %d" % [role_glyph(h["class"]),h["name"],h["class"],h["level"]];card.focus_mode=Control.FOCUS_NONE
+	var card:=Button.new(); card.custom_minimum_size=Vector2(132,74); card.text="%s\n%s\n%s  •  Level %d" % [role_glyph(h["class"]),h["name"],h["class"],h["level"]];card.focus_mode=Control.FOCUS_NONE
 	card.add_theme_font_size_override("font_size",13); card.add_theme_color_override("font_color",CLASSES[h["class"]].color if idx==selected_roster_index else C_TEXT)
 	card.add_theme_stylebox_override("normal",ui_box(Color("202d42"),4,Color("35445a"),1));card.add_theme_stylebox_override("hover",ui_box(Color("293a53"),4,CLASSES[h["class"]].color,1));card.add_theme_stylebox_override("pressed",ui_box(Color("172131"),4,CLASSES[h["class"]].color,2))
 	var is_party_member:=hero_is_on_active_team(idx)
-	var active_star:=Button.new();active_star.name="ActiveTeamStar";active_star.text="★" if is_party_member else "☆";active_star.position=Vector2(112,0);active_star.size=Vector2(36,34);active_star.flat=true;active_star.focus_mode=Control.FOCUS_NONE;active_star.tooltip_text="Remove from selected party" if is_party_member else "Add to selected party";active_star.add_theme_font_size_override("font_size",20);active_star.add_theme_color_override("font_color",C_GOLD if is_party_member else C_MUTED)
+	var active_star:=Button.new();active_star.name="ActiveTeamStar";active_star.text="★" if is_party_member else "☆";active_star.position=Vector2(94,0);active_star.size=Vector2(36,34);active_star.flat=true;active_star.focus_mode=Control.FOCUS_NONE;active_star.tooltip_text="Remove from selected party" if is_party_member else "Add to selected party";active_star.add_theme_font_size_override("font_size",20);active_star.add_theme_color_override("font_color",C_GOLD if is_party_member else C_MUTED)
 	active_star.gui_input.connect(func(event,i=idx):
 		if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:begin_roster_party_press(i,"reserve",event.position)
 		elif event is InputEventScreenTouch and event.pressed:begin_roster_party_press(i,"reserve",event.position))
@@ -660,12 +660,13 @@ func make_roster_equipment_slot(hero:Dictionary,slot:String)->Button:
 
 func show_roster() -> void:
 	screen="roster"; var root=base_screen("Hero Roster")
-	var roster_toolbar:=HBoxContainer.new();roster_toolbar.add_theme_constant_override("separation",12);root.add_child(roster_toolbar)
-	var roster_filters:=filter_bar(show_roster,true,true,true);roster_filters.size_flags_horizontal=Control.SIZE_EXPAND_FILL;roster_toolbar.add_child(roster_filters)
-	roster_toolbar.add_child(make_roster_party_summary())
-	var carousel:=HBoxContainer.new(); carousel.add_theme_constant_override("separation",8); root.add_child(carousel);team_reserve_zone=carousel
+	var roster_header:=Control.new();roster_header.name="RosterHeader";roster_header.custom_minimum_size.y=140;root.add_child(roster_header)
+	var roster_filters:=filter_bar(show_roster,true,true,true);roster_filters.position=Vector2.ZERO;roster_filters.size=Vector2(826,32);roster_header.add_child(roster_filters)
+	for filter_control in roster_filters.get_children():filter_control.size_flags_vertical=Control.SIZE_SHRINK_CENTER
+	var party_summary:=make_roster_party_summary();party_summary.position=Vector2(990,0);party_summary.size=Vector2(226,116);roster_header.add_child(party_summary)
+	var carousel:=HBoxContainer.new(); carousel.position=Vector2(0,54);carousel.size=Vector2(940,74);carousel.add_theme_constant_override("separation",8); roster_header.add_child(carousel);team_reserve_zone=carousel
 	var previous_page:=compact_button("←",func():hero_roster_page=max(0,hero_roster_page-1);show_roster(),42);apply_sharp_compact_style(previous_page);carousel.add_child(previous_page)
-	var cards:=GridContainer.new(); cards.columns=6; cards.custom_minimum_size.x=950;cards.add_theme_constant_override("h_separation",10); cards.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN; carousel.add_child(cards)
+	var cards:=GridContainer.new(); cards.columns=6; cards.custom_minimum_size.x=832;cards.add_theme_constant_override("h_separation",8); cards.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN; carousel.add_child(cards)
 	var indices=roster_display_indices(); var pages=max(1,int(ceil(indices.size()/6.0))); hero_roster_page=clampi(hero_roster_page,0,pages-1)
 	if not indices.is_empty() and not indices.has(selected_roster_index):selected_roster_index=indices[0]
 	for card_index in range(hero_roster_page*6,min(indices.size(),hero_roster_page*6+6)):cards.add_child(make_roster_card(indices[card_index]))
@@ -680,7 +681,7 @@ func show_roster() -> void:
 	var hero_name:=label(hero["name"],30,info.color);hero_name.name="HeroName";hero_name.autowrap_mode=TextServer.AUTOWRAP_OFF;hero_name.custom_minimum_size.x=95;hero_name.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;identity_row.add_child(hero_name)
 	var level_class:=label("Level %d %s"%[hero.level,hero["class"]],16,C_MUTED);level_class.name="HeroLevelClass";level_class.autowrap_mode=TextServer.AUTOWRAP_OFF;level_class.custom_minimum_size.x=155;level_class.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;identity_row.add_child(level_class)
 	var identity_space:=Control.new();identity_space.size_flags_horizontal=Control.SIZE_EXPAND_FILL;identity_row.add_child(identity_space)
-	var prestige:=label("Prestige   %s"%PrestigeSystem.stars(hero),16,C_GOLD);prestige.name="HeroPrestige";prestige.autowrap_mode=TextServer.AUTOWRAP_OFF;prestige.custom_minimum_size.x=160;prestige.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;prestige.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;identity_row.add_child(prestige)
+	var prestige:=label(PrestigeSystem.stars(hero),16,C_GOLD);prestige.name="HeroPrestige";prestige.tooltip_text="Prestige";prestige.autowrap_mode=TextServer.AUTOWRAP_OFF;prestige.custom_minimum_size.x=70;prestige.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;prestige.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;identity_row.add_child(prestige)
 	var experience_row:=HBoxContainer.new();experience_row.name="HeroExperienceRow";experience_row.custom_minimum_size.x=464;experience_row.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN;experience_row.alignment=BoxContainer.ALIGNMENT_CENTER;character.add_child(experience_row)
 	var experience:=make_hero_experience_bar(hero,330,24);experience_row.add_child(experience)
 	var equipment_row:=HBoxContainer.new();equipment_row.add_theme_constant_override("separation",12);character.add_child(equipment_row)

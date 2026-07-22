@@ -92,16 +92,16 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.team_dragging and main.team_drag_index==1 and main.team_drag_preview!=null and main.team_drag_preview.size==Vector2(58,48),"Holding a Hero Roster party symbol should begin a compact drag that can reorder or remove that hero.")
 	main.roster_party_press_active=false;main.roster_party_press_index=-1;main.roster_party_press_origin="";main.team_dragging=false;main.team_drag_index=-1;main.team_drag_origin=""
 	if main.team_drag_preview!=null:main.team_drag_preview.queue_free();main.team_drag_preview=null
-	var pinned_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(150,74))
+	var pinned_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(132,74))
 	TestSupport.check(errors,pinned_cards.size()>=2 and "Sera" in pinned_cards[0].text and "Brann" in pinned_cards[1].text,"The selected party should be pinned to the front of the Hero Roster in party order so every active star stays on the first page.")
 	main.current_team_slot=-1;main.state.active_team=[0,1];main.state.selected_team=[0,1]
-	var compact_roster_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(150,74))
+	var compact_roster_cards:Array[Node]=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(132,74))
 	var compact_search:LineEdit=main.ui.find_children("*","LineEdit",true,false).filter(func(candidate):return candidate.placeholder_text=="Search" and candidate.custom_minimum_size.x>0)[0]
 	var roster_gap:Control=main.ui.find_child("RosterDetailGap",true,false)
 	TestSupport.check(errors,compact_roster_cards.size()==main.state.heroes.size() and compact_roster_cards.all(func(card):return card.focus_mode==Control.FOCUS_NONE and card.get_theme_stylebox("normal").corner_radius_top_left==4) and compact_search.custom_minimum_size==Vector2(190,32) and roster_gap!=null and roster_gap.custom_minimum_size.y==16,"Hero Roster should use narrower sharp filters and compact cards, avoid focus outlines, and keep a clear details gap.")
 	var roster_label_texts:Array=main.ui.find_children("*","Label",true,false).map(func(candidate):return candidate.text)
 	TestSupport.check(errors,main.ui.find_child("HeroExperienceBar",true,false)!=null and main.ui.find_child("HeroExperienceText",true,false)!=null,"Hero Roster should show experience as a numbered progress bar.")
-	TestSupport.check(errors,roster_label_texts.any(func(text):return str(text).begins_with("Prestige")) and ["HEALTH","POWER","ARMOR"].all(func(title):return title in roster_label_texts),"Hero Roster should show Prestige plus compact Health, Power, and Armor stat tiles.")
+	TestSupport.check(errors,["HEALTH","POWER","ARMOR"].all(func(title):return title in roster_label_texts),"Hero Roster should show compact Health, Power, and Armor stat tiles without a redundant Prestige caption.")
 	TestSupport.check(errors,not roster_label_texts.any(func(text):return "Member Type" in str(text) or "Hero Legacy" in str(text) or "Gear Score" in str(text) or "SPECIAL HERO" in str(text)),"Retired Hero Roster labels should no longer be displayed.")
 	var details_grid:GridContainer=main.ui.find_child("RosterDetailsGrid",true,false)
 	TestSupport.check(errors,details_grid!=null and details_grid.columns==2 and details_grid.get_child_count()==4 and ["RosterDetailsAction","RosterDetailsDefense","RosterDetailsCritical","RosterDetailsProficiencies"].all(func(node_name):return main.ui.find_child(node_name,true,false)!=null),"Details should organize its four player-facing categories into a compact two-by-two grid.")
@@ -174,7 +174,7 @@ static func run(main:Node) -> Array:
 	main.selected_roster_index=1
 	main.show_roster()
 	await main.get_tree().process_frame
-	var unselected_special_card:Button=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(150,74) and "Brann" in candidate.text)[0]
+	var unselected_special_card:Button=main.ui.find_children("*","Button",true,false).filter(func(candidate):return candidate.custom_minimum_size==Vector2(132,74) and "Brann" in candidate.text)[0]
 	var unselected_special_style:StyleBoxFlat=unselected_special_card.get_theme_stylebox("normal")
 	TestSupport.check(errors,unselected_special_style.border_color!=main.C_GOLD,"An unselected special hero card should not retain the selected hero's gold outline.")
 	main.state.heroes[0].is_special_hero=false
