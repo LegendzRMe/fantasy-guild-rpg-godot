@@ -1,0 +1,18 @@
+extends RefCounted
+
+const MageData = preload("res://scripts/data/mage_data.gd")
+const MageSystem = preload("res://scripts/systems/mage_system.gd")
+
+static func _amount(hero:Dictionary,value:float,pyro:bool=false)->int:
+	return floori(MageSystem.scaled_ability_amount(hero,value,pyro))
+
+static func details(hero:Dictionary,key:String,heroic_id:String="")->Dictionary:
+	match key:
+		"Q":return {"key":"Q","title":"Flamestrike","meta":"Cooldown: 7 seconds  •  Warning: 1 second","description":"Mark a ground area, then deal %d Magical damage to enemies inside it."%_amount(hero,MageData.VALUES.q_damage),"sections":[{"heading":"VERDANT SPHERES","body":"The empowered Flamestrike has 50% more radius."}],"note":"Its warning area is visible to the player and resolves at the location originally chosen."}
+		"W":return {"key":"W","title":"Living Bomb","meta":"Cooldown: 10 seconds  •  Duration: 3 seconds","description":"Afflict an enemy for 3 ticks of %d Magical damage, then explode for %d damage around it."%[_amount(hero,MageData.VALUES.w_tick_damage),_amount(hero,MageData.VALUES.w_explosion_damage)],"sections":[{"heading":"DETONATION","body":"The Bomb also explodes if its host dies. Casting directly on an already-afflicted target detonates the old Bomb before applying a new one."},{"heading":"SPREAD","body":"An explosion infects eligible nearby enemies once. Lineage tracking prevents the same Bomb family from reinfecting a previous host."}],"note":"Verdant Spheres removes Living Bomb's cooldown for that cast."}
+		"E":return {"key":"E","title":"Gravity Lapse","meta":"Cooldown: 12 seconds","description":"Launch a line projectile that deals no damage and Stuns the first enemy hit for 1 second.","sections":[{"heading":"VERDANT SPHERES","body":"The empowered projectile passes through and Stuns up to 3 enemies for 1.5 seconds."}],"note":"Bosses collide with Gravity Lapse but resist its Stun by default."}
+		"R":
+			if heroic_id=="mage_l15_r1":return {"key":"R","title":"Phoenix","meta":"Cooldown: 60 seconds  •  Duration: %d seconds"%int(MageData.VALUES.r1_duration),"description":"Launch a Phoenix to the chosen location. It deals %d damage along its path, then attacks nearby enemies for %d damage with %d splash damage."%[_amount(hero,MageData.VALUES.r1_travel_damage),_amount(hero,MageData.VALUES.r1_attack_damage),_amount(hero,MageData.VALUES.r1_splash_damage)],"sections":[{"heading":"PERSISTENT SUMMON","body":"The Phoenix prioritizes the Mage's assigned target, then Bosses, Elite or Named enemies, Standard enemies, and hostile summons."}],"note":"Rebirth extends its duration and allows three reposition commands."}
+			if heroic_id=="mage_l15_r2":return {"key":"R","title":"Pyroblast","meta":"Cooldown: 100 seconds  •  Cast: 1.5 seconds","description":"After casting, launch a slow homing projectile for %d Magical damage and %d splash damage."%[_amount(hero,MageData.VALUES.r2_primary,true),_amount(hero,MageData.VALUES.r2_splash,true)],"sections":[{"heading":"INTERRUPTS","body":"True control or movement before release cancels the cast and applies the universal 10-second interrupted Heroic cooldown."}],"note":"The projectile continues homing after release."}
+		"D":return {"key":"D","title":"Verdant Spheres","meta":"1 charge  •  6-second sequential recharge","description":"Activate to empower the next Flamestrike, Living Bomb, or Gravity Lapse.","sections":[{"heading":"RECHARGE","body":"Recharge normally begins after the empowered Ability is consumed. Only one empowerment may be armed at a time."}],"note":"Twin Spheres increases storage to 2 charges; the charges still recharge one at a time."}
+	return {"key":key,"title":"Mage Ability","meta":"","description":"","sections":[],"note":""}

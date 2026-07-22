@@ -90,6 +90,7 @@ func apply_hit_nudge(source:Dictionary,target:Dictionary)->void:
 func record_blind_miss(source:Dictionary,target:Dictionary)->void:
 	combat_events.append_array(CombatSystem.event_bundle_for_basic_action_miss(source,target,{"damage_type":str(source.get("basic_attack_damage_type","physical")),"origin":"blind"}))
 	if str(source.get("class",""))=="Cleric" and not source.get("cleric_runtime",{}).is_empty():ClericSystem.telemetry_add(source,"blind_misses");ClericSystem.telemetry_add(source,"offensive_basic_attacks")
+	if str(source.get("class",""))=="Mage" and not source.get("mage_runtime",{}).is_empty():MageSystem.sunfire_release(source,false);MageSystem.telemetry_add(source,"basic_attacks_released");MageSystem.telemetry_add(source,"basic_attack_misses")
 	call("add_effect","hit",source.get("pos",Vector2.ZERO),target.get("pos",Vector2.ZERO),"MISS",C_MUTED)
 
 func spawn_basic_projectile(source:Dictionary,target:Dictionary,amount:float,damage_type:String,origin:String)->void:

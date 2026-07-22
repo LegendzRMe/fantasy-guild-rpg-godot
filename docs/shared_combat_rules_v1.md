@@ -14,6 +14,10 @@ Idle self-defense only looks inside `IDLE_MELEE_DEFENSE_RADIUS`. It never chases
 
 Blind is evaluated only when a Basic Attack releases. Melee attacks miss immediately; ranged attacks retain a release-time `will_miss` decision through projectile travel. Blind never affects Basic Heals or abilities, and a miss emits completion telemetry without damage, threat, nudge, Block consumption, or on-hit processing. Boss Blind immunity and duration changes are data-driven through shared control profiles. See `docs/blind_and_boss_blind_v1.md`.
 
+Bosses resist Stun by default through the same shared control profile. A test or future encounter may explicitly opt a Boss into Stun; successful-control talents then receive the actual resolved result rather than assuming the cast applied.
+
+Ability Power is a shared additive percentage stat resolved by `ability_power_system.gd`. It applies after authored level scaling and current raw Power scaling to Basic Abilities and Heroics. It does not modify Basic Attacks, Basic Heals, or percentage-Health damage by default.
+
 ## Geometry and projectiles
 
 Rectangular blockers independently flag movement, line of sight, and projectiles. An established assignment is cancelled when sight is broken. A newly issued blocked assignment probes nearby positions for a reachable range-and-sight angle, then fails cleanly after the path timeout. Straight physical projectiles remain in world space and test every travelled segment, so a newly created wall can block an arrow already in flight. Destructible blockers receive configured obstacle damage.

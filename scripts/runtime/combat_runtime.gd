@@ -29,6 +29,7 @@ func _process(delta:float) -> void:
 	update_guardian_runtime(delta)
 	update_cleric_runtime(delta)
 	update_ranger_runtime(delta)
+	update_mage_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	for i in heroes.size():

@@ -29,6 +29,7 @@ Owns mutable application, menu, map, tutorial, item-overlay, and combat state de
 - `scripts/runtime/item_combat_runtime.gd`: damage, healing, shields, threat creation, timed item effects, and passive item triggers.
 - `scripts/runtime/guardian_runtime.gd`: Guardian V1 ability execution, world projectiles, delayed effects, Heroics, and class-specific testing hooks. It delegates reusable damage, Armor, control, geometry, command, and projectile rules to shared systems.
 - `scripts/runtime/cleric_runtime.gd`: Cleric V1 Q/W/E, Heroics, Serpent ownership, periodic healing, and class-specific testing hooks. It delegates Blind, Unstoppable, damage/healing, commands, and cooldown-rate math to focused shared/class systems.
+- `scripts/runtime/mage_runtime.gd`: Mage V1 Verdant Spheres, Q/W/E, Phoenix, Pyroblast, Living Bomb updates, and Mage-specific testing behavior. Reusable Ability Power and bomb-lineage rules remain outside the runtime.
 - `scripts/runtime/enemy_combat_runtime.gd`: waves, spawning, encounter objectives, enemy target selection, and combat lookup helpers.
 - `scripts/runtime/ability_runtime.gd`: temporary class ability execution and cast-position resolution.
 - `scripts/runtime/combat_input_runtime.gd`: combat selection, drag commands, ability aiming, keyboard, mouse, touch, and tutorial input gates.
@@ -57,6 +58,8 @@ Owns the editable class and archetype authoring surface: stable IDs, roles, Basi
 Guardian's larger conversion surface is isolated in `scripts/data/guardian_data.gd`; its source values, conversion constants, stable IDs, working-name metadata, and exact talent tiers do not enlarge generic class data.
 
 Cleric follows the same focused pattern through `cleric_data.gd`, `cleric_system.gd`, `cleric_runtime.gd`, and `cleric_ability_presenter.gd`. Future class conversions should prefer this data/system/runtime/presenter split instead of enlarging `class_data.gd`, `ability_runtime.gd`, or the roster screen.
+
+Mage follows that pattern through `mage_data.gd`, `mage_system.gd`, `mage_runtime.gd`, and `mage_ability_presenter.gd`. `ability_power_system.gd` owns additive Ability Power math, while `living_bomb_lineage_system.gd` owns generation and reinfection safety independently of scene state.
 
 ### `scripts/data/talent_data.gd`
 
@@ -139,6 +142,8 @@ Combat invariants:
 - Weapon families modify only Basic Action amount and interval; Basic Abilities and Heroics scale from Power without inheriting weapon profiles.
 - Armor reduction is `Armor / (Armor + 100 + 10 * attacker level)`, capped at 75 percent. True Damage bypasses Armor.
 - Shields are removed before Health and preserve their creator so absorbed damage can generate creator threat.
+- Timed Shield sources expire through the shared runtime and remove only their own unconsumed amount. Arcane Barrier previews the fully mitigated hit with the same critical roll, then applies before the real lethal resolution.
+- Ability Power sources stack additively and multiply the final raw-Power-scaled Basic Ability or Heroic amount. Percentage-Health damage is excluded unless a mechanic explicitly opts in.
 - Resolved damage creates one threat per point. Effective healing creates 0.5 total threat and absorbed shielding creates 0.25 total threat, distributed across living threat-aware enemies.
 - A nearby challenger needs 110 percent of the current target's threat; a distant challenger needs 130 percent. Guardian threat uses the class-defined five-times modifier.
 

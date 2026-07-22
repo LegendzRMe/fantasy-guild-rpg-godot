@@ -10,7 +10,7 @@ static func control_profile(unit:Dictionary)->Dictionary:
 		"displacement":true, "interruptible":true, "stagger_multiplier":1.0
 	}
 	if bool(unit.get("boss", false)):
-		ordinary.merge({"stun_multiplier":0.25, "slow_multiplier":0.5,
+		ordinary.merge({"stun_multiplier":0.0, "slow_multiplier":0.5,
 			"attack_speed_multiplier":0.5, "blind_duration_multiplier":0.0,
 			"blind_immune":true, "displacement":false}, true)
 	ordinary.merge(unit.get("control_profile", {}), true)

@@ -1,4 +1,4 @@
-extends "res://scripts/runtime/ranger_runtime.gd"
+extends "res://scripts/runtime/mage_runtime.gd"
 
 func clamped_cast_point(hero:Dictionary,point:Vector2,range_limit:float)->Vector2:
 	if range_limit<=0:return hero.pos
@@ -19,6 +19,8 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 	if not item_repeat:
 		if slot==0 and hero_has_passive(h,"twin_incantation"):
 			if int(h.get("q_charges",0))<=0:return
+		elif h["class"]=="Mage" and slot==1 and MageSystem.trait_is_armed(h):pass
+		elif h["class"]=="Mage" and slot==3 and MageSystem.has_talent(h,"mage_l27_r1") and not h.mage_runtime.phoenix.is_empty() and int(h.mage_runtime.phoenix.get("reposition_charges",0))>0:pass
 		elif h.ability_cds[slot]>0:return
 	if tutorial_active and tutorial_step==7 and h["class"]=="Cleric" and slot==0:tutorial_ability_used=true
 	if cast_position==Vector2.INF:cast_position=get_global_mouse_position()
@@ -39,6 +41,9 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 		return
 	if h["class"]=="Ranger":
 		cast_ranger_ability(slot,cast_position,item_repeat)
+		return
+	if h["class"]=="Mage":
+		cast_mage_ability(slot,cast_position,item_repeat)
 		return
 	var ability_range=float(ABILITY_RANGES[h["class"]][slot])
 	var resolved_point=clamped_cast_point(h,cast_position,ability_range) if ability_range>0 else h.pos
@@ -62,11 +67,6 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 				h.pos=resolved_point;h.dest=h.pos
 				for foe_rush in enemies:if foe_rush.hp>0 and foe_rush.pos.distance_to(h.pos)<105:deal_damage(h,foe_rush,scaled_ability_amount(h,38.0),ability_action,"physical",ABILITIES[h["class"]][slot])
 			else:for ally_bastion in heroes:if ally_bastion.hp>0:apply_unit_shield(h,ally_bastion,scaled_ability_amount(h,30.0),ABILITIES[h["class"]][slot])
-		"Mage":
-			if slot==0 and ability_enemy_target>=0:deal_damage(h,enemies[ability_enemy_target],scaled_ability_amount(h,78.0),ability_action,ability_damage_type,ABILITIES[h["class"]][slot])
-			elif slot==1:h.pos=resolved_point;h.dest=h.pos
-			elif slot==2:for foe_burst in enemies:if foe_burst.hp>0 and foe_burst.pos.distance_to(h.pos)<240:deal_damage(h,foe_burst,scaled_ability_amount(h,55.0),ability_action,ability_damage_type,ABILITIES[h["class"]][slot])
-			else:for foe_starfall in enemies:if foe_starfall.hp>0 and foe_starfall.pos.distance_to(resolved_point)<190:deal_damage(h,foe_starfall,scaled_ability_amount(h,85.0),ability_action,ability_damage_type,ABILITIES[h["class"]][slot])
 		"Rogue":
 			if slot==0 and ability_enemy_target>=0:deal_damage(h,enemies[ability_enemy_target],scaled_ability_amount(h,72.0),ability_action,ability_damage_type,ABILITIES[h["class"]][slot])
 			elif slot==1:h.pos=resolved_point;h.dest=h.pos

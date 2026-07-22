@@ -109,6 +109,11 @@ func draw_combat_debug_overlay()->void:
 	var lines:=["ID  %s"%hero.combat_id,"COMMAND  %s"%CombatRulesV1.command_name(int(hero.command_state)),"TARGET  %s (%s)"%[str(hero.assigned_target_id),str(hero.assigned_target_kind)],"ACTION  %s  %.2f"%[CombatRulesV1.phase_name(int(hero.basic_action_phase)),float(hero.basic_action_timer)],"READY AT  %.2f"%float(hero.next_action_ready_time),"IN RANGE  %s   LOS  %s"%[in_range,line_of_sight],"CAST  %s"%cast_name,"INCAPACITATED  %s"%bool(hero.incapacitated)]
 	draw_rect(Rect2(18,16,285,190),Color(0.02,.03,.05,.88));draw_rect(Rect2(18,16,285,190),C_MUTED,false,2)
 	for line_index in lines.size():draw_string(ThemeDB.fallback_font,Vector2(32,42+line_index*20),lines[line_index],HORIZONTAL_ALIGNMENT_LEFT,-1,13,C_TEXT)
+	if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():
+		draw_arc(hero.pos,MageSystem.flamestrike_range(hero),0,TAU,72,Color(CLASSES.Mage.color,.45),2)
+		draw_arc(hero.pos,MageSystem.gravity_range(hero),0,TAU,72,Color("70b9ff",.35),2)
+		for bomb in hero.mage_runtime.bomb_state.bombs_by_target.values():
+			var bomb_target=unit_by_combat_id(str(bomb.target_id));if bomb_target!=null:draw_arc(bomb_target.pos,MageSystem.bomb_radius(hero),0,TAU,48,Color("ff9a4f",.38),2)
 
 func _draw() -> void:
 	if screen not in ["combat","ashwood_victory"]:return
@@ -166,7 +171,18 @@ func _draw() -> void:
 		var enemy_color=GameData.enemy_color(e.type)
 		var target_outline:=Color.WHITE if focused_enemy_index==i else C_GOLD if heroes.size()>selected and heroes[selected].target==i else Color("5f2931")
 		var enemy_radius:=62.0 if e.type=="Defense Dummy" else 46.0;draw_circle(e.pos,enemy_radius,enemy_color); draw_circle(e.pos,enemy_radius+6,target_outline,4); if not victory_sequence and (e.revealed or e.hp<e.max_hp):health_bar(e.pos+Vector2(-54,-enemy_radius-24),108,e.hp/e.max_hp,C_RED); draw_string(ThemeDB.fallback_font,e.pos+Vector2(-55,6),"DEFENSE" if e.type=="Defense Dummy" else e.type.substr(0,7),HORIZONTAL_ALIGNMENT_CENTER,110,15,C_TEXT)
+		if not victory_sequence:
+			for mage in heroes:
+				if str(mage.get("class",""))=="Mage" and not mage.get("mage_runtime",{}).is_empty() and mage.mage_runtime.bomb_state.bombs_by_target.has(str(e.combat_id)):
+					var bomb:Dictionary=mage.mage_runtime.bomb_state.bombs_by_target[str(e.combat_id)];var bomb_ratio:=clampf(float(bomb.remaining)/maxf(0.01,float(MageData.VALUES.w_duration)),0.0,1.0);draw_arc(e.pos,enemy_radius+12,-PI/2,-PI/2+TAU*bomb_ratio,36,Color("ff9a4f"),4)
 		if testing_zone_active and not e.get("bloodletting_stacks",[]).is_empty():draw_string(ThemeDB.fallback_font,e.pos+Vector2(-50,enemy_radius+22),"Bloodletting x%d"%e.bloodletting_stacks.size(),HORIZONTAL_ALIGNMENT_CENTER,100,12,Color("f09a9f"))
+	for mage in heroes:
+		if str(mage.get("class",""))!="Mage" or mage.get("mage_runtime",{}).is_empty():continue
+		var phoenix:Dictionary=mage.mage_runtime.phoenix
+		if not phoenix.is_empty():
+			var phoenix_pos:=Vector2(phoenix.pos);draw_circle(phoenix_pos,18,Color("ff7a3d",.30));draw_circle(phoenix_pos,11,Color("ffb34f"));draw_colored_polygon(PackedVector2Array([phoenix_pos+Vector2(0,-19),phoenix_pos+Vector2(-17,10),phoenix_pos,phoenix_pos+Vector2(17,10)]),Color("ffd15c"))
+		for projectile in mage.mage_runtime.pyro_projectiles:
+			var pyro_pos:=Vector2(projectile.pos);draw_circle(pyro_pos,18,Color("ff7a3d",.28));draw_circle(pyro_pos,11,Color("ff7a3d"));draw_circle(pyro_pos,5,Color("fff2a8"))
 	for i in heroes.size():
 		var h=heroes[i]; var col=CLASSES[h["class"]].color; if h.hp<=0:col=Color("455067")
 		if bool(h.get("incapacitated",false)):
@@ -202,7 +218,9 @@ func _draw() -> void:
 	if ability_aiming and selected<heroes.size():
 		var aiming_hero=heroes[selected];var range_limit=float(ABILITY_RANGES[aiming_hero["class"]][aimed_ability_slot]);var aim_point=clamped_cast_point(aiming_hero,ability_aim_point,range_limit) if range_limit>0 else aiming_hero.pos
 		if range_limit>0:draw_circle(aiming_hero.pos,range_limit,Color(C_GOLD,.035));draw_arc(aiming_hero.pos,range_limit,0,TAU,64,Color(C_GOLD,.55),2)
-		if aimed_ability_category=="ground":draw_circle(aim_point,30,Color(C_GOLD,.16));draw_arc(aim_point,30,0,TAU,30,C_GOLD,3);draw_dashed_line(aiming_hero.pos,aim_point,Color(C_GOLD,.7),8,6)
+		if aimed_ability_category=="ground":
+			var ground_radius:=MageSystem.flamestrike_radius(aiming_hero,MageSystem.trait_is_armed(aiming_hero)) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==0 else float(MageData.SPACE.pyro_splash_radius) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==3 else 30.0
+			draw_circle(aim_point,ground_radius,Color(C_GOLD,.10));draw_arc(aim_point,ground_radius,0,TAU,48,C_GOLD,3);draw_dashed_line(aiming_hero.pos,aim_point,Color(C_GOLD,.7),8,6)
 		elif aimed_ability_category=="directional":draw_dashed_line(aiming_hero.pos,aim_point,C_GOLD,10,6);draw_circle(aim_point,14,Color(C_GOLD,.3))
 		elif aimed_ability_category=="area":draw_circle(aiming_hero.pos,max(90.0,range_limit),Color(C_GOLD,.10));draw_arc(aiming_hero.pos,max(90.0,range_limit),0,TAU,48,C_GOLD,3)
 	for fx in effects: draw_combat_effect(fx)
@@ -250,22 +268,28 @@ func _draw() -> void:
 				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_3"):action_name="Let's Go!"
 				elif slot==3 and active["class"]=="Ranger":action_name=str(RangerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
+				elif slot==3 and active["class"]=="Mage":action_name=str(MageData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				var cleric_trait_active:bool=false
 				if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
 				var hatred_ratio:float=0.0
 				if slot==4 and str(active.get("class",""))=="Ranger" and not active.get("ranger_runtime",{}).is_empty():hatred_ratio=clampf(float(active.ranger_runtime.hatred)/float(RangerData.VALUES.hatred_max),0.0,1.0)
 				var ranger_hatred_full:bool=hatred_ratio>=1.0
-				if cleric_trait_active or ranger_hatred_full:
+				var mage_trait_armed:bool=slot==4 and str(active.get("class",""))=="Mage" and not active.get("mage_runtime",{}).is_empty() and MageSystem.trait_is_armed(active)
+				if cleric_trait_active or ranger_hatred_full or mage_trait_armed:
 					var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 					draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
 				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
 				if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
 				draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
-				if cleric_trait_active or ranger_hatred_full:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+				if cleric_trait_active or ranger_hatred_full or mage_trait_armed:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
 				if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
 					var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
 					draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[charge_state.charges,charge_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+				if active["class"]=="Mage" and not active.get("mage_runtime",{}).is_empty():
+					if slot==4:
+						var trait_state:=MageSystem.slot_state(active);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[trait_state.charges,trait_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+					elif slot==3 and MageSystem.has_talent(active,"mage_l27_r1") and not active.mage_runtime.phoenix.is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d"%int(active.mage_runtime.phoenix.reposition_charges),HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 			if active["class"]=="Guardian" and not active.get("guardian_runtime",{}).is_empty():
 				var status_parts:Array=[]
 				if GuardianSystem.has_talent(active,"guardian_l24_3"):status_parts.append("PRESENCE READY" if battle_time>=float(active.guardian_runtime.imposing_ready_at) else "PRESENCE %.0fs"%(float(active.guardian_runtime.imposing_ready_at)-battle_time))
@@ -275,6 +299,12 @@ func _draw() -> void:
 			elif active["class"]=="Cleric" and not active.get("cleric_runtime",{}).is_empty() and testing_zone_active:
 				var cleric_status:="FAST FEET  Q/E %.2fx  W %.2fx"%[ClericSystem.qwe_cooldown_rate(active),ClericSystem.w_cooldown_rate(active)] if ClericSystem.fast_feet_active(active) else "FAST FEET READY"
 				draw_string(ThemeDB.fallback_font,Vector2(450,620),cleric_status,HORIZONTAL_ALIGNMENT_CENTER,390,11,C_MUTED)
+			elif active["class"]=="Mage" and not active.get("mage_runtime",{}).is_empty():
+				var mage_status:Array=["AP %.0f%%"%(float(active.get("ability_power_percent",0.0))*100.0)]
+				if MageSystem.has_talent(active,"mage_l9_1"):mage_status.append("CONVECTION %d/20  x%d"%[int(active.mage_runtime.convection_progress),int(active.mage_runtime.convection_completions)])
+				if MageSystem.has_talent(active,"mage_l12_3"):mage_status.append("DYNAMO %d/5"%int(active.mage_runtime.arcane_dynamo_stacks))
+				if MageSystem.has_talent(active,"mage_l9_3"):mage_status.append("BARRIER READY" if float(active.mage_runtime.arcane_barrier_ready_in)<=0.0 else "BARRIER %.0fs"%float(active.mage_runtime.arcane_barrier_ready_in))
+				draw_string(ThemeDB.fallback_font,Vector2(410,620),"  •  ".join(mage_status),HORIZONTAL_ALIGNMENT_CENTER,470,11,C_MUTED)
 		draw_string(ThemeDB.fallback_font,Vector2(1080,50),"●  %d"%state.gold,HORIZONTAL_ALIGNMENT_RIGHT,115,20,C_GOLD);draw_circle(Vector2(1235,42),25,Color(0.08,.11,.16,.9)); draw_string(ThemeDB.fallback_font,Vector2(1222,50),"Ⅱ",HORIZONTAL_ALIGNMENT_LEFT,-1,22,C_TEXT)
 
 	if tutorial_active and tutorial_step==4:
@@ -371,6 +401,12 @@ func draw_combat_effect(fx:Dictionary)->void:
 		"cloud_serpent_projectile":
 			var serpent_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var serpent_direction:Vector2=fx.from.direction_to(fx.to)
 			draw_line(serpent_position-serpent_direction*20.0,serpent_position,Color("79dfe8",alpha*.58),4);draw_circle(serpent_position,8,Color("8feaf2",alpha*.26));draw_circle(serpent_position,4.5,col);draw_circle(serpent_position,2,Color.WHITE)
+		"mage_gravity":
+			var gravity_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(gravity_position,9,Color(col,.24));draw_circle(gravity_position,4,Color.WHITE);draw_line(fx.from,gravity_position,Color(col,.45),3)
+		"mage_phoenix":
+			var phoenix_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(phoenix_position,12,Color("ffb34f",alpha));draw_line(fx.from,phoenix_position,Color("ff7a3d",alpha*.55),6)
+		"mage_pyro":
+			var pyro_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(pyro_position,13,Color("ff7a3d",alpha*.45));draw_circle(pyro_position,7,Color("ffd15c",alpha));draw_circle(pyro_position,3,Color.WHITE)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":

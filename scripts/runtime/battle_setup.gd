@@ -28,6 +28,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		if str(heroes[-1].get("class",""))=="Guardian":GuardianSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Cleric":ClericSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Ranger":RangerSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Mage":MageSystem.initialize_runtime(heroes[-1],is_testing_save())
 	queue_redraw()
 
 func start_testing_zone() -> void:
@@ -42,14 +43,15 @@ func start_testing_zone() -> void:
 		if str(hero.get("class",""))=="Guardian":hero.guardian_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Cleric":hero.cleric_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Ranger":hero.ranger_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Mage":hero.mage_runtime.telemetry_enabled=true
 	testing_dummy_attacks_enabled=true
 	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
 	spawn_enemy(Vector2(650,120),"Dummy");enemies[-1]["passive_test_enemy"]=true
 	spawn_enemy(Vector2(610,525),"Raider")
 	spawn_enemy(Vector2(720,525),"Archer")
 	spawn_enemy(Vector2(665,555),"Dummy")
-	spawn_enemy(Vector2(1050,170),"Boss");enemies[-1]["passive_test_enemy"]=true
-	spawn_enemy(Vector2(1080,505),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["control_profile"]={"blind_immune":false,"blind_duration_multiplier":0.5,"slow_multiplier":0.5,"stun_multiplier":0.25,"displacement":false}
+	spawn_enemy(Vector2(1050,170),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1].max_hp*=1.5;enemies[-1].hp=enemies[-1].max_hp;enemies[-1]["percent_damage_health_basis"]=enemies[-1].max_hp;enemies[-1].combat_tags.append("difficulty_health_test")
+	spawn_enemy(Vector2(1080,505),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["damage_taken_multiplier"]=0.75;enemies[-1].combat_tags.append("phase_reduction_test");enemies[-1]["control_profile"]={"blind_immune":false,"blind_duration_multiplier":0.5,"slow_multiplier":0.5,"stun_multiplier":0.25,"displacement":false}
 	spawn_enemy(Vector2(880,330),"Defense Dummy")
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:pillar",Rect2(570,250,74,145)))
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:wall",Rect2(760,210,38,165),{"destructible":true,"current_health":240.0,"maximum_health":240.0}))
