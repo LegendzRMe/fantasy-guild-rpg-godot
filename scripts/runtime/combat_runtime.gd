@@ -31,6 +31,7 @@ func _process(delta:float) -> void:
 	update_cleric_runtime(delta)
 	update_ranger_runtime(delta)
 	update_mage_runtime(delta)
+	update_warlock_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	for i in heroes.size():
@@ -40,7 +41,9 @@ func _process(delta:float) -> void:
 			var cooldown_rate:=1.0
 			if str(h.get("class",""))=="Cleric" and not h.get("cleric_runtime",{}).is_empty() and slot<3:cooldown_rate=ClericSystem.w_cooldown_rate(h) if slot==1 else ClericSystem.qwe_cooldown_rate(h)
 			elif str(h.get("class",""))=="Ranger" and not h.get("ranger_runtime",{}).is_empty() and slot==1 and RangerSystem.has_talent(h,"ranger_l24_1") and int(h.ranger_runtime.hatred)>=int(RangerData.VALUES.hatred_max):cooldown_rate=1.5
+			elif str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty() and slot==1 and WarlockSystem.has_talent(h,"warlock_l12_1") and not h.get("active_channel",{}).is_empty():cooldown_rate=2.0
 			h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta*cooldown_rate)
+		if str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty():h.ability_cds[4]=float(h.warlock_runtime.life_tap_lockout)
 		if h.hp>0:update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):finish_battle(false);return
@@ -63,12 +66,17 @@ func _process(delta:float) -> void:
 				elif str(e.type).begins_with("Controlled "):
 					add_effect("cast",e.pos,e.pos,"SUBDUED",C_GREEN)
 			continue
-		if e.type=="Dummy":continue
-		if bool(e.get("passive_test_enemy",false)):continue
+			if e.type=="Dummy":continue
+			if bool(e.get("passive_test_enemy",false)):continue
 		if CombatSystem.is_stunned(e):continue
+		if CombatSystem.is_feared(e):
+			e.telegraph=0.0;e.special="";e.target=-1
+			var fear_origin:=Vector2(e.get("fear_origin",e.pos-Vector2.RIGHT));var fear_direction:=fear_origin.direction_to(e.pos)
+			if fear_direction==Vector2.ZERO:fear_direction=Vector2.RIGHT
+			e.facing_direction=fear_direction;e.pos=CombatGeometry.move_toward_safe(e.pos,e.pos+fear_direction*100.0,float(e.movement_speed)*delta,42.0,combat_blockers);continue
 		if e.type=="Defense Dummy" and not testing_dummy_attacks_enabled:continue
 		e.cooldown=max(0,e.cooldown-delta);e.taunt_time=max(0.0,float(e.get("taunt_time",0.0))-delta)
-		if e.type=="Shaman" and e.cooldown<=0:
+		if e.type=="Shaman" and e.cooldown<=0 and not CombatSystem.is_silenced(e):
 			var wounded=-1; var lowest=1.0
 			for ally_i in enemies.size():
 				if enemies[ally_i].hp>0 and enemies[ally_i].hp/enemies[ally_i].max_hp<lowest: lowest=enemies[ally_i].hp/enemies[ally_i].max_hp; wounded=ally_i

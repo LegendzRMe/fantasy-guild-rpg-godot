@@ -26,6 +26,9 @@ const RangerData = preload("res://scripts/data/ranger_data.gd")
 const RangerSystem = preload("res://scripts/systems/ranger_system.gd")
 const MageData = preload("res://scripts/data/mage_data.gd")
 const MageSystem = preload("res://scripts/systems/mage_system.gd")
+const WarlockData = preload("res://scripts/data/warlock_data.gd")
+const WarlockSystem = preload("res://scripts/systems/warlock_system.gd")
+const PeriodicStatusSystem = preload("res://scripts/systems/periodic_status_system.gd")
 const AbilityPowerSystem = preload("res://scripts/systems/ability_power_system.gd")
 const LivingBombLineageSystem = preload("res://scripts/systems/living_bomb_lineage_system.gd")
 const AbilitySlotSystem = preload("res://scripts/systems/ability_slot_system.gd")
@@ -656,6 +659,7 @@ func show_vault()->void:pass
 # Combat/story contracts implemented by the runtime layers.
 func start_battle(_id:int,_node:int=0,_party_override:Array=[])->void:pass
 func start_testing_zone()->void:pass
+func start_warlock_testing_zone()->void:pass
 func show_testing_zone_menu()->void:pass
 func start_testing_endless(_enemy_level:int)->void:pass
 func start_ashwood_battle(_encounter_key:String)->void:pass

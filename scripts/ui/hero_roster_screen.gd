@@ -5,6 +5,7 @@ const GuardianAbilityPresenter = preload("res://scripts/data/guardian_ability_pr
 const ClericAbilityPresenter = preload("res://scripts/data/cleric_ability_presenter.gd")
 const RangerAbilityPresenter = preload("res://scripts/data/ranger_ability_presenter.gd")
 const MageAbilityPresenter = preload("res://scripts/data/mage_ability_presenter.gd")
+const WarlockAbilityPresenter = preload("res://scripts/data/warlock_ability_presenter.gd")
 const TalentTierView = preload("res://scripts/ui/talent_tier_view.gd")
 const EquipmentSlotSilhouette = preload("res://scripts/ui/equipment_slot_silhouette.gd")
 
@@ -48,6 +49,10 @@ func open_roster_ability_details(hero:Dictionary,action_key:String,heroic_id:Str
 		var presenter_hero:=hero.duplicate(true);var presenter_stats:=hero_final_stats(hero);presenter_hero["power"]=float(presenter_stats.power);presenter_hero["stats"]=presenter_stats;presenter_hero["base_ability_power_percent"]=float(presenter_stats.get("ability_power_percent",0.0))
 		if presenter_hero.get("mage_runtime",{}).is_empty():MageSystem.initialize_runtime(presenter_hero,is_testing_save())
 		details=MageAbilityPresenter.details(presenter_hero,action_key,heroic_id)
+	elif str(hero.get("class",""))=="Warlock":
+		var presenter_hero:=hero.duplicate(true);var presenter_stats:=hero_final_stats(hero);presenter_hero["power"]=float(presenter_stats.power);presenter_hero["stats"]=presenter_stats;presenter_hero["max_hp"]=float(presenter_stats.health);presenter_hero["hp"]=float(presenter_stats.health);presenter_hero["ability_cds"]=[0.0,0.0,0.0,0.0,0.0]
+		WarlockSystem.initialize_runtime(presenter_hero,false)
+		details=WarlockAbilityPresenter.details(presenter_hero,action_key,heroic_id)
 	else:
 		var action_keys:Array=["Q","W","E","R"];var slot:=action_keys.find(action_key)
 		details={"key":action_key,"title":str(TRAITS[hero["class"]]) if action_key=="D" else str(ABILITIES[hero["class"]][slot]),"meta":"Passive Trait" if action_key=="D" else "Ability","description":"Passive Trait" if action_key=="D" else ability_tooltip(hero["class"],slot),"sections":[],"note":""}
@@ -77,6 +82,7 @@ func guardian_talent_name(talent_id:String)->String:
 	if talent_id.begins_with("cleric_"):return str(ClericData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 	if talent_id.begins_with("ranger_"):return str(RangerData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 	if talent_id.begins_with("mage_"):return str(MageData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
+	if talent_id.begins_with("warlock_"):return str(WarlockData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 	return str(GuardianData.WORKING_NAMES.get(talent_id,talent_id.replace("_"," ").capitalize()))
 
 func roster_talent_description(hero_class:String,option_id:String)->String:
@@ -84,6 +90,7 @@ func roster_talent_description(hero_class:String,option_id:String)->String:
 	if hero_class=="Cleric":return str(ClericData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
 	if hero_class=="Ranger":return str(RangerData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
 	if hero_class=="Mage":return str(MageData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
+	if hero_class=="Warlock":return str(WarlockData.TALENT_DESCRIPTIONS.get(option_id,"Talent details are still being developed."))
 	return "Talent details are still being developed."
 
 func remember_roster_scroll()->void:
@@ -599,9 +606,11 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 			var trait_name:String="Stoneform" if hero["class"]=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2") else str(TRAITS[hero["class"]])
 			if hero["class"]=="Cleric" and ClericSystem.has_talent(hero,"cleric_l12_2"):trait_name="Safety Sprint"
 			elif hero["class"]=="Cleric" and ClericSystem.has_talent(hero,"cleric_l12_3"):trait_name="Let's Go!"
+			elif hero["class"]=="Warlock":trait_name="Life Tap"
 			var trait_text:String=GuardianData.TALENT_DESCRIPTIONS.guardian_l24_2 if trait_name=="Stoneform" else "Passive Trait"
 			if hero["class"]=="Cleric" and trait_name=="Safety Sprint":trait_text=str(ClericData.TALENT_DESCRIPTIONS.cleric_l12_2)
 			elif hero["class"]=="Cleric" and trait_name=="Let's Go!":trait_text=str(ClericData.TALENT_DESCRIPTIONS.cleric_l12_3)
+			elif hero["class"]=="Warlock":trait_text="Sacrifice 13% of maximum Health to accelerate eligible cooldowns."
 			var class_color:Color=CLASSES[hero["class"]].color
 			for slot in 3:
 				var required_level:=int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]);var locked:=int(hero.get("level",1))<required_level;var description:=ability_tooltip(hero["class"],slot)
@@ -610,8 +619,8 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 				content.add_child(make_roster_ability_row(action_key,str(ABILITIES[hero["class"]][slot]),description,class_color,locked,func(key=action_key):open_roster_ability_details(hero,key)))
 			var selected_heroic_id:=str(hero.get("selected_heroic_id",""));var heroic_unlocked:=TalentSystem.ability_is_unlocked(int(hero.get("level",1)),3)
 			if heroic_unlocked and selected_heroic_id!="":
-				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"] in ["Guardian","Cleric","Ranger","Mage"] else str(ABILITIES[hero["class"]][3])
-				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else str(ClericData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Cleric" else str(RangerData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Ranger" else str(MageData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Mage" else ability_tooltip(hero["class"],3)
+				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"] in ["Guardian","Cleric","Ranger","Mage","Warlock"] else str(ABILITIES[hero["class"]][3])
+				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else str(ClericData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Cleric" else str(RangerData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Ranger" else str(MageData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Mage" else str(WarlockData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Warlock" else ability_tooltip(hero["class"],3)
 				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color,false,func(heroic=selected_heroic_id):open_roster_ability_details(hero,"R",heroic)))
 			else:
 				content.add_child(make_roster_ability_row("R","Heroic Ability","Choose your Heroic at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[3]),class_color,true))

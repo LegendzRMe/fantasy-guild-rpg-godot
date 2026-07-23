@@ -1,16 +1,18 @@
 extends RefCounted
 
-const PREVENTED_BY_UNSTOPPABLE := ["stun", "root", "silence", "slow", "displacement"]
+const PREVENTED_BY_UNSTOPPABLE := ["stun", "root", "silence", "fear", "slow", "displacement"]
 
 static func control_profile(unit:Dictionary)->Dictionary:
 	var ordinary := {
 		"stun_multiplier":1.0, "root_multiplier":1.0, "silence_multiplier":1.0,
+		"fear_multiplier":1.0,
 		"slow_multiplier":1.0, "attack_speed_multiplier":1.0,
 		"blind_duration_multiplier":1.0, "blind_immune":false,
 		"displacement":true, "interruptible":true, "stagger_multiplier":1.0
 	}
 	if bool(unit.get("boss", false)):
 		ordinary.merge({"stun_multiplier":0.0, "slow_multiplier":0.5,
+			"fear_multiplier":0.0,
 			"attack_speed_multiplier":0.5, "blind_duration_multiplier":0.0,
 			"blind_immune":true, "displacement":false}, true)
 	ordinary.merge(unit.get("control_profile", {}), true)
@@ -25,6 +27,16 @@ static func is_blinded(unit:Dictionary)->bool:
 
 static func is_unstoppable(unit:Dictionary)->bool:
 	return has_effect(unit, "unstoppable")
+
+static func has_control(unit:Dictionary,control_type:String)->bool:
+	return unit.get("active_effects", []).any(func(effect):
+		return str(effect.get("control_type", "")) == control_type and float(effect.get("remaining_duration", 0.0)) > 0.0)
+
+static func is_silenced(unit:Dictionary)->bool:
+	return has_control(unit, "silence")
+
+static func is_feared(unit:Dictionary)->bool:
+	return has_control(unit, "fear")
 
 static func remove_removable_controls(unit:Dictionary)->Array:
 	var removed:Array = []

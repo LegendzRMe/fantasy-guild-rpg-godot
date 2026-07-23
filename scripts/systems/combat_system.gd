@@ -178,6 +178,12 @@ static func apply_unstoppable(unit:Dictionary,duration:float)->Dictionary:
 static func is_unstoppable(unit:Dictionary)->bool:
 	return StatusEffectSystem.is_unstoppable(unit)
 
+static func is_silenced(unit:Dictionary)->bool:
+	return StatusEffectSystem.is_silenced(unit)
+
+static func is_feared(unit:Dictionary)->bool:
+	return StatusEffectSystem.is_feared(unit)
+
 static func control_amount(unit:Dictionary,control_type:String)->float:
 	var strongest:=0.0
 	for effect in unit.get("active_effects",[]):

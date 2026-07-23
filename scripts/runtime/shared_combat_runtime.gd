@@ -59,7 +59,9 @@ func interrupt_unit_action(unit:Dictionary,reason:String)->bool:
 		if bool(cast.get("uninterruptible",false)):return false
 		var slot:int=int(cast.get("slot",-1))
 		if slot>=0 and bool(cast.get("is_heroic",false)):unit.ability_cds[slot]=CombatRulesV1.HEROIC_INTERRUPT_COOLDOWN
-		unit.active_cast={};CombatRulesV1.restore_preserved_command(unit,target_is_valid_for(unit,unit_by_combat_id(str(unit.get("preserved_target_id",""))),str(unit.get("preserved_target_kind",""))))
+		unit.active_cast={}
+		if str(unit.get("class",""))=="Warlock" and bool(unit.get("active_channel",{}).get("background",false)):unit.active_channel={}
+		CombatRulesV1.restore_preserved_command(unit,target_is_valid_for(unit,unit_by_combat_id(str(unit.get("preserved_target_id",""))),str(unit.get("preserved_target_kind",""))))
 		unit.last_command_failure="cast interrupted: %s"%reason;return true
 	if not unit.get("active_channel",{}).is_empty():
 		unit.active_channel={};CombatRulesV1.restore_preserved_command(unit,target_is_valid_for(unit,unit_by_combat_id(str(unit.get("preserved_target_id",""))),str(unit.get("preserved_target_kind",""))))
@@ -142,13 +144,19 @@ func idle_defense_target(hero:Dictionary):
 
 func update_shared_hero(hero:Dictionary,delta:float)->void:
 	ensure_combat_runtime_fields(hero,"hero:%d"%int(hero.get("battle_index",heroes.find(hero))),"player")
-	var has_true_control:bool=hero.get("active_effects",[]).any(func(effect):return str(effect.get("control_type","")) in ["stun","root","silence"] and float(effect.get("remaining_duration",0.0))>0.0)
+	var has_true_control:bool=hero.get("active_effects",[]).any(func(effect):return str(effect.get("control_type","")) in ["stun","root","silence","fear"] and float(effect.get("remaining_duration",0.0))>0.0)
 	if has_true_control and (not hero.get("active_cast",{}).is_empty() or not hero.get("active_channel",{}).is_empty() or bool(hero.get("cleric_runtime",{}).get("jug_active",false))):interrupt_unit_action(hero,"crowd control")
 	if hero.hp<=0.0:
 		if not bool(hero.get("incapacitated",false)):
 			interrupt_unit_action(hero,"incapacitated");CombatRulesV1.incapacitate(hero)
 			if str(hero.combat_id) not in incapacitated_hero_ids:incapacitated_hero_ids.append(str(hero.combat_id))
 		return
+	if str(hero.get("class",""))=="Warlock" and float(hero.get("warlock_runtime",{}).get("banished_remaining",0.0))>0.0:return
+	var fear_effects:Array=hero.get("active_effects",[]).filter(func(effect):return str(effect.get("control_type",""))=="fear" and float(effect.get("remaining_duration",0.0))>0.0)
+	if not fear_effects.is_empty():
+		var origin:=Vector2(hero.get("fear_origin",hero.pos-hero.facing_direction));var away:=origin.direction_to(hero.pos)
+		if away==Vector2.ZERO:away=Vector2.RIGHT
+		hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.pos+away*100.0,float(hero.movement_speed)*delta,42.0,combat_blockers);return
 	update_unit_casts(hero,delta)
 	if int(hero.command_state) in [CombatRulesV1.CommandState.CAST,CombatRulesV1.CommandState.CHANNEL]:return
 	var phase_event:=CombatRulesV1.advance_basic_action(hero,delta,battle_time)

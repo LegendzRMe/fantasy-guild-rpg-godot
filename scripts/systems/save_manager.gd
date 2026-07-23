@@ -54,6 +54,31 @@ static func fresh_state() -> Dictionary:
 		hero_state("Sera","Cleric",1,10,"founding_recruit")
 	]}
 
+static func testing_heroes() -> Array:
+	return [
+		hero_state("Brann","Guardian",4,16,"founding_recruit"),
+		hero_state("Sera","Cleric",4,16,"founding_recruit"),
+		hero_state("Wren","Ranger",4,16),
+		hero_state("Nyx","Mage",4,16),
+		hero_state("Kestrel","Rogue",4,16),
+		hero_state("Morrow","Warlock",4,16),
+		hero_state("Aldren Vale","Guardian",4,18,"special_hero",true,1,{"signature_ability":"Oath of Cinders","story_lead":"The traitor's broken oath-seal"}),
+		hero_state("Mira Thorn","Ranger",4,18,"special_hero",true,1,{"signature_ability":"Ghostmark Volley","story_lead":"Unnatural tracks leaving Ashwood"}),
+		hero_state("Ilyra Voss","Mage",4,18,"special_hero",true,1,{"signature_ability":"Runebreak","story_lead":"The force inside the servant's runes"})
+	]
+
+static func ensure_testing_roster(state:Dictionary) -> void:
+	var existing_ids:Dictionary={}
+	var existing_names:Dictionary={}
+	for saved_hero in state.heroes:
+		existing_ids[str(saved_hero.get("hero_id",""))]=true
+		existing_names[str(saved_hero.get("display_name",saved_hero.get("name","")))]=true
+	for required_hero in testing_heroes():
+		if existing_ids.has(str(required_hero.hero_id)) or existing_names.has(str(required_hero.display_name)):continue
+		state.heroes.append(required_hero)
+		existing_ids[str(required_hero.hero_id)]=true
+		existing_names[str(required_hero.display_name)]=true
+
 static func testing_state() -> Dictionary:
 	var state:=fresh_state()
 	state.merge({
@@ -78,17 +103,7 @@ static func testing_state() -> Dictionary:
 		"selected_team":[0,1,2,3],
 		"active_team":[0,1,2,3],
 		"saved_teams":[[0,1,2,3],[],[],[],[]],
-		"heroes":[
-			hero_state("Brann","Guardian",4,16,"founding_recruit"),
-			hero_state("Sera","Cleric",4,16,"founding_recruit"),
-			hero_state("Wren","Ranger",4,16),
-			hero_state("Nyx","Mage",4,16),
-			hero_state("Kestrel","Rogue",4,16),
-			hero_state("Morrow","Warlock",4,16),
-			hero_state("Aldren Vale","Guardian",4,18,"special_hero",true,1,{"signature_ability":"Oath of Cinders","story_lead":"The traitor's broken oath-seal"}),
-			hero_state("Mira Thorn","Ranger",4,18,"special_hero",true,1,{"signature_ability":"Ghostmark Volley","story_lead":"Unnatural tracks leaving Ashwood"}),
-			hero_state("Ilyra Voss","Mage",4,18,"special_hero",true,1,{"signature_ability":"Runebreak","story_lead":"The force inside the servant's runes"})
-		]
+		"heroes":testing_heroes()
 	},true)
 	state.item_instances=ItemData.testing_instances()
 	state=migrate_state(state,true,true)
@@ -160,6 +175,7 @@ static func migrate_state(state:Dictionary, save_declared_tutorial:bool, testing
 						state.casting_settings[device][category]=casting_defaults[device][category]
 	if not state.has("item_instances") or not state.item_instances is Array:state["item_instances"]=[]
 	if testing_save or str(state.get("guild_name",""))=="Testing Guild":
+		ensure_testing_roster(state)
 		state["item_instances"]=state.item_instances.filter(func(item):return str(item.get("instance_id","")) not in ItemData.LEGACY_TEST_INSTANCE_IDS)
 		for saved_hero in state.heroes:
 			if not saved_hero.has("equipment_slots") or not saved_hero.equipment_slots is Dictionary:continue
