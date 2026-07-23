@@ -2,6 +2,7 @@ extends RefCounted
 
 const SaveManager = preload("res://scripts/systems/save_manager.gd")
 const ItemData = preload("res://scripts/data/item_data.gd")
+const GameData = preload("res://scripts/data/game_data.gd")
 const TestSupport = preload("res://tests/test_support.gd")
 
 static func run() -> Array:
@@ -24,6 +25,7 @@ static func run() -> Array:
 	TestSupport.check(errors,testing.tutorial_complete==true,"The testing slot should skip the tutorial.")
 	TestSupport.check(errors,testing.major_systems_unlocked==true,"The testing slot should keep major guild systems unlocked.")
 	TestSupport.check(errors,testing.heroes.size()==9,"The testing slot should include all current normal recruits and Special Hero candidates.")
+	TestSupport.check(errors,GameData.CLASSES.keys().all(func(hero_class):return testing.heroes.any(func(hero):return str(hero.get("class",""))==str(hero_class))),"The testing slot should include at least one hero for every registered class.")
 	TestSupport.check(errors,testing.heroes.slice(0,6).all(func(hero):return hero.prestige_rank==0) and testing.heroes.slice(6).all(func(hero):return hero.prestige_rank==1),"Normal heroes should begin at Prestige 0 while current Special Heroes begin at Prestige 1.")
 	TestSupport.check(errors,testing.heroes.slice(6).all(func(hero):return hero.identity_type=="special" and not hero.can_edit_name and not hero.can_edit_appearance),"Special Heroes should preserve authored, non-editable identities.")
 	TestSupport.check(errors,testing.class_talent_discovery.values().all(func(level):return int(level)==30),"The testing guild should reveal every current class talent tree.")
@@ -73,10 +75,12 @@ static func run() -> Array:
 	TestSupport.check(errors,repaired.heroes is Array and repaired.heroes.size()==2 and repaired.selected_team is Array and repaired.casting_settings is Dictionary and repaired.zone0 is Dictionary,"Migration should repair valid JSON containing invalid core field types.")
 	var legacy_testing:=SaveManager.testing_state()
 	legacy_testing.erase("major_systems_unlocked")
+	legacy_testing.heroes=legacy_testing.heroes.filter(func(hero):return str(hero.get("class",""))!="Warlock" and str(hero.get("name",""))!="Ilyra Voss")
 	legacy_testing.item_instances.append({"instance_id":"test_ashwood_bulwark","definition_id":"ashwood_bulwark","owner_state":"equipped","equipped_hero_index":0})
 	legacy_testing.heroes[0].equipment_slots.chest="test_ashwood_bulwark"
 	legacy_testing=SaveManager.migrate_state(legacy_testing,true)
 	TestSupport.check(errors,legacy_testing.major_systems_unlocked==true,"Legacy four-hero testing saves should remain fully usable.")
+	TestSupport.check(errors,legacy_testing.heroes.size()==9 and legacy_testing.heroes.any(func(hero):return str(hero.get("class",""))=="Warlock") and legacy_testing.heroes.any(func(hero):return str(hero.get("name",""))=="Ilyra Voss"),"Legacy testing saves should automatically receive every current testing hero and class without duplicating existing heroes.")
 	TestSupport.check(errors,legacy_testing.item_instances.size()==10 and legacy_testing.item_instances.all(func(item):return item.definition_id in ItemData.TESTING_DEFINITION_IDS),"Legacy testing saves should replace obsolete prototype items with exactly the current ten Legendary definitions.")
 	TestSupport.check(errors,legacy_testing.heroes[0].equipment_slots.chest==null,"Removing an obsolete testing item should safely clear its old equipment reference.")
 
