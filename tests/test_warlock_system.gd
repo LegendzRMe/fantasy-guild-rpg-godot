@@ -26,6 +26,7 @@ static func run() -> Array:
 	TestSupport.check(errors,is_equal_approx(WarlockData.scaled(100.0,2),104.0),"Warlock should use four-percent level scaling.")
 
 	var unit:=make_warlock()
+	unit["assigned_target_id"]="enemy:kept";unit["assigned_target_kind"]="enemy";unit["shield"]=500.0
 	var result:=WarlockSystem.use_life_tap(unit)
 	TestSupport.check(errors,bool(result.valid),"Life Tap should commit when eligible cooldowns can benefit.")
 	TestSupport.check(errors,is_equal_approx(float(unit.hp),1478.0),"Life Tap should pay the precise 222/1700 maximum-Health ratio.")
@@ -34,6 +35,10 @@ static func run() -> Array:
 	TestSupport.check(errors,is_equal_approx(float(unit.ability_cds[2]),21.0),"Life Tap should reduce E by 7 seconds.")
 	TestSupport.check(errors,is_equal_approx(float(unit.ability_cds[3]),80.0),"Normal Life Tap should not reduce the Heroic.")
 	TestSupport.check(errors,is_equal_approx(float(unit.warlock_runtime.life_tap_lockout),0.5),"Successful Life Tap should start the input lockout.")
+	TestSupport.check(errors,is_equal_approx(float(unit.shield),500.0) and str(unit.assigned_target_id)=="enemy:kept","Life Tap should bypass Shields and preserve the assigned Basic Action target.")
+
+	var floor_unit:=make_warlock();floor_unit.ability_cds=[0.1,1.0,2.0,80.0,0.0];WarlockSystem.use_life_tap(floor_unit)
+	TestSupport.check(errors,is_equal_approx(float(floor_unit.ability_cds[0]),0.0) and is_equal_approx(float(floor_unit.ability_cds[1]),0.0) and is_equal_approx(float(floor_unit.ability_cds[2]),0.0),"Life Tap should floor cooldowns at zero without storing overflow.")
 
 	var lethal:=make_warlock();lethal.hp=222.0
 	var lethal_result:=WarlockSystem.use_life_tap(lethal)
@@ -51,6 +56,11 @@ static func run() -> Array:
 	var dark_bargain:=make_warlock({"tier_5":"warlock_l21_3"})
 	TestSupport.check(errors,is_equal_approx(float(dark_bargain.max_hp),2380.0),"Dark Bargain should increase maximum Health by 40%.")
 	TestSupport.check(errors,is_equal_approx(WarlockSystem.modified_base_cooldown(dark_bargain,0),3.3),"Dark Bargain should increase modified cooldown bases by 10%.")
+	WarlockSystem.use_life_tap(dark_bargain)
+	TestSupport.check(errors,is_equal_approx(float(dark_bargain.ability_cds[0]),2.175),"Life Tap should reduce Dark Bargain Q by 25% of its modified 3.3-second base.")
+
+	var hunger:=make_warlock({"tier_4":"warlock_l18_3"});hunger.armor=999.0;hunger.shield=999.0;var hunger_cost:=WarlockSystem.life_tap_cost(hunger);WarlockSystem.use_life_tap(hunger)
+	TestSupport.check(errors,is_equal_approx(float(hunger.hp),1700.0-hunger_cost) and is_equal_approx(float(hunger.shield),999.0),"Armor, Shields, and Hunger for Power must not alter Life Tap's Health cost.")
 
 	var passive:=make_warlock();passive.ability_cds=[3.0,20.0,28.0,80.0,0.0]
 	var passive_result:=WarlockSystem.convert_health_loss(passive,111.0)

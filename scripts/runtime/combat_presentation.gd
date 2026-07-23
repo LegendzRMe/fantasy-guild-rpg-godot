@@ -107,13 +107,17 @@ func draw_combat_debug_overlay()->void:
 	if not hero.get("active_cast",{}).is_empty():cast_name="cast slot %d"%int(hero.active_cast.get("slot",-1))
 	elif not hero.get("active_channel",{}).is_empty():cast_name="channel slot %d"%int(hero.active_channel.get("slot",-1))
 	var lines:=["ID  %s"%hero.combat_id,"COMMAND  %s"%CombatRulesV1.command_name(int(hero.command_state)),"TARGET  %s (%s)"%[str(hero.assigned_target_id),str(hero.assigned_target_kind)],"ACTION  %s  %.2f"%[CombatRulesV1.phase_name(int(hero.basic_action_phase)),float(hero.basic_action_timer)],"READY AT  %.2f"%float(hero.next_action_ready_time),"IN RANGE  %s   LOS  %s"%[in_range,line_of_sight],"CAST  %s"%cast_name,"INCAPACITATED  %s"%bool(hero.incapacitated)]
-	draw_rect(Rect2(18,16,285,190),Color(0.02,.03,.05,.88));draw_rect(Rect2(18,16,285,190),C_MUTED,false,2)
+	if str(hero.get("class",""))=="Warlock" and not hero.get("warlock_runtime",{}).is_empty():
+		var runtime:Dictionary=hero.warlock_runtime;lines.append("TAP LOCK  %.2f"%float(runtime.life_tap_lockout));lines.append("DARKNESS  %.0f / %.0f"%[float(runtime.darkness_progress),float(WarlockData.VALUES.darkness_damage_requirement)]);lines.append("CORRUPTION  %d"%runtime.periodic_effects.size());lines.append("BANISHED  %.2f"%float(runtime.banished_remaining))
+	var debug_height:=190.0+maxi(0,lines.size()-8)*20.0;draw_rect(Rect2(18,16,285,debug_height),Color(0.02,.03,.05,.88));draw_rect(Rect2(18,16,285,debug_height),C_MUTED,false,2)
 	for line_index in lines.size():draw_string(ThemeDB.fallback_font,Vector2(32,42+line_index*20),lines[line_index],HORIZONTAL_ALIGNMENT_LEFT,-1,13,C_TEXT)
 	if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():
 		draw_arc(hero.pos,MageSystem.flamestrike_range(hero),0,TAU,72,Color(CLASSES.Mage.color,.45),2)
 		draw_arc(hero.pos,MageSystem.gravity_range(hero),0,TAU,72,Color("70b9ff",.35),2)
 		for bomb in hero.mage_runtime.bomb_state.bombs_by_target.values():
 			var bomb_target=unit_by_combat_id(str(bomb.target_id));if bomb_target!=null:draw_arc(bomb_target.pos,MageSystem.bomb_radius(hero),0,TAU,48,Color("ff9a4f",.38),2)
+	elif str(hero.get("class",""))=="Warlock" and not hero.get("warlock_runtime",{}).is_empty():
+		draw_arc(hero.pos,float(WarlockData.SPACE.q_range),0,TAU,72,Color(CLASSES.Warlock.color,.26),2);draw_arc(hero.pos,float(WarlockData.SPACE.w_cast_range),0,TAU,72,Color("d7a2ff",.24),2)
 
 func _draw() -> void:
 	if screen not in ["combat","ashwood_victory"]:return

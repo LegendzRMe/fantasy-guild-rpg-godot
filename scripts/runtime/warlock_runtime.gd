@@ -41,9 +41,13 @@ func cast_warlock_q(hero:Dictionary, point:Vector2, item_repeat:bool=false) -> b
 		hero.warlock_runtime.delayed_effects.append({"kind":"fel_flame_hit","remaining":maxf(0.01,float(WarlockData.SPACE.q_travel_time)*travel_fraction),"target_id":str(target.combat_id),"amount":amount})
 	WarlockSystem.telemetry_add(hero,"q_casts");WarlockSystem.telemetry_add(hero,"q_hits",hits.size());WarlockSystem.telemetry_add(hero,"q_distinct_hits",qualifying.size())
 	if WarlockSystem.has_talent(hero,"warlock_l9_1") and not bool(hero.warlock_runtime.pursuit_complete):
-		hero.warlock_runtime.pursuit_progress=mini(int(WarlockData.VALUES.pursuit_requirement),int(hero.warlock_runtime.pursuit_progress)+qualifying.size())
+		var new_pursuit_targets:=0
+		for pursuit_target in qualifying:
+			var pursuit_id:=str(pursuit_target.combat_id)
+			if not hero.warlock_runtime.pursuit_target_ids.has(pursuit_id):hero.warlock_runtime.pursuit_target_ids[pursuit_id]=true;new_pursuit_targets+=1
+		hero.warlock_runtime.pursuit_progress=mini(int(WarlockData.VALUES.pursuit_requirement),int(hero.warlock_runtime.pursuit_progress)+new_pursuit_targets)
 		hero.warlock_runtime.pursuit_complete=int(hero.warlock_runtime.pursuit_progress)>=int(WarlockData.VALUES.pursuit_requirement)
-		WarlockSystem.telemetry_add(hero,"pursuit_progress",qualifying.size())
+		WarlockSystem.telemetry_add(hero,"pursuit_progress",new_pursuit_targets)
 	if WarlockSystem.has_talent(hero,"warlock_l18_1"):
 		hero.ability_cds[2]=maxf(0.0,float(hero.ability_cds[2])-1.75*qualifying.size())
 	if WarlockSystem.has_talent(hero,"warlock_l21_1") and not qualifying.is_empty():
@@ -122,7 +126,7 @@ func resolve_corruption_burst(hero:Dictionary, effect:Dictionary) -> void:
 			hero.warlock_runtime.echoed_complete=int(hero.warlock_runtime.echoed_progress)>=int(WarlockData.VALUES.echoed_requirement)
 			hero.warlock_runtime.echoed_mythic=int(hero.warlock_runtime.echoed_progress)>=int(WarlockData.VALUES.echoed_mythic_requirement)
 		if WarlockSystem.has_talent(hero,"warlock_l24_2") and int(effect.burst_number) in [3,6]:
-			warlock_damage(hero,target,WarlockSystem.scaled_amount(hero,217.8),"basic_ability","Ruinous Affliction",false)
+			warlock_damage(hero,target,WarlockSystem.scaled_amount(hero,float(WarlockData.VALUES.ruinous_affliction_damage)),"basic_ability","Ruinous Affliction",false)
 	warlock_visual("warlock_corruption_impact",Vector2(effect.center),Vector2(effect.center),0.4,"",{"radius":float(WarlockData.SPACE.e_burst_radius)})
 
 func resolve_horrify(hero:Dictionary, effect:Dictionary) -> void:

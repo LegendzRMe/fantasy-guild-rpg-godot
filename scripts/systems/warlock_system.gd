@@ -36,7 +36,7 @@ static func initialize_runtime(unit:Dictionary, telemetry_enabled:bool=false) ->
 			"demonic_circle":{"remaining":0.0,"modified_base":float(WarlockData.VALUES.demonic_circle_cooldown),"life_tap_reducible":false,"health_loss_reducible":false,"chaotic_energy_reducible":false}
 		},
 		"periodic_effects":[], "delayed_effects":[], "rain_effects":[],
-		"next_cast_id":1, "pursuit_progress":0, "pursuit_complete":false,
+		"next_cast_id":1, "pursuit_progress":0, "pursuit_complete":false, "pursuit_target_ids":{},
 		"chaotic_progress":0, "chaotic_complete":false,
 		"echoed_progress":0, "echoed_complete":false, "echoed_mythic":false,
 		"rampant_stacks":0, "rampant_remaining":0.0,

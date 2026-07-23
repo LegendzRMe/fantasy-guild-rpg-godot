@@ -48,6 +48,7 @@ const VALUES := {
 	"r2_meteor_interval":0.5, "r2_warning_time":0.45,
 	"pursuit_requirement":30, "chaotic_energy_requirement":15,
 	"echoed_requirement":40, "echoed_mythic_requirement":85,
+	"ruinous_affliction_damage":217.8,
 	"consume_soul_healing":365.0, "consume_soul_internal_cooldown":50.0,
 	"fel_armor_per_target":50.0, "fel_armor_duration":2.5,
 	"dark_bargain_health_multiplier":1.40, "dark_bargain_cooldown_multiplier":1.10,
