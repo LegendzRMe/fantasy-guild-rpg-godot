@@ -67,6 +67,8 @@ Combo Points survive target swaps, Vanish, waves, and rooms in one encounter. Th
 
 Testing-only telemetry is initialized for Combo Point gain/use/waste, concealment time and breaks, action-set swaps, attacks and abilities, Armor reduction, periodic effects, Heroics, and talent triggers. The Rogue Range supplies clustered enemies, armored targets, detector and non-detector Bosses, control profiles, healing fixtures, a summon, a non-qualifying target, a Defense Dummy, a wall, and six representative builds on Shift+1 through Shift+6. F3 toggles the shared debug overlay.
 
+Test-only shortcuts: Alt+1 through Alt+5 set 0/1/2/3/5 Combo Points; Alt+V resets Vanish and all Rogue cooldowns; Alt+S and Alt+I force Stealth and Invisible; Alt+R applies Reveal; Alt+D toggles detector capability; Alt+P removes Rogue periodic statuses; Alt+F fills/resets Fatal Finesse; Alt+B grants three Block charges; Alt+M and Alt+C trigger Smoke/Cloak; Alt+T toggles Boss control profiles; Alt+H and Alt+J trigger external and self-healing fixtures. Normal battle controls are unchanged.
+
 ## Known limitations and manual checks
 
 Temporary shapes, circles, transparency, pips, and text stand in for final art, sound, animation, and status icons. Public geometry is incomplete, so collision widths, stopping distance, opener range, and Smoke radius require manual feel calibration. The automated suite covers the reusable state contracts and class scaling; a four-hero interactive playthrough is still required to judge readability, action-set clarity, detection feedback, Smoke versus area attacks, accelerated attack recovery, isolation clarity, multi-debuff readability, and total attention load.

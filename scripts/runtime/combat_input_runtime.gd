@@ -11,6 +11,53 @@ func load_level_one_mage_test(hero:Dictionary)->void:
 func load_rogue_test_build(hero:Dictionary,build_index:int)->void:
 	var build:Dictionary=RogueData.TEST_BUILDS[clampi(build_index,0,RogueData.TEST_BUILDS.size()-1)];var level:int=int(build.level);hero.level=level;hero.power=RogueData.scaled(float(RogueData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=RogueData.scaled(float(RogueData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);RogueSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func rogue_range_hero():
+	for hero in heroes:
+		if str(hero.get("class",""))=="Rogue":return hero
+	return null
+
+func handle_rogue_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="rogue_range" or not event.alt_pressed:return false
+	var hero=rogue_range_hero();if hero==null:return false
+	if event.keycode>=KEY_1 and event.keycode<=KEY_5:
+		var values:=[0,1,2,3,5];hero.combo_points=mini(ComboPointSystem.maximum(hero),values[int(event.keycode-KEY_1)]);flash("Combo Points: %d"%int(hero.combo_points));queue_redraw();return true
+	match event.keycode:
+		KEY_V:
+			RogueSystem.break_vanish(hero);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];for id in hero.alternate_cooldowns:hero.alternate_cooldowns[id]=0.0;flash("Vanish and cooldowns reset")
+		KEY_S:
+			RogueSystem.break_vanish(hero);hero.ability_cds[4]=0.0;RogueSystem.activate_vanish(hero);flash("Stealth forced")
+		KEY_I:
+			RogueSystem.break_vanish(hero);hero.ability_cds[4]=0.0;RogueSystem.activate_vanish(hero);hero.concealment.unrevealable_remaining=0.0;hero.concealment.invisible=true;hero.rogue_runtime.stationary_elapsed=float(RogueData.VALUES.vanish_invisible_stationary);flash("Invisible forced")
+		KEY_R:
+			hero.concealment.unrevealable_remaining=0.0;StealthDetectionSystem.reveal(hero,3.0);flash("Reveal applied")
+		KEY_D:
+			for enemy in enemies:
+				if "detector" in enemy.get("combat_tags",[]):enemy.detection_profile={} if bool(enemy.get("detection_profile",{}).get("detect_stealthed",false)) else {"detect_stealthed":true,"detect_invisible":true,"detection_radius":210.0}
+			flash("Detector profile toggled")
+		KEY_P:
+			hero.rogue_runtime.garrotes=[];for enemy in enemies:enemy.bloodletting_stacks=[];flash("Rogue periodic statuses removed")
+		KEY_F:
+			hero.rogue_runtime.fatal_finesse_stacks=0 if int(hero.rogue_runtime.fatal_finesse_stacks)>=int(RogueData.VALUES.fatal_max_stacks) else int(RogueData.VALUES.fatal_max_stacks);flash("Fatal Finesse: %d"%int(hero.rogue_runtime.fatal_finesse_stacks))
+		KEY_B:
+			hero.rogue_runtime.block_charges=3;flash("Combat Readiness: 3 Block")
+		KEY_M:
+			hero.selected_heroic_id="rogue_l15_r1";hero.ability_cds[3]=0.0;cast_rogue_heroic(hero);flash("Smoke Bomb triggered")
+		KEY_C:
+			hero.selected_heroic_id="rogue_l15_r2";hero.ability_cds[3]=0.0;cast_rogue_heroic(hero);flash("Cloak triggered")
+		KEY_T:
+			for enemy in enemies:
+				if "boss" in enemy.get("combat_tags",[]):enemy.control_profile={"stun_multiplier":1.0,"blind_immune":false,"silence_multiplier":1.0} if bool(enemy.get("control_profile",{}).get("blind_immune",true)) else {"stun_multiplier":0.0,"blind_immune":true,"silence_multiplier":0.0}
+			flash("Boss control profiles toggled")
+		KEY_H:
+			var healer=enemies.filter(func(enemy):return str(enemy.get("test_fixture",""))=="external_healer");var targets=enemies.filter(func(enemy):return str(enemy.get("test_fixture",""))=="healable_target");if not healer.is_empty() and not targets.is_empty():targets[0].hp=maxf(1.0,float(targets[0].hp)-300.0);deal_healing(healer[0],targets[0],250.0,"basic_heal","Rogue Range")
+			flash("External healing triggered")
+		KEY_J:
+			var self_targets=enemies.filter(func(enemy):return bool(enemy.get("self_heal_test",false)));if not self_targets.is_empty():self_targets[0].hp=maxf(1.0,float(self_targets[0].hp)-300.0);deal_healing(self_targets[0],self_targets[0],250.0,"basic_heal","Rogue Range")
+			flash("Self-healing triggered")
+		_:
+			return false
+	queue_redraw();return true
+
 func player_controlled_hero_indices() -> Array:
 	var result:=[]
 	for hero_index in heroes.size():
@@ -206,6 +253,7 @@ func _unhandled_input(event:InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed:
+		if handle_rogue_range_shortcut(event):get_viewport().set_input_as_handled();return
 		if testing_zone_active and testing_zone_mode=="rogue_range" and event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_6:
 			var build_index:int=int(event.keycode-KEY_1)
 			for hero in heroes:
