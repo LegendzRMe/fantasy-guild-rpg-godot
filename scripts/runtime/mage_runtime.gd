@@ -31,6 +31,10 @@ func mage_damage(hero:Dictionary,target:Dictionary,amount:float,action:String,or
 func mage_visual(kind:String,from:Vector2,to:Vector2,duration:float,text_value:String="")->void:
 	var life:=maxf(0.08,duration);effects.append({"kind":kind,"from":from,"to":to,"text":text_value,"color":CLASSES["Mage"].color,"life":life,"max_life":life})
 
+func mage_flamestrike_visual(kind:String,center:Vector2,radius:float,duration:float,repeat:bool=false)->void:
+	var life:=maxf(0.08,duration)
+	effects.append({"kind":kind,"from":center,"to":center,"text":"","color":CLASSES["Mage"].color,"life":life,"max_life":life,"radius":radius,"repeat":repeat})
+
 func mage_presence_reduction(hero:Dictionary,count:int)->void:
 	if not MageSystem.has_talent(hero,"mage_l27_r2") or count<=0:return
 	var applications:=mini(int(MageData.VALUES.presence_event_ceiling),count);hero.ability_cds[3]=maxf(0.0,float(hero.ability_cds[3])-10.0*applications)
@@ -40,7 +44,7 @@ func cast_mage_q(hero:Dictionary,point:Vector2,item_repeat:bool=false)->bool:
 	var empowered:bool=false if item_repeat else MageSystem.consume_empowerment(hero,"Q")
 	var center:Vector2=mage_clamped_point(hero,point,MageSystem.flamestrike_range(hero));var radius:float=MageSystem.flamestrike_radius(hero,empowered)
 	hero.mage_runtime.delayed_effects.append({"kind":"flamestrike","remaining":float(MageData.VALUES.q_warning),"center":center,"radius":radius,"repeat":false})
-	mage_visual("danger",center,center,float(MageData.VALUES.q_warning),"")
+	mage_flamestrike_visual("mage_flamestrike_warning",center,radius,float(MageData.VALUES.q_warning))
 	if not item_repeat:hero.ability_cds[0]=float(MageData.VALUES.q_cooldown);MageSystem.commit_basic_ability(hero)
 	MageSystem.telemetry_add(hero,"q_casts");MageSystem.telemetry_add(hero,"q_empowered_casts" if empowered else "q_normal_casts");return true
 
@@ -141,6 +145,7 @@ func cast_mage_ability(slot:int,point:Vector2,item_repeat:bool=false)->bool:
 	return cast_mage_q(hero,point,item_repeat) if slot==0 else cast_mage_w(hero,item_repeat) if slot==1 else cast_mage_e(hero,point,item_repeat) if slot==2 else cast_mage_heroic(hero,point)
 
 func resolve_flamestrike(hero:Dictionary,effect:Dictionary)->void:
+	mage_flamestrike_visual("mage_flamestrike_impact",Vector2(effect.center),float(effect.radius),0.5,bool(effect.get("repeat",false)))
 	var hits:Array=[]
 	for foe in enemies:
 		if foe.hp>0 and foe.pos.distance_to(Vector2(effect.center))<=float(effect.radius):hits.append(foe)
@@ -158,7 +163,9 @@ func resolve_flamestrike(hero:Dictionary,effect:Dictionary)->void:
 		var ignite_candidates:=qualifying.filter(func(target):return target.hp>0 and not LivingBombLineageSystem.has_bomb(hero.mage_runtime.bomb_state,str(target.combat_id)))
 		ignite_candidates.sort_custom(func(a,b):return a.pos.distance_squared_to(Vector2(effect.center))<b.pos.distance_squared_to(Vector2(effect.center)) or a.pos.distance_squared_to(Vector2(effect.center))==b.pos.distance_squared_to(Vector2(effect.center)) and str(a.combat_id)<str(b.combat_id))
 		if not ignite_candidates.is_empty():apply_living_bomb(hero,ignite_candidates[0],true)
-	if MageSystem.has_talent(hero,"mage_l24_1") and not bool(effect.get("repeat",false)):hero.mage_runtime.delayed_effects.append({"kind":"flamestrike","remaining":1.5,"center":effect.center,"radius":effect.radius,"repeat":true})
+	if MageSystem.has_talent(hero,"mage_l24_1") and not bool(effect.get("repeat",false)):
+		hero.mage_runtime.delayed_effects.append({"kind":"flamestrike","remaining":1.5,"center":effect.center,"radius":effect.radius,"repeat":true})
+		mage_flamestrike_visual("mage_flamestrike_warning",Vector2(effect.center),float(effect.radius),1.5,true)
 
 func resolve_gravity_lapse(hero:Dictionary,effect:Dictionary)->void:
 	var target=unit_by_combat_id(str(effect.target_id));if target==null or target.hp<=0:return

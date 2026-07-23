@@ -406,6 +406,14 @@ func draw_combat_effect(fx:Dictionary)->void:
 			draw_line(serpent_position-serpent_direction*20.0,serpent_position,Color("79dfe8",alpha*.58),4);draw_circle(serpent_position,8,Color("8feaf2",alpha*.26));draw_circle(serpent_position,4.5,col);draw_circle(serpent_position,2,Color.WHITE)
 		"mage_gravity":
 			var gravity_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(gravity_position,9,Color(col,.24));draw_circle(gravity_position,4,Color.WHITE);draw_line(fx.from,gravity_position,Color(col,.45),3)
+		"mage_flamestrike_warning":
+			var flame_center:=Vector2(fx.to);var flame_radius:=float(fx.get("radius",72.0));var warning_pulse:=0.5+0.5*sin(progress*TAU*4.0);var warning_color:=Color("d978ff") if bool(fx.get("repeat",false)) else Color("ff9b45")
+			draw_circle(flame_center,flame_radius,Color(warning_color,.07+.035*warning_pulse));draw_arc(flame_center,flame_radius,0,TAU,64,Color(warning_color,.70),3)
+			draw_arc(flame_center,flame_radius+5,-PI/2,-PI/2+TAU*(1.0-progress),64,Color.WHITE,.0 if progress>=1.0 else 5.0)
+			draw_circle(flame_center,8+warning_pulse*3.0,Color(warning_color,.35));draw_line(flame_center+Vector2(-flame_radius*.42,0),flame_center+Vector2(flame_radius*.42,0),Color(warning_color,.38),2);draw_line(flame_center+Vector2(0,-flame_radius*.42),flame_center+Vector2(0,flame_radius*.42),Color(warning_color,.38),2)
+		"mage_flamestrike_impact":
+			var impact_center:=Vector2(fx.to);var impact_radius:=float(fx.get("radius",72.0));var expanding_radius:=lerpf(impact_radius*.35,impact_radius,clampf(progress*2.0,0.0,1.0))
+			draw_circle(impact_center,expanding_radius,Color("ff742f",alpha*.24));draw_arc(impact_center,expanding_radius,0,TAU,64,Color("ffc45e",alpha),6);draw_arc(impact_center,impact_radius*(.25+.45*progress),0,TAU,48,Color.WHITE,alpha*4.0);draw_circle(impact_center,12+progress*20,Color("fff2b0",alpha*.72))
 		"mage_phoenix":
 			var phoenix_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(phoenix_position,12,Color("ffb34f",alpha));draw_line(fx.from,phoenix_position,Color("ff7a3d",alpha*.55),6)
 		"mage_pyro":
