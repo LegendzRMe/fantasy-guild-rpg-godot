@@ -43,6 +43,7 @@ func _process(delta:float) -> void:
 			elif str(h.get("class",""))=="Ranger" and not h.get("ranger_runtime",{}).is_empty() and slot==1 and RangerSystem.has_talent(h,"ranger_l24_1") and int(h.ranger_runtime.hatred)>=int(RangerData.VALUES.hatred_max):cooldown_rate=1.5
 			elif str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty() and slot==1 and WarlockSystem.has_talent(h,"warlock_l12_1") and not h.get("active_channel",{}).is_empty():cooldown_rate=2.0
 			h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta*cooldown_rate)
+		if str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty():h.ability_cds[4]=float(h.warlock_runtime.life_tap_lockout)
 		if h.hp>0:update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):finish_battle(false);return

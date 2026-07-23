@@ -34,6 +34,28 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		elif str(heroes[-1].get("class",""))=="Warlock":WarlockSystem.initialize_runtime(heroes[-1],is_testing_save())
 	queue_redraw()
 
+func start_warlock_testing_zone() -> void:
+	var test_party:Array=[]
+	for wanted_class in ["Warlock","Guardian","Cleric","Ranger"]:
+		for hero_index in state.heroes.size():
+			if state.heroes[hero_index]["class"]==wanted_class and hero_index not in test_party:test_party.append(hero_index);break
+	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Warlock"):
+		flash("Add a Warlock to the testing roster first.");show_testing_zone_menu();return
+	start_battle(0,-1,test_party)
+	testing_zone_active=true;testing_zone_mode="range"
+	for hero in heroes:
+		if str(hero.get("class",""))=="Warlock":hero.warlock_runtime.telemetry_enabled=true
+	testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	spawn_enemy(Vector2(610,145),"Dummy");enemies[-1]["passive_test_enemy"]=true
+	spawn_enemy(Vector2(760,145),"Dummy");enemies[-1]["passive_test_enemy"]=true
+	spawn_enemy(Vector2(920,260),"Defense Dummy")
+	spawn_enemy(Vector2(720,510),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["control_profile"]={"fear_multiplier":0.0,"silence_multiplier":0.0,"slow_multiplier":0.5}
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:warlock_pillar",Rect2(650,275,72,150)))
+	for enemy in enemies:
+		enemy.rewarded=true;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0
+		if enemy.type in ["Dummy","Defense Dummy"]:enemy.hp=5000.0;enemy.max_hp=5000.0
+	queue_redraw()
+
 func start_testing_zone() -> void:
 	var test_party:Array=[]
 	for wanted_class in ["Guardian","Cleric","Ranger","Mage"]:

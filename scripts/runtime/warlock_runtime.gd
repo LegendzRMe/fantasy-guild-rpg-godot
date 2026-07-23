@@ -36,10 +36,9 @@ func cast_warlock_q(hero:Dictionary, point:Vector2, item_repeat:bool=false) -> b
 	var hits:=warlock_targets_in_expanding_wave(hero,point);var qualifying:=hits.filter(func(target):return WarlockSystem.qualifying_target(target))
 	var rampant_before:=int(hero.warlock_runtime.rampant_stacks)
 	var amount:=WarlockSystem.scaled_amount(hero,float(WarlockData.VALUES.q_damage),true)*(1.0+0.12*rampant_before)
-	var direct_kill:=false
 	for target in hits:
-		var was_alive:bool=float(target.hp)>0.0;var damage:=warlock_damage(hero,target,amount,"basic_ability","Fel Flame")
-		if was_alive and bool(damage.get("defeated",false)) and WarlockSystem.qualifying_target(target):direct_kill=true
+		var travel_fraction:=clampf(Vector2(target.pos).distance_to(hero.pos)/maxf(1.0,float(WarlockData.SPACE.q_range)),0.0,1.0)
+		hero.warlock_runtime.delayed_effects.append({"kind":"fel_flame_hit","remaining":maxf(0.01,float(WarlockData.SPACE.q_travel_time)*travel_fraction),"target_id":str(target.combat_id),"amount":amount})
 	WarlockSystem.telemetry_add(hero,"q_casts");WarlockSystem.telemetry_add(hero,"q_hits",hits.size());WarlockSystem.telemetry_add(hero,"q_distinct_hits",qualifying.size())
 	if WarlockSystem.has_talent(hero,"warlock_l9_1") and not bool(hero.warlock_runtime.pursuit_complete):
 		hero.warlock_runtime.pursuit_progress=mini(int(WarlockData.VALUES.pursuit_requirement),int(hero.warlock_runtime.pursuit_progress)+qualifying.size())
@@ -51,11 +50,6 @@ func cast_warlock_q(hero:Dictionary, point:Vector2, item_repeat:bool=false) -> b
 		hero.warlock_runtime.fel_armor_stacks=int(hero.warlock_runtime.fel_armor_stacks)+qualifying.size();hero.warlock_runtime.fel_armor_remaining=float(WarlockData.VALUES.fel_armor_duration)
 	if WarlockSystem.has_talent(hero,"warlock_l24_1") and not qualifying.is_empty():
 		hero.warlock_runtime.rampant_stacks=mini(5,int(hero.warlock_runtime.rampant_stacks)+1);hero.warlock_runtime.rampant_remaining=5.0
-	if direct_kill and WarlockSystem.has_talent(hero,"warlock_l12_3"):
-		var consume:Dictionary=hero.warlock_runtime.internal_cooldowns.consume_soul
-		if float(consume.remaining)<=0.0:
-			deal_healing(hero,hero,WarlockSystem.scaled_amount(hero,float(WarlockData.VALUES.consume_soul_healing),false,false),"basic_ability","Consume Soul")
-			consume.remaining=float(consume.modified_base)
 	if not item_repeat:hero.ability_cds[0]=WarlockSystem.modified_base_cooldown(hero,0)
 	warlock_visual("warlock_fel_flame",hero.pos,hero.pos+direction*float(WarlockData.SPACE.q_range),float(WarlockData.SPACE.q_travel_time),"",{"start_radius":float(WarlockData.SPACE.q_start_radius),"end_radius":float(WarlockData.SPACE.q_end_radius)*(1.33 if bool(hero.warlock_runtime.pursuit_complete) else 1.0)})
 	return true
@@ -245,6 +239,14 @@ func update_warlock_runtime(delta:float) -> void:
 			var effect:Dictionary=hero.warlock_runtime.delayed_effects[effect_index];effect.remaining=float(effect.remaining)-delta
 			if float(effect.remaining)>0.0:hero.warlock_runtime.delayed_effects[effect_index]=effect;continue
 			match str(effect.kind):
+				"fel_flame_hit":
+					var fel_target=unit_by_combat_id(str(effect.target_id))
+					if fel_target!=null and fel_target.hp>0.0:
+						var consume_qualifying:=WarlockSystem.qualifying_target(fel_target);var fel_damage:=warlock_damage(hero,fel_target,float(effect.amount),"basic_ability","Fel Flame")
+						if bool(fel_damage.get("defeated",false)) and consume_qualifying and WarlockSystem.has_talent(hero,"warlock_l12_3"):
+							var consume:Dictionary=hero.warlock_runtime.internal_cooldowns.consume_soul
+							if float(consume.remaining)<=0.0:
+								deal_healing(hero,hero,WarlockSystem.scaled_amount(hero,float(WarlockData.VALUES.consume_soul_healing),false,false),"basic_ability","Consume Soul");consume.remaining=float(consume.modified_base)
 				"corruption_burst":resolve_corruption_burst(hero,effect)
 				"horrify":
 					if hero.get("active_cast",{}).is_empty():pass

@@ -606,9 +606,11 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 			var trait_name:String="Stoneform" if hero["class"]=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2") else str(TRAITS[hero["class"]])
 			if hero["class"]=="Cleric" and ClericSystem.has_talent(hero,"cleric_l12_2"):trait_name="Safety Sprint"
 			elif hero["class"]=="Cleric" and ClericSystem.has_talent(hero,"cleric_l12_3"):trait_name="Let's Go!"
+			elif hero["class"]=="Warlock":trait_name="Life Tap"
 			var trait_text:String=GuardianData.TALENT_DESCRIPTIONS.guardian_l24_2 if trait_name=="Stoneform" else "Passive Trait"
 			if hero["class"]=="Cleric" and trait_name=="Safety Sprint":trait_text=str(ClericData.TALENT_DESCRIPTIONS.cleric_l12_2)
 			elif hero["class"]=="Cleric" and trait_name=="Let's Go!":trait_text=str(ClericData.TALENT_DESCRIPTIONS.cleric_l12_3)
+			elif hero["class"]=="Warlock":trait_text="Sacrifice 13% of maximum Health to accelerate eligible cooldowns."
 			var class_color:Color=CLASSES[hero["class"]].color
 			for slot in 3:
 				var required_level:=int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]);var locked:=int(hero.get("level",1))<required_level;var description:=ability_tooltip(hero["class"],slot)
@@ -617,8 +619,8 @@ func populate_roster_workspace(content:VBoxContainer,hero:Dictionary,info:Dictio
 				content.add_child(make_roster_ability_row(action_key,str(ABILITIES[hero["class"]][slot]),description,class_color,locked,func(key=action_key):open_roster_ability_details(hero,key)))
 			var selected_heroic_id:=str(hero.get("selected_heroic_id",""));var heroic_unlocked:=TalentSystem.ability_is_unlocked(int(hero.get("level",1)),3)
 			if heroic_unlocked and selected_heroic_id!="":
-				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"] in ["Guardian","Cleric","Ranger","Mage"] else str(ABILITIES[hero["class"]][3])
-				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else str(ClericData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Cleric" else str(RangerData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Ranger" else str(MageData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Mage" else ability_tooltip(hero["class"],3)
+				var heroic_name:=guardian_talent_name(selected_heroic_id) if hero["class"] in ["Guardian","Cleric","Ranger","Mage","Warlock"] else str(ABILITIES[hero["class"]][3])
+				var heroic_description:=str(GuardianData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Guardian" else str(ClericData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Cleric" else str(RangerData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Ranger" else str(MageData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Mage" else str(WarlockData.TALENT_DESCRIPTIONS.get(selected_heroic_id,ability_tooltip(hero["class"],3))) if hero["class"]=="Warlock" else ability_tooltip(hero["class"],3)
 				content.add_child(make_roster_ability_row("R",heroic_name,heroic_description,class_color,false,func(heroic=selected_heroic_id):open_roster_ability_details(hero,"R",heroic)))
 			else:
 				content.add_child(make_roster_ability_row("R","Heroic Ability","Choose your Heroic at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[3]),class_color,true))

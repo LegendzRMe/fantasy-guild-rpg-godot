@@ -75,6 +75,9 @@ static func run() -> Array:
 	var stacks:Array=[]
 	for index in 4:stacks=PeriodicStatusSystem.add_stack(stacks,corruption,3)
 	TestSupport.check(errors,stacks.size()==3,"Corruption should retain at most three independent instances per owner and target.")
+	var other_target:=PeriodicStatusSystem.make_instance("warlock_corruption","owner","other_target",6.0,1.0,{"cast_id":"cast:2","max_stacks":3})
+	stacks=PeriodicStatusSystem.add_stack(stacks,other_target,3)
+	TestSupport.check(errors,stacks.size()==4,"A different target should own an independent Corruption stack allowance.")
 	var advanced:=PeriodicStatusSystem.advance(corruption,1.25)
 	TestSupport.check(errors,int(advanced.due_ticks)==1 and is_equal_approx(float(advanced.remaining_duration),4.75),"Periodic instances should retain deterministic tick and duration state.")
 
@@ -82,4 +85,11 @@ static func run() -> Array:
 	TestSupport.check(errors,WarlockSystem.qualifying_target(target),"Standard combat enemies should qualify for Warlock quests.")
 	target.combat_tags=["damageable_object"]
 	TestSupport.check(errors,not WarlockSystem.qualifying_target(target),"Damageable objects should not qualify for Warlock talents.")
+
+	var circle:=make_warlock({"tier_8":"warlock_l30_1"});circle.hp=100.0
+	var circle_result:=WarlockSystem.try_demonic_circle(circle,100.0)
+	TestSupport.check(errors,bool(circle_result.triggered) and is_equal_approx(float(circle.warlock_runtime.banished_remaining),3.0),"Demonic Circle should prevent eligible lethal damage and begin its three-second banish.")
+	TestSupport.check(errors,is_equal_approx(float(circle.warlock_runtime.internal_cooldowns.demonic_circle.remaining),120.0),"Demonic Circle should start its nonreducible 120-second internal cooldown.")
+	var circle_reduction:=WarlockSystem.convert_health_loss(circle,100.0,{"exclude_health_loss_cooldown_conversion":true})
+	TestSupport.check(errors,is_equal_approx(float(circle_reduction.tap_equivalent),0.0),"Demonic-Circle-prevented damage must produce no health-loss conversion.")
 	return errors

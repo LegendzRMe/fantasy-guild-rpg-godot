@@ -659,6 +659,7 @@ func show_vault()->void:pass
 # Combat/story contracts implemented by the runtime layers.
 func start_battle(_id:int,_node:int=0,_party_override:Array=[])->void:pass
 func start_testing_zone()->void:pass
+func start_warlock_testing_zone()->void:pass
 func show_testing_zone_menu()->void:pass
 func start_testing_endless(_enemy_level:int)->void:pass
 func start_ashwood_battle(_encounter_key:String)->void:pass

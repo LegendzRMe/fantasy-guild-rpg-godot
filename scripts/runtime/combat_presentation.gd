@@ -175,7 +175,13 @@ func _draw() -> void:
 			for mage in heroes:
 				if str(mage.get("class",""))=="Mage" and not mage.get("mage_runtime",{}).is_empty() and mage.mage_runtime.bomb_state.bombs_by_target.has(str(e.combat_id)):
 					var bomb:Dictionary=mage.mage_runtime.bomb_state.bombs_by_target[str(e.combat_id)];var bomb_ratio:=clampf(float(bomb.remaining)/maxf(0.01,float(MageData.VALUES.w_duration)),0.0,1.0);draw_arc(e.pos,enemy_radius+12,-PI/2,-PI/2+TAU*bomb_ratio,36,Color("ff9a4f"),4)
-		if testing_zone_active and not e.get("bloodletting_stacks",[]).is_empty():draw_string(ThemeDB.fallback_font,e.pos+Vector2(-50,enemy_radius+22),"Bloodletting x%d"%e.bloodletting_stacks.size(),HORIZONTAL_ALIGNMENT_CENTER,100,12,Color("f09a9f"))
+			if testing_zone_active and not e.get("bloodletting_stacks",[]).is_empty():draw_string(ThemeDB.fallback_font,e.pos+Vector2(-50,enemy_radius+22),"Bloodletting x%d"%e.bloodletting_stacks.size(),HORIZONTAL_ALIGNMENT_CENTER,100,12,Color("f09a9f"))
+			var corruption_stacks:=0
+			for warlock in heroes:
+				if str(warlock.get("class",""))=="Warlock" and not warlock.get("warlock_runtime",{}).is_empty():corruption_stacks+=warlock.warlock_runtime.periodic_effects.filter(func(instance):return str(instance.get("target_id",""))==str(e.combat_id)).size()
+			for stack_index in corruption_stacks:draw_circle(e.pos+Vector2(-12+stack_index*12,-enemy_radius-10),4,Color("b15cff"))
+			if CombatSystem.is_feared(e):draw_string(ThemeDB.fallback_font,e.pos+Vector2(-22,enemy_radius+19),"FEAR",HORIZONTAL_ALIGNMENT_CENTER,44,10,Color("d6a5ff"))
+			elif CombatSystem.is_silenced(e):draw_string(ThemeDB.fallback_font,e.pos+Vector2(-26,enemy_radius+19),"SILENCE",HORIZONTAL_ALIGNMENT_CENTER,52,10,Color("d6a5ff"))
 	for mage in heroes:
 		if str(mage.get("class",""))!="Mage" or mage.get("mage_runtime",{}).is_empty():continue
 		var phoenix:Dictionary=mage.mage_runtime.phoenix
@@ -264,20 +270,27 @@ func _draw() -> void:
 				elif slot==3 and active["class"]=="Ranger":action_name=str(RangerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
 				elif slot==3 and active["class"]=="Mage":action_name=str(MageData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+				elif slot==3 and active["class"]=="Warlock":action_name=str(WarlockData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				var cleric_trait_active:bool=false
 				if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
 				var hatred_ratio:float=0.0
 				if slot==4 and str(active.get("class",""))=="Ranger" and not active.get("ranger_runtime",{}).is_empty():hatred_ratio=clampf(float(active.ranger_runtime.hatred)/float(RangerData.VALUES.hatred_max),0.0,1.0)
 				var ranger_hatred_full:bool=hatred_ratio>=1.0
 				var mage_trait_armed:bool=slot==4 and str(active.get("class",""))=="Mage" and not active.get("mage_runtime",{}).is_empty() and MageSystem.trait_is_armed(active)
-				if cleric_trait_active or ranger_hatred_full or mage_trait_armed:
+				var warlock_trait_state:Dictionary=WarlockSystem.slot_state(active) if slot==4 and str(active.get("class",""))=="Warlock" else {}
+				var warlock_darkness_armed:bool=bool(warlock_trait_state.get("darkness_armed",false))
+				if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:
 					var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 					draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
 				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
 				if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
+				if not warlock_trait_state.is_empty() and not warlock_darkness_armed:
+					var darkness_ratio:=clampf(float(warlock_trait_state.darkness_progress)/maxf(1.0,float(warlock_trait_state.darkness_required)),0.0,1.0)
+					if darkness_ratio>0.0:draw_octagon_vertical_fill(center,34,darkness_ratio,Color(CLASSES["Warlock"].color,.55))
 				draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
-				if cleric_trait_active or ranger_hatred_full or mage_trait_armed:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+				if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+				if not warlock_trait_state.is_empty() and slot==4:draw_string(ThemeDB.fallback_font,center+Vector2(14,-20),"%d%%"%int(warlock_trait_state.cost_percent),HORIZONTAL_ALIGNMENT_CENTER,42,9,C_TEXT)
 				if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
 					var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
 					draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[charge_state.charges,charge_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
@@ -406,6 +419,25 @@ func draw_combat_effect(fx:Dictionary)->void:
 			var phoenix_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(phoenix_position,12,Color("ffb34f",alpha));draw_line(fx.from,phoenix_position,Color("ff7a3d",alpha*.55),6)
 		"mage_pyro":
 			var pyro_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(pyro_position,13,Color("ff7a3d",alpha*.45));draw_circle(pyro_position,7,Color("ffd15c",alpha));draw_circle(pyro_position,3,Color.WHITE)
+		"warlock_fel_flame":
+			var flame_direction:Vector2=fx.from.direction_to(fx.to);var flame_length:float=fx.from.distance_to(fx.to)*clampf(progress,0.0,1.0);var flame_tip:Vector2=fx.from+flame_direction*flame_length;var side:Vector2=flame_direction.orthogonal();var start_radius:=float(fx.get("start_radius",18.0));var end_radius:=float(fx.get("end_radius",80.0))*clampf(progress,0.15,1.0)
+			var wave:=PackedVector2Array([fx.from+side*start_radius,flame_tip+side*end_radius,flame_tip-side*end_radius,fx.from-side*start_radius]);draw_colored_polygon(wave,Color("7b2aa8",alpha*.18));draw_polyline(PackedVector2Array([wave[0],wave[1],wave[2],wave[3],wave[0]]),Color("c45cff",alpha),4)
+		"warlock_drain_tether":
+			var wobble:float=sin(progress*TAU*3.0)*5.0;var midpoint:Vector2=fx.from.lerp(fx.to,.5)+fx.from.direction_to(fx.to).orthogonal()*wobble;draw_polyline(PackedVector2Array([fx.from,midpoint,fx.to]),Color("b45cff",alpha*.85),5);draw_circle(fx.to,8,Color("d89aff",alpha*.35))
+		"warlock_corruption_warning":
+			var corruption_radius:=float(fx.get("radius",54.0));draw_circle(fx.to,corruption_radius,Color("7b2aa8",.07));draw_arc(fx.to,corruption_radius,0,TAU,40,Color("b15cff",alpha*.65),3)
+		"warlock_corruption_impact":
+			var corruption_radius:=float(fx.get("radius",54.0));draw_circle(fx.to,corruption_radius*clampf(progress*1.8,0.0,1.0),Color("8c35b8",alpha*.22));draw_arc(fx.to,corruption_radius,0,TAU,40,Color("df9cff",alpha),5)
+		"warlock_horrify_warning":
+			var fear_radius:=float(fx.get("radius",105.0));draw_circle(fx.to,fear_radius,Color("6b248f",.08));draw_arc(fx.to,fear_radius,-PI/2,-PI/2+TAU*(1.0-progress),52,Color("d091ff",.82),5)
+		"warlock_horrify_impact":
+			var fear_radius:=float(fx.get("radius",105.0));draw_circle(fx.to,fear_radius,Color("792da3",alpha*.18));draw_arc(fx.to,fear_radius*(.35+.65*progress),0,TAU,52,Color("e0a8ff",alpha),7)
+		"warlock_rain_warning":
+			var rain_radius:=float(fx.get("radius",42.0));draw_circle(fx.to,rain_radius,Color("7b2aa8",.10));draw_arc(fx.to,rain_radius,-PI/2,-PI/2+TAU*(1.0-progress),36,Color("dd7cff",.86),4)
+		"warlock_rain_impact":
+			var rain_radius:=float(fx.get("radius",42.0));draw_circle(fx.to,rain_radius,Color("7f2aa6",alpha*.27));draw_line(fx.to-Vector2(18,75),fx.to,Color("db8cff",alpha),9);draw_arc(fx.to,rain_radius,0,TAU,40,Color("ffd6ff",alpha),5)
+		"warlock_life_tap":
+			var tap_color:=Color("e2a5ff") if bool(fx.get("free",false)) else Color("b15cff");draw_circle(fx.from,30+progress*32,Color(tap_color,alpha*.12));draw_arc(fx.from,30+progress*32,0,TAU,36,Color(tap_color,alpha),5)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":

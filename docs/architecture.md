@@ -61,6 +61,8 @@ Cleric follows the same focused pattern through `cleric_data.gd`, `cleric_system
 
 Mage follows that pattern through `mage_data.gd`, `mage_system.gd`, `mage_runtime.gd`, and `mage_ability_presenter.gd`. `ability_power_system.gd` owns additive Ability Power math, while `living_bomb_lineage_system.gd` owns generation and reinfection safety independently of scene state.
 
+Warlock follows the same split through `warlock_data.gd`, `warlock_system.gd`, `warlock_runtime.gd`, and `warlock_ability_presenter.gd`. Reusable periodic status records live in `periodic_status_system.gd`; Fear and Silence remain shared controls in `status_effect_system.gd`. Health-loss cooldown conversion and the background-channel exception are documented as narrow contracts rather than generic class behavior.
+
 ### `scripts/data/talent_data.gd`
 
 Owns the shared ability and talent milestones plus tier structure. Future class-specific talent content can be added beside this foundation without duplicating unlock levels in UI or combat code. `game_data.gd` retains compatibility aliases so existing consumers do not need a broad rewrite.
