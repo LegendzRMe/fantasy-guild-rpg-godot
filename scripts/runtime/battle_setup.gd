@@ -32,6 +32,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		elif str(heroes[-1].get("class",""))=="Ranger":RangerSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Mage":MageSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Warlock":WarlockSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Rogue":RogueSystem.initialize_runtime(heroes[-1],is_testing_save())
 	queue_redraw()
 
 func start_warlock_testing_zone() -> void:
@@ -54,6 +55,34 @@ func start_warlock_testing_zone() -> void:
 	for enemy in enemies:
 		enemy.rewarded=true;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0
 		if enemy.type in ["Dummy","Defense Dummy"]:enemy.hp=5000.0;enemy.max_hp=5000.0
+	queue_redraw()
+
+func start_rogue_testing_zone() -> void:
+	var test_party:Array=[]
+	for wanted_class in ["Rogue","Guardian","Cleric","Ranger"]:
+		for hero_index in state.heroes.size():
+			if state.heroes[hero_index]["class"]==wanted_class and hero_index not in test_party:test_party.append(hero_index);break
+	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Rogue"):
+		flash("Add a Rogue to the testing roster first.");show_testing_zone_menu();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="rogue_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	for hero in heroes:
+		if str(hero.get("class",""))=="Rogue":hero.rogue_runtime.telemetry_enabled=true
+	# Ordinary cluster for Blade Flurry, Fatal Finesse, and isolation checks.
+	for position in [Vector2(520,145),Vector2(610,145),Vector2(565,220),Vector2(655,220)]:spawn_enemy(position,"Dummy");enemies[-1]["passive_test_enemy"]=true
+	spawn_enemy(Vector2(790,145),"Defense Dummy");enemies[-1]["passive_test_enemy"]=true;enemies[-1].armor=30.0;enemies[-1].combat_tags.append("armored")
+	spawn_enemy(Vector2(930,145),"Brute");enemies[-1]["passive_test_enemy"]=true;enemies[-1].combat_tags.append("armored")
+	# Detector and non-detector Bosses expose separate authored profiles.
+	spawn_enemy(Vector2(1050,225),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["detection_profile"]={"detect_stealthed":true,"detect_invisible":true,"detection_radius":210.0};enemies[-1]["control_profile"]={"stun_multiplier":0.25,"blind_immune":true,"silence_multiplier":0.5};enemies[-1].combat_tags.append("detector")
+	spawn_enemy(Vector2(1040,475),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["detection_profile"]={};enemies[-1]["control_profile"]={"stun_multiplier":0.0,"blind_immune":true,"silence_multiplier":1.0};enemies[-1].combat_tags.append("non_detector")
+	# Healing, summon, and non-qualifying fixtures for Strangle and Fatal Finesse.
+	spawn_enemy(Vector2(760,500),"Shaman");enemies[-1]["test_fixture"]="external_healer"
+	spawn_enemy(Vector2(850,500),"Raider");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["test_fixture"]="healable_target"
+	spawn_enemy(Vector2(650,500),"Brute");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["test_fixture"]="self_healer";enemies[-1]["self_heal_test"]=true
+	spawn_enemy(Vector2(455,500),"Swift");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["summoned_unit"]=true
+	spawn_enemy(Vector2(365,500),"Dummy");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["object"]=true;enemies[-1].combat_tags.append("temporary")
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:rogue_wall",Rect2(700,280,70,135)))
+	for enemy in enemies:
+		enemy.rewarded=true;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0;enemy.hp=6000.0;enemy.max_hp=6000.0
 	queue_redraw()
 
 func start_testing_zone() -> void:

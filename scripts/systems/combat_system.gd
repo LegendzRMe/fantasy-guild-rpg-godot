@@ -70,7 +70,7 @@ static func calculate_final_stats(definition:Dictionary,level:int=1,equipped_ite
 		"movement_speed":float(definition.get("movement_speed",110.0)),
 		"critical_chance":float(definition.get("base_critical_chance",definition.get("critical_chance",0.05))),
 		"critical_damage":float(definition.get("critical_damage",2.0)),
-		"health_regeneration":float(definition.get("health_regeneration",0.0)),
+		"health_regeneration":float(definition.get("health_regeneration",0.0))*pow(1.0+float(definition.get("health_regeneration_growth",0.0)),maxi(0,safe_level-1)),
 		"threat_modifier":float(definition.get("threat_modifier",1.0)),
 		"basic_action_damage_type":action_damage_type,
 		"armor_family":str(definition.get("armor_family","")),
@@ -151,7 +151,7 @@ static func resolve_damage(source:Dictionary,target:Dictionary,request:Dictionar
 	if critical:amount*=critical_multiplier
 	amount*=float(request.get("damage_taken_multiplier",target.get("damage_taken_multiplier",1.0)))
 	amount=maxf(0.0,amount)
-	var resolved_armor:=strongest_armor(float(target.get("armor",0.0)),request.get("armor_sources",target.get("temporary_armor_sources",[])),damage_type,source_action)
+	var resolved_armor:=strongest_armor(float(request.get("base_armor_override",target.get("armor",0.0))),request.get("armor_sources",target.get("temporary_armor_sources",[])),damage_type,source_action)
 	var reduction:float=0.0 if damage_type=="true" else calculate_armor_reduction(resolved_armor,int(source.get("level",1)))
 	var mitigated_amount:float=amount*(1.0-reduction)
 	var available_shield:float=maxf(0.0,float(target.get("shield",0.0)));var shield_damage:float=minf(available_shield,mitigated_amount)

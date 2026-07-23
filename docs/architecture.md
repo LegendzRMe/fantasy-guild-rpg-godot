@@ -30,6 +30,7 @@ Owns mutable application, menu, map, tutorial, item-overlay, and combat state de
 - `scripts/runtime/guardian_runtime.gd`: Guardian V1 ability execution, world projectiles, delayed effects, Heroics, and class-specific testing hooks. It delegates reusable damage, Armor, control, geometry, command, and projectile rules to shared systems.
 - `scripts/runtime/cleric_runtime.gd`: Cleric V1 Q/W/E, Heroics, Serpent ownership, periodic healing, and class-specific testing hooks. It delegates Blind, Unstoppable, damage/healing, commands, and cooldown-rate math to focused shared/class systems.
 - `scripts/runtime/mage_runtime.gd`: Mage V1 Verdant Spheres, Q/W/E, Phoenix, Pyroblast, Living Bomb updates, and Mage-specific testing behavior. Reusable Ability Power and bomb-lineage rules remain outside the runtime.
+- `scripts/runtime/rogue_runtime.gd`: Rogue V1 normal/opening action sets, Combo Point finishers, concealment Heroics, owned Garrote effects, temporary presentation, and Rogue-range behavior.
 - `scripts/runtime/enemy_combat_runtime.gd`: waves, spawning, encounter objectives, enemy target selection, and combat lookup helpers.
 - `scripts/runtime/ability_runtime.gd`: temporary class ability execution and cast-position resolution.
 - `scripts/runtime/combat_input_runtime.gd`: combat selection, drag commands, ability aiming, keyboard, mouse, touch, and tutorial input gates.
@@ -62,6 +63,8 @@ Cleric follows the same focused pattern through `cleric_data.gd`, `cleric_system
 Mage follows that pattern through `mage_data.gd`, `mage_system.gd`, `mage_runtime.gd`, and `mage_ability_presenter.gd`. `ability_power_system.gd` owns additive Ability Power math, while `living_bomb_lineage_system.gd` owns generation and reinfection safety independently of scene state.
 
 Warlock follows the same split through `warlock_data.gd`, `warlock_system.gd`, `warlock_runtime.gd`, and `warlock_ability_presenter.gd`. Reusable periodic status records live in `periodic_status_system.gd`; Fear and Silence remain shared controls in `status_effect_system.gd`. Health-loss cooldown conversion and the background-channel exception are documented as narrow contracts rather than generic class behavior.
+
+Rogue follows the same split through `rogue_data.gd`, `rogue_system.gd`, `rogue_runtime.gd`, and `rogue_ability_presenter.gd`. Class-neutral Combo Points, alternate action sets, concealment/detection, and strongest-source Armor reduction live in focused systems so future forms, detectors, enemies, items, and debuffs can reuse the contracts without importing Rogue runtime code.
 
 ### `scripts/data/talent_data.gd`
 

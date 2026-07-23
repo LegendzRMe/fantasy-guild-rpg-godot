@@ -77,6 +77,7 @@ func apply_passive_trigger(owner:Dictionary,event:Dictionary,target:Dictionary)-
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var resolved_amount:=amount;var retribution_bonus:float=0.0
+	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and RogueSystem.has_talent(source,"rogue_l12_2") and source.get("rogue_runtime",{}).get("garrotes",[]).any(func(instance):return str(instance.get("target_id",""))==str(target.get("combat_id","")) and float(instance.get("remaining_duration",0.0))>0.0):resolved_amount*=1.40
 	if MageSystem.gravity_crush_applies(source,target,source_action,originating_effect_id,origin):resolved_amount*=1.0+float(MageData.VALUES.gravity_crush)
 	var ranger_basic_result:={}
 	if str(source.get("class",""))=="Ranger" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("ranger_runtime",{}).is_empty():
@@ -93,6 +94,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 			retribution_bonus=float(source.retribution_charges.pop_front().amount)
 	var before_ratio:float=float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))
 	var damage_request:={"amount":resolved_amount,"source_action":source_action,"damage_type":damage_type,"damage_taken_multiplier":current_damage_taken_multiplier(target)}
+	if not target.get("armor_reduction_sources",[]).is_empty():damage_request["base_armor_override"]=ArmorReductionSystem.effective_armor(target)
 	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
 		var armor_sources:Array=target.guardian_runtime.temporary_armor_sources.duplicate(true)
 		if damage_type=="physical" and source_action=="basic_attack" and int(target.guardian_runtime.block_charges)>0:armor_sources.append({"id":"dwarf_block","armor":GuardianData.VALUES.block_armor,"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
@@ -106,6 +108,10 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	elif str(target.get("class",""))=="Warlock" and not target.get("warlock_runtime",{}).is_empty():
 		var warlock_armor:=WarlockSystem.fel_armor(target)
 		if warlock_armor>0.0:damage_request["armor_sources"]=[{"id":"fel_armor","armor":warlock_armor,"remaining":float(target.warlock_runtime.fel_armor_remaining)}]
+	elif str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty():
+		var rogue_sources:Array=target.rogue_runtime.temporary_armor_sources.duplicate(true)
+		if damage_type=="physical" and source_action=="basic_attack" and int(target.rogue_runtime.block_charges)>0:rogue_sources.append({"id":"combat_readiness","armor":float(RogueData.VALUES.combat_readiness_armor),"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
+		if not rogue_sources.is_empty():damage_request["armor_sources"]=rogue_sources
 	if source_action=="percentage_health":damage_request["outgoing_multiplier"]=1.0;damage_request["can_crit"]=false
 	if can_crit_override!=null:damage_request["can_crit"]=bool(can_crit_override)
 	var previews_mage_barrier:bool=str(target.get("class",""))=="Mage" and not target.get("mage_runtime",{}).is_empty() and str(source.get("combat_team",""))!=str(target.get("combat_team",""))
@@ -115,6 +121,16 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll);var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
 		if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
+	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and not source.get("rogue_runtime",{}).is_empty() and bool(source.rogue_runtime.vanish_active):RogueSystem.break_vanish(source)
+	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and float(result.get("resolved_damage",0.0))>0.0 and bool(target.rogue_runtime.vanish_active) and not StealthDetectionSystem.is_unrevealable(target):RogueSystem.break_vanish(target)
+	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and damage_type=="physical" and source_action=="basic_attack" and float(result.get("resolved_damage",0.0))>0.0 and int(target.rogue_runtime.block_charges)>0:target.rogue_runtime.block_charges=int(target.rogue_runtime.block_charges)-1
+	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("rogue_runtime",{}).is_empty():
+		if ComboPointSystem.successful_hit(result):
+			RogueSystem.double_strike_roll(source)
+			if RogueSystem.has_talent(source,"rogue_l30_1"):
+				for garrote in source.rogue_runtime.garrotes:
+					if str(garrote.target_id)==str(target.get("combat_id","")):garrote.remaining_duration=float(RogueData.VALUES.garrote_duration)
+		RogueSystem.consume_slice_attack(source)
 	if str(target.get("class",""))=="Warlock" and not target.get("warlock_runtime",{}).is_empty() and float(result.get("health_damage",0.0))>0.0:
 		var circle:=WarlockSystem.try_demonic_circle(target,float(result.health_damage),{"health_cost":false})
 		if bool(circle.triggered):
@@ -176,6 +192,9 @@ func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action
 	for hero in heroes:
 		if str(hero.get("class",""))!="Cleric" or not ClericSystem.has_talent(hero,"cleric_l24_3"):continue
 		if hero.get("cleric_runtime",{}).get("serpents",[]).any(func(serpent):return str(serpent.get("host_id",""))==str(target.get("combat_id",""))):incoming_multiplier=maxf(incoming_multiplier,1.10)
+	if str(source.get("combat_id",""))!=str(target.get("combat_id","")):
+		for rogue in heroes:
+			if str(rogue.get("class",""))=="Rogue" and RogueSystem.has_talent(rogue,"rogue_l21_3") and rogue.get("rogue_runtime",{}).get("garrotes",[]).any(func(instance):return str(instance.get("target_id",""))==str(target.get("combat_id","")) and float(instance.get("remaining_duration",0.0))>0.0):incoming_multiplier=minf(incoming_multiplier,float(RogueData.VALUES.strangle_external_multiplier))
 	var result:=CombatSystem.resolve_healing(source,target,{"amount":amount,"source_action":source_action,"incoming_multiplier":incoming_multiplier})
 	var context:={"source_action":source_action,"action_tags":[source_action,"healing"],"origin":origin,"originating_effect_id":originating_effect_id};var events:=CombatSystem.event_bundle_for_healing(source,target,result,context);combat_events.append_array(events)
 	for event in events:
@@ -188,6 +207,7 @@ func apply_unit_shield(source:Dictionary,target:Dictionary,amount:float,origin=n
 	var result:=CombatSystem.apply_shield(target,amount,{"creator_index":int(source.get("battle_index",-1)),"source_id":source_id,"origin":origin,"cap":cap,"duration":duration,"source_action":"basic_ability"});var event:=CombatSystem.create_event("shield_applied",source,target,result,{"source_action":"basic_ability","action_tags":["basic_ability","shield"],"origin":origin});combat_events.append(event);return result
 
 func update_timed_combat_effects(unit:Dictionary,delta:float)->void:
+	ArmorReductionSystem.update(unit,delta)
 	for shield_index in range(unit.get("shield_sources",[]).size()-1,-1,-1):
 		var shield_source:Dictionary=unit.shield_sources[shield_index];var shield_duration:=float(shield_source.get("remaining_duration",0.0))
 		if shield_duration<=0.0:continue

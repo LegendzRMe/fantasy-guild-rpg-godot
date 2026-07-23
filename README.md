@@ -25,7 +25,7 @@ An original Godot 4 prototype combining manual party control, guild management, 
 - Item storage grid, bags, capacity upgrades, and organization controls
 - Merchant Contacts foundation
 - A dedicated testing Vault containing ten unequipped Legendary items for combat-system validation
-- A testing-zone launcher with the general Dummy Range, dedicated Warlock Range, and a fixed-level Endless Arena
+- A testing-zone launcher with the general Dummy Range, dedicated Warlock and Rogue ranges, and a fixed-level Endless Arena
 
 ## Combat controls
 
@@ -36,7 +36,7 @@ An original Godot 4 prototype combining manual party control, guild management, 
 - **F3** toggles the Shared Combat Rules debug overlay in the testing range.
 - Click the pause button to resume or retreat.
 
-In the testing save, select **TESTING** on the world map to choose the Dummy Range, Warlock Range, or Endless Arena. Endless Arena continuously replaces defeated enemies at the selected level without increasing that level or awarding test-fight resources.
+In the testing save, select **TESTING** on the world map to choose the Dummy Range, a class range, or Endless Arena. The Rogue Range includes ordinary targets and a detector Boss for Combo Point, opener, Armor-reduction, and concealment testing. Endless Arena continuously replaces defeated enemies at the selected level without increasing that level or awarding test-fight resources.
 
 The project uses original placeholder systems and artwork. Names, UI, game rules, and assets are subject to change during development.
 

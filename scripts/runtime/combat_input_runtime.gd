@@ -8,6 +8,9 @@ func load_mage_test_build(hero:Dictionary,heroic_id:String)->void:
 func load_level_one_mage_test(hero:Dictionary)->void:
 	hero.level=1;hero.power=float(MageData.VALUES.basic_attack_damage);hero.base_power=hero.power;hero.max_hp=float(MageData.VALUES.health);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id="";hero.selected_talents={};MageSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_rogue_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=RogueData.TEST_BUILDS[clampi(build_index,0,RogueData.TEST_BUILDS.size()-1)];var level:int=int(build.level);hero.level=level;hero.power=RogueData.scaled(float(RogueData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=RogueData.scaled(float(RogueData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);RogueSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
 func player_controlled_hero_indices() -> Array:
 	var result:=[]
 	for hero_index in heroes.size():
@@ -86,6 +89,8 @@ func begin_trait()->void:
 		queue_redraw()
 	elif str(hero.get("class",""))=="Warlock":
 		if use_warlock_trait(hero):queue_redraw()
+	elif str(hero.get("class",""))=="Rogue":
+		if use_rogue_trait(hero):queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -201,6 +206,11 @@ func _unhandled_input(event:InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed:
+		if testing_zone_active and testing_zone_mode=="rogue_range" and event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_6:
+			var build_index:int=int(event.keycode-KEY_1)
+			for hero in heroes:
+				if str(hero.get("class",""))=="Rogue":load_rogue_test_build(hero,build_index)
+			flash("Rogue build: %s"%str(RogueData.TEST_BUILDS[build_index].name));queue_redraw();return
 		if event.keycode==KEY_ESCAPE and ability_aiming:cancel_ability_aim();get_viewport().set_input_as_handled();return
 		if event.keycode==KEY_F3 and testing_zone_active:debug_combat_overlay=not debug_combat_overlay;queue_redraw();return
 		if event.keycode==KEY_F4 and testing_zone_active:

@@ -67,6 +67,7 @@ func show_testing_zone_menu() -> void:
 	modes.add_child(range_card);var range_content:=range_card.get_child(0) as VBoxContainer;range_content.add_spacer(false)
 	var enter_range:=button("Enter Dummy Range",start_testing_zone,240);enter_range.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;range_content.add_child(enter_range)
 	var enter_warlock_range:=button("Enter Warlock Range",start_warlock_testing_zone,240);enter_warlock_range.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;range_content.add_child(enter_warlock_range)
+	var enter_rogue_range:=button("Enter Rogue Range",start_rogue_testing_zone,240);enter_rogue_range.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;range_content.add_child(enter_rogue_range)
 	var endless_card:=testing_mode_card("Endless Arena","Fight a continuous stream of enemies at one fixed level. Defeated enemies are replaced, and the selected level never increases automatically.")
 	modes.add_child(endless_card);var endless_content:=endless_card.get_child(0) as VBoxContainer
 	var level_row:=HBoxContainer.new();level_row.alignment=BoxContainer.ALIGNMENT_CENTER;level_row.add_theme_constant_override("separation",14);endless_content.add_child(level_row)

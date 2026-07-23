@@ -166,6 +166,11 @@ func _draw() -> void:
 	if rune_active:
 		draw_circle(rune_center,rune_radius,Color(C_RED,.10));draw_arc(rune_center,rune_radius,0,TAU,64,Color(C_RED,.92),5);draw_circle(rune_center,118,Color(C_RED,.025));draw_arc(rune_center,118,0,TAU,64,Color(C_RED,.35),2)
 	if objective_notice!="":draw_string(ThemeDB.fallback_font,Vector2(320,102),objective_notice,HORIZONTAL_ALIGNMENT_CENTER,640,17,C_GOLD)
+	# World-space smoke belongs beneath units and combat HUD elements.
+	for rogue in heroes:
+		if str(rogue.get("class",""))!="Rogue" or rogue.get("rogue_runtime",{}).is_empty():continue
+		for cloud in rogue.rogue_runtime.smoke_clouds:
+			if float(cloud.remaining)>0.0:draw_circle(Vector2(cloud.center),float(cloud.radius),Color("778292",.18));draw_arc(Vector2(cloud.center),float(cloud.radius),0,TAU,48,Color("a7b0bf",.55),3)
 	for i in enemies.size():
 		var e=enemies[i]; if e.hp<=0:continue
 		if e.telegraph>0:
@@ -195,6 +200,7 @@ func _draw() -> void:
 			var pyro_pos:=Vector2(projectile.pos);draw_circle(pyro_pos,18,Color("ff7a3d",.28));draw_circle(pyro_pos,11,Color("ff7a3d"));draw_circle(pyro_pos,5,Color("fff2a8"))
 	for i in heroes.size():
 		var h=heroes[i]; var col=CLASSES[h["class"]].color; if h.hp<=0:col=Color("455067")
+		if str(h.get("class",""))=="Rogue" and h.has("concealment") and (StealthDetectionSystem.is_stealthed(h) or StealthDetectionSystem.is_invisible(h)):col=Color(col,.42 if StealthDetectionSystem.is_invisible(h) else .62)
 		if bool(h.get("incapacitated",false)):
 			draw_circle(h.pos,50,Color("202735"));draw_line(h.pos+Vector2(-24,-24),h.pos+Vector2(24,24),C_RED,7);draw_line(h.pos+Vector2(-24,24),h.pos+Vector2(24,-24),C_RED,7);continue
 		if int(h.get("basic_action_phase",CombatRulesV1.BasicActionPhase.READY))==CombatRulesV1.BasicActionPhase.WINDUP:
@@ -205,6 +211,9 @@ func _draw() -> void:
 			draw_circle(h.pos,66,Color(C_GOLD,.18));draw_circle(h.pos,59,C_GOLD,4)
 		if h.shield>0 and not victory_sequence:draw_circle(h.pos,63,Color("5fa8ff"),4)
 		draw_circle(h.pos,48,col);draw_role_icon(h.pos,h["class"]);if not victory_sequence and (h.hp<h.max_hp or h.last_hit>0 or h.shield>0):health_bar_with_shield(h.pos+Vector2(-54,-70),108,h)
+		if not victory_sequence and str(h.get("class",""))=="Rogue" and not h.get("rogue_runtime",{}).is_empty():
+			var point_count:int=ComboPointSystem.current(h);var point_max:int=ComboPointSystem.maximum(h);var pip_start:float=float(h.pos.x)-(point_max-1)*7.0
+			for point_index in point_max:draw_circle(Vector2(pip_start+point_index*14.0,h.pos.y-83),4.5,C_GOLD if point_index<point_count else Color("45546a"))
 		if not victory_sequence:
 			var serpent_count:=ClericSystem.active_serpent_count(heroes,str(h.get("combat_id","")))
 			for serpent_marker_index in mini(serpent_count,2):
@@ -240,6 +249,8 @@ func _draw() -> void:
 		for feed_index in item_feedback_feed.size():draw_string(ThemeDB.fallback_font,Vector2(30,59+feed_index*19),item_feedback_feed[feed_index],HORIZONTAL_ALIGNMENT_LEFT,225,12,C_TEXT)
 	if testing_zone_active and testing_zone_mode=="endless" and not victory_sequence:
 		draw_rect(Rect2(525,18,230,48),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(537,40),"ENDLESS ARENA  •  LEVEL %d"%testing_endless_level,HORIZONTAL_ALIGNMENT_LEFT,205,13,C_GOLD);draw_string(ThemeDB.fallback_font,Vector2(537,58),"DEFEATED  %d"%testing_endless_defeated,HORIZONTAL_ALIGNMENT_LEFT,205,12,C_MUTED)
+	if testing_zone_active and testing_zone_mode=="rogue_range" and not victory_sequence:
+		draw_rect(Rect2(470,18,340,42),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(486,44),"ROGUE RANGE  -  SHIFT+1-6 BUILDS",HORIZONTAL_ALIGNMENT_CENTER,308,13,C_GOLD)
 	if not victory_sequence and (not tutorial_active or tutorial_step>=4):
 		var selectable_heroes:Array=player_controlled_hero_indices()
 		for i in 8:
@@ -268,6 +279,8 @@ func _draw() -> void:
 				if TalentSystem.ability_is_unlocked(hero_level,ability_slot) and (ability_slot!=3 or str(active.get("selected_heroic_id",""))!=""):visible_slots.insert(visible_slots.size()-1,ability_slot)
 			for slot in visible_slots:
 				var center=Vector2(484+slot*78,674);var action_name:String=str(ABILITIES[active["class"]][slot]) if slot<4 else "Stoneform" if active["class"]=="Guardian" and GuardianSystem.has_talent(active,"guardian_l24_2") else str(TRAITS[active["class"]])
+				if active["class"]=="Rogue" and slot<3 and not active.get("rogue_runtime",{}).is_empty() and bool(active.rogue_runtime.vanish_active):action_name=["Ambush","Cheap Shot","Garrote"][slot]
+				elif active["class"]=="Rogue" and slot==3:action_name=str(RogueData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				if slot==3 and active["class"]=="Cleric":action_name=str(ClericData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_2"):action_name="Safety Sprint"
 				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_3"):action_name="Let's Go!"
@@ -293,6 +306,7 @@ func _draw() -> void:
 					if darkness_ratio>0.0:draw_octagon_vertical_fill(center,34,darkness_ratio,Color(CLASSES["Warlock"].color,.55))
 				draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
+				if active["class"]=="Rogue" and slot==2 and ComboPointSystem.current(active)<=0:draw_octagon(center,37,Color(0,0,0,.58),C_MUTED,2)
 				if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
 				if not warlock_trait_state.is_empty() and slot==4:draw_string(ThemeDB.fallback_font,center+Vector2(14,-20),"%d%%"%int(warlock_trait_state.cost_percent),HORIZONTAL_ALIGNMENT_CENTER,42,9,C_TEXT)
 				if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
@@ -303,7 +317,6 @@ func _draw() -> void:
 						var trait_state:=MageSystem.slot_state(active);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[trait_state.charges,trait_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 					elif slot==3 and MageSystem.has_talent(active,"mage_l27_r1") and not active.mage_runtime.phoenix.is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d"%int(active.mage_runtime.phoenix.reposition_charges),HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 		draw_string(ThemeDB.fallback_font,Vector2(1080,50),"●  %d"%state.gold,HORIZONTAL_ALIGNMENT_RIGHT,115,20,C_GOLD);draw_circle(Vector2(1235,42),25,Color(0.08,.11,.16,.9)); draw_string(ThemeDB.fallback_font,Vector2(1222,50),"Ⅱ",HORIZONTAL_ALIGNMENT_LEFT,-1,22,C_TEXT)
-
 	if tutorial_active and tutorial_step==4:
 		draw_tutorial_box(Rect2(420,570,455,68))
 	if tutorial_active and tutorial_step==7:

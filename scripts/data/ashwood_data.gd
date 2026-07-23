@@ -22,7 +22,7 @@ const RARITY_COLORS := {
 
 const RECRUITS := {
 	"ranger":{"name":"Wren","class":"Ranger","signature":"Trailseeker"},
-	"rogue":{"name":"Kestrel","class":"Rogue","signature":"Veiled Strike"},
+	"rogue":{"name":"Kestrel","class":"Rogue","signature":"Sinister Strike"},
 	"mage":{"name":"Nyx","class":"Mage","signature":"Arcane Focus"},
 	"warlock":{"name":"Morrow","class":"Warlock","signature":"Blackflame Pact"}
 }

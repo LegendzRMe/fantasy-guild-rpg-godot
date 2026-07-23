@@ -28,6 +28,12 @@ const MageData = preload("res://scripts/data/mage_data.gd")
 const MageSystem = preload("res://scripts/systems/mage_system.gd")
 const WarlockData = preload("res://scripts/data/warlock_data.gd")
 const WarlockSystem = preload("res://scripts/systems/warlock_system.gd")
+const RogueData = preload("res://scripts/data/rogue_data.gd")
+const RogueSystem = preload("res://scripts/systems/rogue_system.gd")
+const ComboPointSystem = preload("res://scripts/systems/combo_point_system.gd")
+const AlternateActionSetSystem = preload("res://scripts/systems/alternate_action_set_system.gd")
+const StealthDetectionSystem = preload("res://scripts/systems/stealth_detection_system.gd")
+const ArmorReductionSystem = preload("res://scripts/systems/armor_reduction_system.gd")
 const PeriodicStatusSystem = preload("res://scripts/systems/periodic_status_system.gd")
 const AbilityPowerSystem = preload("res://scripts/systems/ability_power_system.gd")
 const LivingBombLineageSystem = preload("res://scripts/systems/living_bomb_lineage_system.gd")
@@ -660,6 +666,7 @@ func show_vault()->void:pass
 func start_battle(_id:int,_node:int=0,_party_override:Array=[])->void:pass
 func start_testing_zone()->void:pass
 func start_warlock_testing_zone()->void:pass
+func start_rogue_testing_zone()->void:pass
 func show_testing_zone_menu()->void:pass
 func start_testing_endless(_enemy_level:int)->void:pass
 func start_ashwood_battle(_encounter_key:String)->void:pass
