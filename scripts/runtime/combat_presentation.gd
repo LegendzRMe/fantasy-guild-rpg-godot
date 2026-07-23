@@ -235,6 +235,8 @@ func _draw() -> void:
 	if testing_zone_active and not item_feedback_feed.is_empty():
 		draw_rect(Rect2(18,18,250,24+item_feedback_feed.size()*19),Color(0.03,.05,.08,.76));draw_string(ThemeDB.fallback_font,Vector2(30,39),"ITEM EFFECTS",HORIZONTAL_ALIGNMENT_LEFT,-1,12,C_GOLD)
 		for feed_index in item_feedback_feed.size():draw_string(ThemeDB.fallback_font,Vector2(30,59+feed_index*19),item_feedback_feed[feed_index],HORIZONTAL_ALIGNMENT_LEFT,225,12,C_TEXT)
+	if testing_zone_active and testing_zone_mode=="endless" and not victory_sequence:
+		draw_rect(Rect2(525,18,230,48),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(537,40),"ENDLESS ARENA  •  LEVEL %d"%testing_endless_level,HORIZONTAL_ALIGNMENT_LEFT,205,13,C_GOLD);draw_string(ThemeDB.fallback_font,Vector2(537,58),"DEFEATED  %d"%testing_endless_defeated,HORIZONTAL_ALIGNMENT_LEFT,205,12,C_MUTED)
 	if not victory_sequence and (not tutorial_active or tutorial_step>=4):
 		var selectable_heroes:Array=player_controlled_hero_indices()
 		for i in 8:
@@ -322,7 +324,8 @@ func _draw() -> void:
 		draw_string(ThemeDB.fallback_font,Vector2(365,427),"Tap to continue" if tutorial_input_device=="mobile" else "Click or press any key to continue",HORIZONTAL_ALIGNMENT_CENTER,550,18,C_GOLD)
 	if paused:
 		draw_rect(Rect2(390,160,500,370 if testing_zone_active else 300),Color(0.03,.05,.08,.94)); draw_string(ThemeDB.fallback_font,Vector2(565,250),"PAUSED",HORIZONTAL_ALIGNMENT_LEFT,-1,34,C_GOLD); draw_rect(Rect2(490,285,300,58),C_PANEL_2); draw_string(ThemeDB.fallback_font,Vector2(600,322),"RESUME",HORIZONTAL_ALIGNMENT_LEFT,-1,20,C_TEXT)
-		if testing_zone_active:draw_rect(Rect2(490,360,300,58),C_PANEL_2);draw_string(ThemeDB.fallback_font,Vector2(535,397),"DUMMY ATTACKS: %s"%("YES" if testing_dummy_attacks_enabled else "NO"),HORIZONTAL_ALIGNMENT_CENTER,210,18,C_GREEN if testing_dummy_attacks_enabled else C_MUTED)
+		if testing_zone_active and testing_zone_mode=="range":draw_rect(Rect2(490,360,300,58),C_PANEL_2);draw_string(ThemeDB.fallback_font,Vector2(535,397),"DUMMY ATTACKS: %s"%("YES" if testing_dummy_attacks_enabled else "NO"),HORIZONTAL_ALIGNMENT_CENTER,210,18,C_GREEN if testing_dummy_attacks_enabled else C_MUTED)
+		elif testing_zone_active:draw_rect(Rect2(490,360,300,58),C_PANEL_2);draw_string(ThemeDB.fallback_font,Vector2(535,397),"ENEMY LEVEL: %d"%testing_endless_level,HORIZONTAL_ALIGNMENT_CENTER,210,18,C_GOLD)
 		var retreat_y:=435 if testing_zone_active else 360;draw_rect(Rect2(490,retreat_y,300,58),C_PANEL_2); draw_string(ThemeDB.fallback_font,Vector2(600,retreat_y+37),"RETREAT",HORIZONTAL_ALIGNMENT_LEFT,-1,20,C_RED)
 	if victory_sequence and victory_phase>=1:
 		draw_string(ThemeDB.fallback_font,Vector2(400,117),"VICTORY",HORIZONTAL_ALIGNMENT_CENTER,480,66,C_GOLD)

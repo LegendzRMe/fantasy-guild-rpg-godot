@@ -292,7 +292,7 @@ func _unhandled_input(event:InputEvent) -> void:
 		if p.x>1190 and p.y<70: paused=true; queue_redraw(); return
 		if paused:
 			if Rect2(490,285,300,58).has_point(p):paused=false;queue_redraw()
-			elif testing_zone_active and Rect2(490,360,300,58).has_point(p):toggle_testing_dummy_attacks()
+			elif testing_zone_active and testing_zone_mode=="range" and Rect2(490,360,300,58).has_point(p):toggle_testing_dummy_attacks()
 			elif Rect2(490,435 if testing_zone_active else 360,300,58).has_point(p):paused=false;show_dungeons() if testing_zone_active else show_zone_map(dungeon_id)
 			return
 		if p.y>575 and p.y<635 and p.x>420 and p.x<875:

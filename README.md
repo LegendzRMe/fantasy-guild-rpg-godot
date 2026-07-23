@@ -25,6 +25,7 @@ An original Godot 4 prototype combining manual party control, guild management, 
 - Item storage grid, bags, capacity upgrades, and organization controls
 - Merchant Contacts foundation
 - A dedicated testing Vault containing ten unequipped Legendary items for combat-system validation
+- A testing-zone launcher with the existing Dummy Range and a fixed-level Endless Arena
 
 ## Combat controls
 
@@ -34,6 +35,8 @@ An original Godot 4 prototype combining manual party control, guild management, 
 - **Mouse wheel** cycles selected heroes; **Tab** cycles living enemy targets.
 - **F3** toggles the Shared Combat Rules debug overlay in the testing range.
 - Click the pause button to resume or retreat.
+
+In the testing save, select **TESTING** on the world map to choose the Dummy Range or Endless Arena. Endless Arena continuously replaces defeated enemies at the selected level without increasing that level or awarding test-fight resources.
 
 The project uses original placeholder systems and artwork. Names, UI, game rules, and assets are subject to change during development.
 

@@ -463,6 +463,8 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.item_card_overlay==null,"Tapping outside the Hero chooser should dismiss it directly.")
 	main.state.selected_team=[0,1,4,2];main.state.active_team=[0,1,4,2]
 	main.state.heroes[1].level=6
+	main.show_testing_zone_menu();await main.get_tree().process_frame
+	TestSupport.check(errors,main.screen=="testing_zone_menu" and main.ui.find_child("TestingEndlessLevel",true,false)!=null and main.ui.find_child("TestingEndlessStart",true,false)!=null,"The testing region should offer separate Dummy Range and fixed-level Endless Arena launch controls.")
 	main.start_testing_zone()
 	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==7 and main.enemies.filter(func(enemy):return bool(enemy.get("boss",false))).size()==2 and main.enemies.any(func(enemy):return float(enemy.get("control_profile",{}).get("blind_duration_multiplier",0.0))==0.5),"The testing range should retain its dummy layout and include default-immune and partially Blind-vulnerable Boss targets without waves.")
 	var ranger_battle_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Ranger")
@@ -586,6 +588,11 @@ static func run(main:Node) -> Array:
 	main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_one");main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_two")
 	var hp_before_third:float=item_dummy.hp;main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_three")
 	TestSupport.check(errors,int(item_rogue.thousand_cuts_count)==0 and hp_before_third-item_dummy.hp>(hp_before_three-hp_before_third)*.45,"Every third Basic Attack should trigger the two Thousand Cuts extra strikes without advancing its own counter.")
+	main.start_testing_endless(17)
+	TestSupport.check(errors,main.testing_zone_mode=="endless" and main.testing_endless_level==17 and main.enemies.size()==4 and main.enemies.all(func(enemy):return int(enemy.level)==17 and bool(enemy.get("testing_endless_enemy",false)) and enemy.rewarded),"Endless Arena should begin with non-rewarding enemies scaled to the selected fixed level.")
+	for endless_enemy in main.enemies:endless_enemy.hp=0.0
+	main.update_testing_endless(.8);main.update_testing_endless(.4)
+	TestSupport.check(errors,main.testing_endless_defeated==4 and main.enemies.size()==1 and int(main.enemies[0].level)==17,"Endless Arena should clear defeated enemies, replace them continuously, and retain the selected enemy level.")
 	main.show_roster()
 	await main.get_tree().process_frame
 	TestSupport.check(errors,main.ui.find_child("TestingHeroLevel",true,false)!=null,"The testing Hero Roster should expose the hero level picker.")
