@@ -24,6 +24,10 @@ const ClericData = preload("res://scripts/data/cleric_data.gd")
 const ClericSystem = preload("res://scripts/systems/cleric_system.gd")
 const RangerData = preload("res://scripts/data/ranger_data.gd")
 const RangerSystem = preload("res://scripts/systems/ranger_system.gd")
+const MageData = preload("res://scripts/data/mage_data.gd")
+const MageSystem = preload("res://scripts/systems/mage_system.gd")
+const AbilityPowerSystem = preload("res://scripts/systems/ability_power_system.gd")
+const LivingBombLineageSystem = preload("res://scripts/systems/living_bomb_lineage_system.gd")
 const AbilitySlotSystem = preload("res://scripts/systems/ability_slot_system.gd")
 const PercentageHealthDamageSystem = preload("res://scripts/systems/percentage_health_damage_system.gd")
 const ASHWOOD_COMBAT_BACKGROUND = preload("res://assets/generated/ashwood_combat_background.png")
@@ -53,6 +57,9 @@ const CHALLENGE_TAUNT_DURATION := 3.0
 const TESTING_DUMMY_RESPAWN_TIME := 5.0
 const TESTING_DUMMY_REGEN_DELAY := 2.5
 const TESTING_DUMMY_REGEN_RATE := 0.10
+const TESTING_ENDLESS_ACTIVE_LIMIT := 6
+const TESTING_ENDLESS_SPAWN_INTERVAL := 1.15
+const TESTING_ENDLESS_DEFEATED_CLEAR_TIME := 0.7
 
 # Transient UI coordination belongs beside the UI/input methods that consume it.
 # Declaring it here also keeps Godot hot reloads from compiling AppCore against a
@@ -496,6 +503,7 @@ func base_screen(title:String, subtitle:String="") -> VBoxContainer:
 	elif screen=="settings": top.add_child(button("Return",show_hall,130))
 	elif screen=="hall": top.add_child(button("×",show_menu,64))
 	elif screen=="zone_map": top.add_child(button("Return",show_dungeons,130))
+	elif screen=="testing_zone_menu": top.add_child(button("Return",show_dungeons,130))
 	elif screen=="encounter_intro": top.add_child(button("Return",func():show_zone_map(0),130))
 	elif screen in ["ashwood_victory","ashwood_consequence"]: pass
 	else: top.add_child(button("Return",show_hall,130))
@@ -648,6 +656,8 @@ func show_vault()->void:pass
 # Combat/story contracts implemented by the runtime layers.
 func start_battle(_id:int,_node:int=0,_party_override:Array=[])->void:pass
 func start_testing_zone()->void:pass
+func show_testing_zone_menu()->void:pass
+func start_testing_endless(_enemy_level:int)->void:pass
 func start_ashwood_battle(_encounter_key:String)->void:pass
 func show_ashwood_consequence(_text_value:String)->void:pass
 func start_tutorial()->void:pass

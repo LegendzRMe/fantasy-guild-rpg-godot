@@ -16,6 +16,7 @@ func _process(delta:float) -> void:
 		recover_tutorial_state()
 	battle_time+=delta
 	spawn_timer=max(0,spawn_timer-delta); wave_break=max(0,wave_break-delta)
+	if testing_zone_active and testing_zone_mode=="endless":update_testing_endless(delta)
 	if not tutorial_active and not testing_zone_active and wave_index==0 and wave_break<=0: begin_next_wave()
 	if not tutorial_active and not testing_zone_active and wave_spawn_remaining>0 and spawn_timer<=0: spawn_wave_enemy()
 	if not tutorial_active and not testing_zone_active and wave_spawn_remaining==0 and wave_index<total_waves and enemies.size()>0 and enemies.all(func(foe):return foe.hp<=0):
@@ -29,6 +30,7 @@ func _process(delta:float) -> void:
 	update_guardian_runtime(delta)
 	update_cleric_runtime(delta)
 	update_ranger_runtime(delta)
+	update_mage_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	for i in heroes.size():
@@ -111,3 +113,30 @@ func _process(delta:float) -> void:
 			e.special="basic"; e.telegraph=.48; e.danger_pos=target_pos
 	if not testing_zone_active and ashwood_combat_complete():finish_battle(true)
 	queue_redraw()
+
+func update_testing_endless(delta:float) -> void:
+	for enemy_index in range(enemies.size()-1,-1,-1):
+		var enemy:Dictionary=enemies[enemy_index]
+		if not bool(enemy.get("testing_endless_enemy",false)) or enemy.hp>0 or not enemy.rewarded:continue
+		enemy.defeated_clear_time=float(enemy.get("defeated_clear_time",0.0))+delta
+		if enemy.defeated_clear_time>=TESTING_ENDLESS_DEFEATED_CLEAR_TIME:
+			remove_testing_endless_enemy_at(enemy_index);testing_endless_defeated+=1
+	var living_count:int=enemies.filter(func(enemy):return enemy.hp>0 and bool(enemy.get("testing_endless_enemy",false))).size()
+	testing_endless_spawn_timer=maxf(0.0,testing_endless_spawn_timer-delta)
+	if living_count<TESTING_ENDLESS_ACTIVE_LIMIT and testing_endless_spawn_timer<=0.0:
+		spawn_testing_endless_enemy();testing_endless_spawn_timer=TESTING_ENDLESS_SPAWN_INTERVAL
+
+func remap_enemy_index_after_removal(value:int,removed_index:int)->int:
+	return -1 if value==removed_index else value-1 if value>removed_index else value
+
+func remove_testing_endless_enemy_at(enemy_index:int)->void:
+	if enemy_index<0 or enemy_index>=enemies.size():return
+	for hero in heroes:
+		hero.target=remap_enemy_index_after_removal(int(hero.get("target",-1)),enemy_index)
+		for repeat in hero.get("pending_repeats",[]):
+			if repeat.has("enemy_target"):repeat.enemy_target=remap_enemy_index_after_removal(int(repeat.enemy_target),enemy_index)
+	focused_enemy_index=remap_enemy_index_after_removal(focused_enemy_index,enemy_index)
+	if drag_target_type=="enemy":
+		if drag_target_index==enemy_index:dragging_hero=false;drag_target_type="ground";drag_target_index=-1
+		elif drag_target_index>enemy_index:drag_target_index-=1
+	enemies.remove_at(enemy_index)

@@ -463,6 +463,8 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.item_card_overlay==null,"Tapping outside the Hero chooser should dismiss it directly.")
 	main.state.selected_team=[0,1,4,2];main.state.active_team=[0,1,4,2]
 	main.state.heroes[1].level=6
+	main.show_testing_zone_menu();await main.get_tree().process_frame
+	TestSupport.check(errors,main.screen=="testing_zone_menu" and main.ui.find_child("TestingEndlessLevel",true,false)!=null and main.ui.find_child("TestingEndlessStart",true,false)!=null,"The testing region should offer separate Dummy Range and fixed-level Endless Arena launch controls.")
 	main.start_testing_zone()
 	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==7 and main.enemies.filter(func(enemy):return bool(enemy.get("boss",false))).size()==2 and main.enemies.any(func(enemy):return float(enemy.get("control_profile",{}).get("blind_duration_multiplier",0.0))==0.5),"The testing range should retain its dummy layout and include default-immune and partially Blind-vulnerable Boss targets without waves.")
 	var ranger_battle_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Ranger")
@@ -479,6 +481,32 @@ static func run(main:Node) -> Array:
 		main.update_ranger_runtime(.20);TestSupport.check(errors,travel_dummy.hp<w_health_before and main.effects.any(func(effect):return effect.kind=="ranger_arrow") and main.effects.any(func(effect):return effect.kind=="multishot"),"Ranger projectiles should synchronize readable battlefield effects with delayed impact damage.")
 		main.effects.clear();visual_ranger.ranger_runtime.delayed_effects.clear();for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=visual_enemy_states[enemy_index].pos;main.enemies[enemy_index].hp=visual_enemy_states[enemy_index].hp
 	else:TestSupport.check(errors,false,"The testing party should include a Ranger for combat-presentation coverage.")
+	var mage_battle_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Mage")
+	if mage_battle_index>=0:
+		var visual_mage:Dictionary=main.heroes[mage_battle_index];main.selected=mage_battle_index
+		visual_mage.selected_talents={"tier_1":"mage_l9_1","tier_2":"mage_l12_2","tier_3":"mage_l15_r1","tier_4":"mage_l18_1","tier_5":"mage_l21_1","tier_6":"mage_l24_3","tier_7":"mage_l27_r1","tier_8":"mage_l30_3"};visual_mage.selected_heroic_id="mage_l15_r1";main.MageSystem.initialize_runtime(visual_mage,true)
+		var mage_enemy_states:Array=main.enemies.map(func(enemy):return {"pos":enemy.pos,"hp":enemy.hp,"active_effects":enemy.active_effects.duplicate(true)})
+		for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=Vector2(1100,80+enemy_index*75);main.enemies[enemy_index].hp=main.enemies[enemy_index].max_hp
+		var flame_target:Dictionary=main.enemies[0];flame_target.pos=visual_mage.pos+Vector2.RIGHT*150.0;var flame_health_before:float=flame_target.hp
+		main.cast_mage_q(visual_mage,flame_target.pos);main.update_mage_runtime(.9);TestSupport.check(errors,is_equal_approx(flame_target.hp,flame_health_before) and main.effects.any(func(effect):return effect.kind=="mage_flamestrike_warning" and float(effect.get("radius",0.0))>0.0),"Flamestrike should preserve and visibly represent its full one-second ground warning before damage.")
+		main.update_mage_runtime(.2);TestSupport.check(errors,flame_target.hp<flame_health_before and main.effects.any(func(effect):return effect.kind=="mage_flamestrike_impact"),"Flamestrike should resolve with a visible impact at the chosen ground point.")
+		main.focused_enemy_index=0;visual_mage.ability_cds[1]=0.0;var bomb_health_before:float=flame_target.hp;main.cast_mage_w(visual_mage);main.update_mage_runtime(3.1)
+		TestSupport.check(errors,flame_target.hp<bomb_health_before and visual_mage.mage_runtime.telemetry.w_ticks==3 and visual_mage.mage_runtime.telemetry.w_explosions==1,"Living Bomb should deliver three periodic ticks and its host-centered explosion even across one large deterministic update.")
+		var trait_charges_before:int=visual_mage.mage_runtime.trait.current_charges;main.begin_trait();TestSupport.check(errors,main.MageSystem.trait_is_armed(visual_mage) and visual_mage.mage_runtime.trait.current_charges==trait_charges_before-1,"Mage D input should arm Verdant Spheres and spend one stored charge.")
+		visual_mage.ability_cds[1]=8.0;main.focused_enemy_index=0;main.use_ability(1);TestSupport.check(errors,visual_mage.ability_cds[1]==0.0 and visual_mage.mage_runtime.bomb_state.bombs_by_target.has(str(flame_target.combat_id)),"An armed Verdant Spheres should make Living Bomb usable through its ordinary cooldown without adding a new action slot.")
+		var boss_target:Dictionary=main.enemies.filter(func(enemy):return bool(enemy.get("boss",false)))[0]
+		for enemy in main.enemies:
+			if enemy!=boss_target:enemy.pos=Vector2(1100,80+main.enemies.find(enemy)*70)
+		boss_target.pos=visual_mage.pos+Vector2.RIGHT*160.0;visual_mage.ability_cds[2]=0.0;main.cast_mage_e(visual_mage,boss_target.pos);main.update_mage_runtime(1.0)
+		TestSupport.check(errors,visual_mage.mage_runtime.telemetry.e_hits>=1 and visual_mage.mage_runtime.telemetry.stuns_resisted>=1 and not boss_target.active_effects.any(func(effect):return str(effect.get("control_type",""))=="stun"),"Gravity Lapse should collide with a Boss while the Boss resists Stun by default.")
+		visual_mage.selected_heroic_id="mage_l15_r1";visual_mage.ability_cds[3]=0.0;var phoenix_destination:Vector2=Vector2(visual_mage.pos)+Vector2(90,80);TestSupport.check(errors,main.cast_phoenix(visual_mage,phoenix_destination),"Phoenix should accept a valid in-bounds launch destination.")
+		main.update_mage_runtime(1.0);TestSupport.check(errors,not visual_mage.mage_runtime.phoenix.is_empty() and int(visual_mage.mage_runtime.phoenix.reposition_charges)==int(main.MageData.VALUES.rebirth_charges),"Rebirth should create three temporary R reposition charges after Phoenix arrives.")
+		var reposition_before:int=visual_mage.mage_runtime.phoenix.reposition_charges;TestSupport.check(errors,not main.cast_phoenix(visual_mage,Vector2(visual_mage.mage_runtime.phoenix.pos)) and int(visual_mage.mage_runtime.phoenix.reposition_charges)==reposition_before,"An invalid no-movement Rebirth destination should consume no charge.")
+		var reposition_destination:Vector2=phoenix_destination+Vector2(50,0);TestSupport.check(errors,main.cast_phoenix(visual_mage,reposition_destination) and int(visual_mage.mage_runtime.phoenix.reposition_charges)==reposition_before-1 and bool(visual_mage.mage_runtime.phoenix.traveling),"Rebirth should reuse R, consume one charge only for a valid destination, and enter relocation travel.")
+		flame_target.pos=visual_mage.pos+Vector2.RIGHT*150.0;visual_mage.selected_heroic_id="mage_l15_r2";visual_mage.ability_cds[3]=0.0;main.focused_enemy_index=0;main.cast_pyroblast(visual_mage);main.issue_hero_move(visual_mage,visual_mage.pos+Vector2(20,0))
+		TestSupport.check(errors,visual_mage.active_cast.is_empty() and is_equal_approx(visual_mage.ability_cds[3],main.CombatRulesV1.HEROIC_INTERRUPT_COOLDOWN),"Moving during Pyroblast's unreleased cast should apply the shared ten-second interrupted Heroic cooldown.")
+		main.effects.clear();visual_mage.hp=visual_mage.max_hp;visual_mage.shield=0.0;visual_mage.shield_sources=[];main.MageSystem.initialize_runtime(visual_mage,true);for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=mage_enemy_states[enemy_index].pos;main.enemies[enemy_index].hp=mage_enemy_states[enemy_index].hp;main.enemies[enemy_index].active_effects=mage_enemy_states[enemy_index].active_effects
+	else:TestSupport.check(errors,false,"The testing party should include a Mage for combat and presentation coverage.")
 	var input_guardian:Dictionary=main.heroes[0];main.selected=0;input_guardian.selected_talents={"tier_6":"guardian_l24_2"};input_guardian.ability_cds[4]=0.0;main.begin_trait()
 	TestSupport.check(errors,input_guardian.guardian_runtime.stoneform_remaining==10.0 and input_guardian.ability_cds[4]==60.0,"The existing D Trait input should activate Stoneform and expose its cooldown without another action slot.")
 	input_guardian.guardian_runtime.stoneform_remaining=0.0
@@ -488,7 +516,7 @@ static func run(main:Node) -> Array:
 	for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=Vector2(1100,100+enemy_index*70)
 	input_guardian.ability_cds[1]=0.0
 	var thunder_clap_cast:bool=bool(main.cast_guardian_ability(1,input_guardian.pos))
-	TestSupport.check(errors,thunder_clap_cast and input_guardian.guardian_runtime.telemetry.thunder_clap_casts[-1]==0,"Thunder Clap should complete safely and record its per-cast target count without a telemetry type crash.")
+	TestSupport.check(errors,thunder_clap_cast and input_guardian.guardian_runtime.telemetry.thunder_clap_casts[-1]==0 and main.effects.any(func(effect):return effect.kind=="guardian_thunder_clap" and is_equal_approx(float(effect.get("radius",0.0)),float(main.GuardianData.SPACE.thunder_clap_radius))),"Thunder Clap should complete safely, record its per-cast target count, and visibly represent its actual area.")
 	for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=original_enemy_positions[enemy_index]
 	var defense_dummy:Dictionary=main.enemies[-1]
 	main.heroes[0].pos=defense_dummy.pos+Vector2(100,0);main.heroes[0].dest=main.heroes[0].pos;main.heroes[0].suppress_auto_target=true
@@ -560,6 +588,14 @@ static func run(main:Node) -> Array:
 	main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_one");main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_two")
 	var hp_before_third:float=item_dummy.hp;main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_three")
 	TestSupport.check(errors,int(item_rogue.thousand_cuts_count)==0 and hp_before_third-item_dummy.hp>(hp_before_three-hp_before_third)*.45,"Every third Basic Attack should trigger the two Thousand Cuts extra strikes without advancing its own counter.")
+	main.start_testing_endless(17)
+	TestSupport.check(errors,main.testing_zone_mode=="endless" and main.testing_endless_level==17 and main.enemies.size()==4 and main.enemies.all(func(enemy):return int(enemy.level)==17 and bool(enemy.get("testing_endless_enemy",false)) and enemy.rewarded),"Endless Arena should begin with non-rewarding enemies scaled to the selected fixed level.")
+	var endless_mage_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Mage");main.selected=endless_mage_index;main.focused_enemy_index=-1;main.heroes[endless_mage_index].target=-1;main.toast="";main.begin_ability(1)
+	TestSupport.check(errors,main.toast=="","An unavailable target-dependent combat ability should fail silently without adding HUD instructions.")
+	main.selected=0;main.dragging_hero=true;main.drag_target_type="enemy";main.drag_target_index=3;main.focused_enemy_index=3;main.heroes[0].target=3
+	for endless_enemy in main.enemies:endless_enemy.hp=0.0
+	main.update_testing_endless(.8);main.update_testing_endless(.4)
+	TestSupport.check(errors,main.testing_endless_defeated==4 and main.enemies.size()==1 and int(main.enemies[0].level)==17 and not main.dragging_hero and main.drag_target_index==-1 and main.focused_enemy_index==-1 and int(main.heroes[0].target)==-1,"Endless Arena should safely clear stale targeting state, replace defeated enemies continuously, and retain the selected enemy level.")
 	main.show_roster()
 	await main.get_tree().process_frame
 	TestSupport.check(errors,main.ui.find_child("TestingHeroLevel",true,false)!=null,"The testing Hero Roster should expose the hero level picker.")

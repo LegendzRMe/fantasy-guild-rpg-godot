@@ -14,6 +14,8 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		state.selected_team=validated_party.duplicate()
 		if current_team_slot<0:state.active_team=validated_party.duplicate()
 	testing_zone_active=false
+	testing_zone_mode="range"
+	testing_endless_spawn_timer=0.0;testing_endless_spawn_count=0;testing_endless_defeated=0
 	current_ashwood_encounter=""
 	battle_objective={};objective_progress=0;objective_health=0;objective_max_health=0;objective_complete=true;objective_pressure_spawned=false;objective_notice="";objective_notice_time=0;objective_banner_time=0;objective_combat_intro="";rune_active=false;rune_timer=0;rune_charge=0;rune_radius=0
 	dungeon_id=id; encounter_id=node; clear_all();combat_events.clear();item_feedback_feed.clear();battle_material_results.clear();combat_blockers.clear();combat_projectiles.clear();incapacitated_hero_ids.clear();next_enemy_combat_id=1;next_projectile_combat_id=1;debug_combat_overlay=CombatRulesV1.DEBUG_COMBAT_OVERLAY_ENABLED; ui.visible=false; combat_layer.visible=true; screen="combat"; battle_time=0; spawn_timer=0; battle_over=false; paused=false; selected=0;focused_enemy_index=-1; wave_index=0; total_waves=3+(1 if node>=3 else 0); wave_spawn_remaining=0; wave_break=.8; waiting_wave=false; battle_gold_earned=0
@@ -28,6 +30,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		if str(heroes[-1].get("class",""))=="Guardian":GuardianSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Cleric":ClericSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Ranger":RangerSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Mage":MageSystem.initialize_runtime(heroes[-1],is_testing_save())
 	queue_redraw()
 
 func start_testing_zone() -> void:
@@ -38,18 +41,20 @@ func start_testing_zone() -> void:
 	if test_party.is_empty():test_party=state.selected_team.duplicate()
 	start_battle(0,-1,test_party)
 	testing_zone_active=true
+	testing_zone_mode="range"
 	for hero in heroes:
 		if str(hero.get("class",""))=="Guardian":hero.guardian_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Cleric":hero.cleric_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Ranger":hero.ranger_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Mage":hero.mage_runtime.telemetry_enabled=true
 	testing_dummy_attacks_enabled=true
 	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
 	spawn_enemy(Vector2(650,120),"Dummy");enemies[-1]["passive_test_enemy"]=true
 	spawn_enemy(Vector2(610,525),"Raider")
 	spawn_enemy(Vector2(720,525),"Archer")
 	spawn_enemy(Vector2(665,555),"Dummy")
-	spawn_enemy(Vector2(1050,170),"Boss");enemies[-1]["passive_test_enemy"]=true
-	spawn_enemy(Vector2(1080,505),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["control_profile"]={"blind_immune":false,"blind_duration_multiplier":0.5,"slow_multiplier":0.5,"stun_multiplier":0.25,"displacement":false}
+	spawn_enemy(Vector2(1050,170),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1].max_hp*=1.5;enemies[-1].hp=enemies[-1].max_hp;enemies[-1]["percent_damage_health_basis"]=enemies[-1].max_hp;enemies[-1].combat_tags.append("difficulty_health_test")
+	spawn_enemy(Vector2(1080,505),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["damage_taken_multiplier"]=0.75;enemies[-1].combat_tags.append("phase_reduction_test");enemies[-1]["control_profile"]={"blind_immune":false,"blind_duration_multiplier":0.5,"slow_multiplier":0.5,"stun_multiplier":0.25,"displacement":false}
 	spawn_enemy(Vector2(880,330),"Defense Dummy")
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:pillar",Rect2(570,250,74,145)))
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:wall",Rect2(760,210,38,165),{"destructible":true,"current_health":240.0,"maximum_health":240.0}))
@@ -58,6 +63,40 @@ func start_testing_zone() -> void:
 		enemy.rewarded=true;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0
 	if heroes.size()>1:heroes[0].hp*=0.55
 	if heroes.size()>2:heroes[2].hp*=0.75
+	queue_redraw()
+
+func testing_party_indices() -> Array:
+	var test_party:Array=[]
+	for wanted_class in ["Guardian","Cleric","Ranger","Mage"]:
+		for hero_index in state.heroes.size():
+			if state.heroes[hero_index]["class"]==wanted_class and hero_index not in test_party:test_party.append(hero_index);break
+	return state.selected_team.duplicate() if test_party.is_empty() else test_party
+
+func apply_testing_enemy_level(enemy:Dictionary,enemy_level:int) -> void:
+	var safe_level:=CombatSystem.clamp_level(enemy_level)
+	var resolved:=CombatSystem.calculate_final_stats(enemy.definition,safe_level)
+	enemy.level=safe_level;enemy.stats=resolved;enemy.hp=resolved.health;enemy.max_hp=resolved.health;enemy.percent_damage_health_basis=resolved.health;enemy.power=resolved.power;enemy.armor=resolved.armor
+	enemy.basic_action_power_coefficient=resolved.basic_action_power_coefficient;enemy.basic_action_amount=resolved.basic_action_amount;enemy.damage=resolved.basic_action_amount;enemy.basic_action_range=resolved.basic_action_range;enemy.attack_range=resolved.basic_action_range;enemy.range=resolved.basic_action_range
+	enemy.basic_action_interval=resolved.basic_action_interval;enemy.basic_attack_interval=resolved.basic_action_interval;enemy.movement_speed=resolved.movement_speed;enemy.critical_chance=resolved.critical_chance;enemy.critical_damage=resolved.critical_damage
+	enemy.rewarded=true;enemy["testing_endless_enemy"]=true;enemy["defeated_clear_time"]=0.0
+
+func spawn_testing_endless_enemy() -> void:
+	var role:String=GameData.WAVE_ENEMY_ROLES[testing_endless_spawn_count%GameData.WAVE_ENEMY_ROLES.size()]
+	var side:int=testing_endless_spawn_count%4
+	var offset:int=(testing_endless_spawn_count*83)%330
+	var entry:Vector2=[Vector2(1215,150+offset),Vector2(410+offset*2,82),Vector2(65,520-offset),Vector2(410+offset*2,558)][side]
+	spawn_enemy(entry,role);apply_testing_enemy_level(enemies[-1],testing_endless_level);testing_endless_spawn_count+=1
+
+func start_testing_endless(enemy_level:int) -> void:
+	start_battle(0,-1,testing_party_indices())
+	testing_zone_active=true;testing_zone_mode="endless";testing_endless_level=CombatSystem.clamp_level(enemy_level);testing_dummy_attacks_enabled=false
+	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false;testing_endless_spawn_timer=TESTING_ENDLESS_SPAWN_INTERVAL;testing_endless_spawn_count=0;testing_endless_defeated=0
+	for hero in heroes:
+		if str(hero.get("class",""))=="Guardian":hero.guardian_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Cleric":hero.cleric_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Ranger":hero.ranger_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Mage":hero.mage_runtime.telemetry_enabled=true
+	for initial_enemy in 4:spawn_testing_endless_enemy()
 	queue_redraw()
 
 func toggle_testing_dummy_attacks() -> void:

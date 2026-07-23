@@ -1,5 +1,13 @@
 extends "res://scripts/runtime/ability_runtime.gd"
 
+func load_mage_test_build(hero:Dictionary,heroic_id:String)->void:
+	var health_ratio:=float(hero.hp)/maxf(1.0,float(hero.max_hp));hero.level=30;hero.power=MageData.scaled(float(MageData.VALUES.basic_attack_damage),30);hero.base_power=hero.power;hero.max_hp=MageData.scaled(float(MageData.VALUES.health),30);hero.hp=maxf(1.0,hero.max_hp*health_ratio);hero.basic_action_amount=hero.power;hero.damage=hero.power
+	var phoenix_build:bool=heroic_id=="mage_l15_r1"
+	hero.selected_heroic_id=heroic_id;hero.selected_talents={"tier_1":"mage_l9_1","tier_2":"mage_l12_2" if phoenix_build else "mage_l12_3","tier_3":heroic_id,"tier_4":"mage_l18_2" if phoenix_build else "mage_l18_3","tier_5":"mage_l21_1","tier_6":"mage_l24_3" if phoenix_build else "mage_l24_2","tier_7":"mage_l27_r1" if phoenix_build else "mage_l27_r2","tier_8":"mage_l30_2" if phoenix_build else "mage_l30_3"};MageSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func load_level_one_mage_test(hero:Dictionary)->void:
+	hero.level=1;hero.power=float(MageData.VALUES.basic_attack_damage);hero.base_power=hero.power;hero.max_hp=float(MageData.VALUES.health);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id="";hero.selected_talents={};MageSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
 func player_controlled_hero_indices() -> Array:
 	var result:=[]
 	for hero_index in heroes.size():
@@ -44,13 +52,14 @@ func begin_ability(slot:int,device:String="pc")->void:
 	if tutorial_active and tutorial_step==7 and heroes[selected]["class"]!="Cleric":return
 	if tutorial_active and tutorial_step==7:use_ability(0,heroes[selected].pos);return
 	var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
-	if not TalentSystem.ability_is_unlocked(hero_level,slot):flash("This ability unlocks at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]));return
+	if not TalentSystem.ability_is_unlocked(hero_level,slot):return
 	var category=ABILITY_TARGETING[heroes[selected]["class"]][slot]
 	if heroes[selected]["class"]=="Guardian" and slot==3 and guardian_heroic_id(heroes[selected])=="guardian_l15_r2":category="enemy"
+	if heroes[selected]["class"]=="Mage" and slot==3 and str(heroes[selected].get("selected_heroic_id",""))=="mage_l15_r2":category="enemy"
 	var mode="instant" if category=="self" else str(state.casting_settings[device].get(category,"cursor"))
 	if mode=="instant" or mode=="cursor" or mode=="facing" or mode=="target":
 		if (category=="enemy" and combat_enemy_target()<0) or (category=="ally" and (heroes[selected].heal_target<0 or heroes[selected].heal_target>=heroes.size())):
-			flash("Choose a valid %s target first."%category);return
+			return
 		var cast_point=get_global_mouse_position()
 		if mode=="facing":cast_point=heroes[selected].pos+heroes[selected].facing_direction*ABILITY_RANGES[heroes[selected]["class"]][slot]
 		use_ability(slot,cast_point);return
@@ -60,14 +69,20 @@ func begin_trait()->void:
 	if selected<0 or selected>=heroes.size() or bool(heroes[selected].get("independent",false)):return
 	var hero:Dictionary=heroes[selected]
 	if str(hero.get("class",""))=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2"):
-		if not use_guardian_trait(hero):flash("Stoneform is not ready.")
+		use_guardian_trait(hero)
 		queue_redraw()
 	elif str(hero.get("class",""))=="Cleric":
-		if not use_cleric_trait(hero):flash("Fast Feet talent action is unavailable or not ready.")
+		use_cleric_trait(hero)
 		queue_redraw()
 	elif str(hero.get("class",""))=="Ranger" and RangerSystem.has_talent(hero,"ranger_l21_3"):
-		if float(hero.ranger_runtime.strafe_remaining)>0.0:flash("Gloom is unavailable during Strafe.");return
-		if not RangerSystem.activate_gloom(hero):flash("Gloom is not ready.")
+		if float(hero.ranger_runtime.strafe_remaining)>0.0:return
+		RangerSystem.activate_gloom(hero)
+		queue_redraw()
+	elif str(hero.get("class",""))=="Mage":
+		if not MageSystem.activate_trait(hero,battle_time):return
+		else:
+			if MageSystem.has_talent(hero,"mage_l9_2"):deal_healing(hero,hero,MageSystem.scaled_ability_amount(hero,float(MageData.VALUES.fel_infusion_heal)),"basic_ability","Fel Infusion")
+			add_effect("cast",hero.pos,hero.pos,"",CLASSES.Mage.color)
 		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
@@ -206,6 +221,36 @@ func _unhandled_input(event:InputEvent) -> void:
 			for hero in heroes:
 				if str(hero.get("class",""))=="Cleric":hero.selected_heroic_id="cleric_l15_r2";hero.selected_talents={"tier_1":"cleric_l9_2","tier_2":"cleric_l12_3","tier_3":"cleric_l15_r2","tier_4":"cleric_l18_2","tier_5":"cleric_l21_1","tier_6":"cleric_l24_3","tier_7":"cleric_l27_r2","tier_8":"cleric_l30_2"};ClericSystem.initialize_runtime(hero,true);flash("Cleric Dragon test build loaded")
 			return
+		if event.keycode==KEY_F9 and event.ctrl_pressed and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Mage":load_level_one_mage_test(hero)
+			flash("Level 1 Mage baseline loaded");return
+		if event.keycode==KEY_F9 and event.shift_pressed and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Mage":load_mage_test_build(hero,"mage_l15_r1")
+			flash("Level 30 Mage Phoenix chain build loaded");return
+		if event.keycode==KEY_F10 and event.shift_pressed and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Mage":load_mage_test_build(hero,"mage_l15_r2")
+			flash("Level 30 Mage Pyro control build loaded");return
+		if event.keycode==KEY_F9 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():hero.mage_runtime.trait.current_charges=hero.mage_runtime.trait.max_charges;hero.mage_runtime.trait.recharge_timers=[];hero.mage_runtime.trait.armed=false
+			flash("Mage Trait charges reset");return
+		if event.keycode==KEY_F10 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():hero.mage_runtime.arcane_dynamo_stacks=int(MageData.VALUES.arcane_dynamo_max);hero.mage_runtime.arcane_dynamo_remaining=float(MageData.VALUES.arcane_dynamo_duration);hero.mage_runtime.arcane_barrier_ready_in=0.0;MageSystem.refresh_ability_power(hero)
+			flash("Mage Dynamo max; Barrier ready");return
+		if event.keycode==KEY_F11 and testing_zone_active:
+			for hero in heroes:
+				if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():
+					for foe in enemies:
+						if foe.hp>0:apply_living_bomb(hero,foe,true)
+			flash("Living Bomb cluster armed");return
+		if event.keycode==KEY_F12 and testing_zone_active:
+			for foe in enemies:
+				if foe.hp>0 and ("boss" in foe.get("combat_tags",[]) or "elite" in foe.get("combat_tags",[])):foe.hp=maxf(1.0,float(foe.max_hp)*0.10)
+			flash("Boss and Elite targets set to 10% Health");return
 		if event.keycode==KEY_SPACE:paused=!paused;queue_redraw()
 		if event.keycode==KEY_TAB and not event.echo:
 			cycle_selected_enemy()
@@ -247,7 +292,7 @@ func _unhandled_input(event:InputEvent) -> void:
 		if p.x>1190 and p.y<70: paused=true; queue_redraw(); return
 		if paused:
 			if Rect2(490,285,300,58).has_point(p):paused=false;queue_redraw()
-			elif testing_zone_active and Rect2(490,360,300,58).has_point(p):toggle_testing_dummy_attacks()
+			elif testing_zone_active and testing_zone_mode=="range" and Rect2(490,360,300,58).has_point(p):toggle_testing_dummy_attacks()
 			elif Rect2(490,435 if testing_zone_active else 360,300,58).has_point(p):paused=false;show_dungeons() if testing_zone_active else show_zone_map(dungeon_id)
 			return
 		if p.y>575 and p.y<635 and p.x>420 and p.x<875:

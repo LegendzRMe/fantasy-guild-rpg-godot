@@ -1,6 +1,7 @@
 extends RefCounted
 
 const StatusEffectSystem = preload("res://scripts/systems/status_effect_system.gd")
+const AbilityPowerSystem = preload("res://scripts/systems/ability_power_system.gd")
 
 const LEVEL_CAP := 30
 const DEFAULT_HEALTH_GROWTH := 0.03
@@ -76,7 +77,7 @@ static func calculate_final_stats(definition:Dictionary,level:int=1,equipped_ite
 		"weapon_proficiencies":definition.get("weapon_proficiencies",[]).duplicate(),
 		"behavior_flags":definition.get("behavior_flags",[]).duplicate(),
 		"combat_tags":definition.get("combat_tags",[]).duplicate(),
-		"basic_action_speed":0.0,"damage_multiplier":1.0,"healing_multiplier":1.0,"damage_taken_multiplier":1.0,"healing_taken_multiplier":1.0
+		"basic_action_speed":0.0,"ability_power_percent":float(definition.get("ability_power_percent",0.0)),"damage_multiplier":1.0,"healing_multiplier":1.0,"damage_taken_multiplier":1.0,"healing_taken_multiplier":1.0
 	}
 	var multiplier_values:Dictionary={}
 	for source in _modifier_sources(equipped_items,buffs,debuffs):
@@ -104,6 +105,9 @@ static func calculate_final_stats(definition:Dictionary,level:int=1,equipped_ite
 
 static func calculate_power_scaled_amount(source:Dictionary,power_coefficient:float,flat_bonus:float=0.0,percentage_multiplier:float=1.0)->float:
 	return maxf(0.0,(float(source.get("power",0.0))*power_coefficient+flat_bonus)*percentage_multiplier)
+
+static func calculate_ability_amount(source:Dictionary,power_coefficient:float,flat_bonus:float=0.0,percentage_multiplier:float=1.0)->float:
+	return AbilityPowerSystem.apply(calculate_power_scaled_amount(source,power_coefficient,flat_bonus,percentage_multiplier),source)
 
 static func calculate_armor_reduction(armor:float,attacker_level:int=1)->float:
 	var armor_constant:float=ARMOR_BASE_CONSTANT+ARMOR_LEVEL_CONSTANT*clamp_level(attacker_level)
@@ -198,7 +202,7 @@ static func apply_shield(target:Dictionary,amount:float,context:Dictionary={})->
 	var current_shield:float=maxf(0.0,float(target.get("shield",0.0)));var cap:float=float(context.get("cap",INF));var applied:float=minf(maxf(0.0,amount),maxf(0.0,cap-current_shield))
 	target["shield"]=current_shield+applied
 	if not target.has("shield_sources") or not target.shield_sources is Array:target["shield_sources"]=[]
-	if applied>0.0:target.shield_sources.append({"source_id":str(context.get("source_id","shield")),"creator_index":int(context.get("creator_index",-1)),"origin":context.get("origin",null),"amount":applied})
+	if applied>0.0:target.shield_sources.append({"source_id":str(context.get("source_id","shield")),"creator_index":int(context.get("creator_index",-1)),"origin":context.get("origin",null),"amount":applied,"remaining_duration":float(context.get("duration",0.0))})
 	return {"amount":applied,"critical":false,"result_category":"shield","source_action":str(context.get("source_action","basic_ability")),"source_id":str(context.get("source_id","shield"))}
 
 static func create_event(event_type:String,source:Dictionary,target:Dictionary,result:Dictionary,context:Dictionary={})->Dictionary:

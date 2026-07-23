@@ -77,6 +77,7 @@ func apply_passive_trigger(owner:Dictionary,event:Dictionary,target:Dictionary)-
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var resolved_amount:=amount;var retribution_bonus:float=0.0
+	if MageSystem.gravity_crush_applies(source,target,source_action,originating_effect_id,origin):resolved_amount*=1.0+float(MageData.VALUES.gravity_crush)
 	var ranger_basic_result:={}
 	if str(source.get("class",""))=="Ranger" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("ranger_runtime",{}).is_empty():
 		ranger_basic_result=RangerSystem.on_basic_attack_released(source,target);resolved_amount*=float(ranger_basic_result.multiplier)
@@ -104,7 +105,17 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		if ranger_armor>0.0:damage_request["armor_sources"]=[{"id":"gloom","armor":ranger_armor,"remaining":1.0}]
 	if source_action=="percentage_health":damage_request["outgoing_multiplier"]=1.0;damage_request["can_crit"]=false
 	if can_crit_override!=null:damage_request["can_crit"]=bool(can_crit_override)
-	var result:=CombatSystem.resolve_damage(source,target,damage_request)
+	var previews_mage_barrier:bool=str(target.get("class",""))=="Mage" and not target.get("mage_runtime",{}).is_empty() and str(source.get("combat_team",""))!=str(target.get("combat_team",""))
+	var resolution_roll:=-1.0
+	if previews_mage_barrier:
+		resolution_roll=randf()
+		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll);var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
+		if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
+	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
+	if str(source.get("class",""))=="Mage" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("mage_runtime",{}).is_empty():
+		MageSystem.telemetry_add(source,"basic_attacks_released");MageSystem.telemetry_add(source,"basic_attack_hits")
+		var sunfire:=MageSystem.sunfire_release(source,true)
+		if bool(sunfire.armed) and float(sunfire.damage)>0.0:deal_damage(source,target,float(sunfire.damage),"basic_ability","magical","Sunfire Enchantment",false,"mage_sunfire",[],false)
 	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
 		var consumed:=GuardianSystem.consume_block(target,damage_type,source_action,float(result.raw_amount))
 		if consumed:GuardianSystem.telemetry_add(target,"block_prevented",float(result.armor_prevented))
@@ -164,10 +175,17 @@ func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action
 	if source_index>=0:add_healing_threat(source_index,float(result.get("effective_amount",0.0)))
 	return result
 
-func apply_unit_shield(source:Dictionary,target:Dictionary,amount:float,origin=null,source_id:String="shield",cap:float=INF)->Dictionary:
-	var result:=CombatSystem.apply_shield(target,amount,{"creator_index":int(source.get("battle_index",-1)),"source_id":source_id,"origin":origin,"cap":cap,"source_action":"basic_ability"});var event:=CombatSystem.create_event("shield_applied",source,target,result,{"source_action":"basic_ability","action_tags":["basic_ability","shield"],"origin":origin});combat_events.append(event);return result
+func apply_unit_shield(source:Dictionary,target:Dictionary,amount:float,origin=null,source_id:String="shield",cap:float=INF,duration:float=0.0)->Dictionary:
+	var result:=CombatSystem.apply_shield(target,amount,{"creator_index":int(source.get("battle_index",-1)),"source_id":source_id,"origin":origin,"cap":cap,"duration":duration,"source_action":"basic_ability"});var event:=CombatSystem.create_event("shield_applied",source,target,result,{"source_action":"basic_ability","action_tags":["basic_ability","shield"],"origin":origin});combat_events.append(event);return result
 
 func update_timed_combat_effects(unit:Dictionary,delta:float)->void:
+	for shield_index in range(unit.get("shield_sources",[]).size()-1,-1,-1):
+		var shield_source:Dictionary=unit.shield_sources[shield_index];var shield_duration:=float(shield_source.get("remaining_duration",0.0))
+		if shield_duration<=0.0:continue
+		shield_source.remaining_duration=shield_duration-delta
+		if float(shield_source.remaining_duration)<=0.0:
+			unit.shield=maxf(0.0,float(unit.get("shield",0.0))-float(shield_source.get("amount",0.0)));unit.shield_sources.remove_at(shield_index)
+		else:unit.shield_sources[shield_index]=shield_source
 	for effect_index in range(unit.get("active_effects",[]).size()-1,-1,-1):
 		var active_effect:Dictionary=unit.active_effects[effect_index]
 		if float(active_effect.get("remaining_duration",0.0))<=0.0:continue

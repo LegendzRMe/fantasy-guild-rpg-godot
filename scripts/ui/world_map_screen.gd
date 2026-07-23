@@ -39,7 +39,7 @@ func show_dungeons() -> void:
 		if AshwoodManager.encounter_is_completed(state.zone0,encounter_key):completed_count+=1
 	var ashwood:=Button.new(); ashwood.position=active_region.position; ashwood.size=active_region.size; ashwood.text="%s\n%d / 7" % [active_region.name,completed_count]; ashwood.add_theme_font_size_override("font_size",19); ashwood.add_theme_color_override("font_color",C_GOLD); ashwood.add_theme_stylebox_override("normal",ui_box(Color(0.04,.08,.10,.92),12,C_GOLD,3)); ashwood.pressed.connect(func():show_zone_map(active_region.zone)); world_map_content.add_child(ashwood)
 	if is_testing_save():
-		var testing_region:=Button.new();testing_region.name="TestingWorldRegion";testing_region.position=Vector2(1110,165);testing_region.size=Vector2(220,82);testing_region.text="TESTING";testing_region.tooltip_text="Open the training-dummy testing area.";testing_region.add_theme_font_size_override("font_size",22);testing_region.add_theme_color_override("font_color",Color("d9c2ff"));testing_region.add_theme_stylebox_override("normal",ui_box(Color("261d3d"),12,Color("b381ff"),3));testing_region.pressed.connect(start_testing_zone);world_map_content.add_child(testing_region)
+		var testing_region:=Button.new();testing_region.name="TestingWorldRegion";testing_region.position=Vector2(1110,165);testing_region.size=Vector2(220,82);testing_region.text="TESTING";testing_region.tooltip_text="Open testing battles and training tools.";testing_region.add_theme_font_size_override("font_size",22);testing_region.add_theme_color_override("font_color",Color("d9c2ff"));testing_region.add_theme_stylebox_override("normal",ui_box(Color("261d3d"),12,Color("b381ff"),3));testing_region.pressed.connect(show_testing_zone_menu);world_map_content.add_child(testing_region)
 	for region in GameData.LOCKED_WORLD_REGIONS:
 		var marker:=Button.new(); marker.position=region[1]; marker.size=Vector2(210,72); marker.text="🔒  %s" % region[0]; marker.disabled=true; marker.mouse_filter=Control.MOUSE_FILTER_IGNORE; marker.tooltip_text="Locked region"; marker.add_theme_font_size_override("font_size",15); marker.add_theme_stylebox_override("disabled",ui_box(Color(0.05,.07,.11,.88),10,Color("68778e"),2)); world_map_content.add_child(marker)
 	var return_button:=button("Return",show_hall,130); return_button.position=Vector2(1116,22); world_map_view.add_child(return_button)
@@ -48,6 +48,31 @@ func show_dungeons() -> void:
 	if is_testing_save():
 		var reset_story:=button("TEST: RESET ASHWOOD STORY",request_reset_testing_story,265);reset_story.name="TestingResetStoryButton";reset_story.position=Vector2(24,648);reset_story.tooltip_text="Reset Ashwood story progress while keeping testing heroes, levels, equipment, inventory, and guild resources.";reset_story.add_theme_color_override("font_color",Color("d9c2ff"));reset_story.add_theme_stylebox_override("normal",ui_box(Color("261d3d"),8,Color("b381ff"),2));world_map_view.add_child(reset_story)
 	clamp_world_map_pan();call_deferred("clamp_world_map_pan")
+
+func testing_mode_card(title:String,description:String) -> PanelContainer:
+	var card:=PanelContainer.new()
+	card.custom_minimum_size=Vector2(520,390)
+	card.add_theme_stylebox_override("panel",ui_box(Color("182536"),12,Color("465b78"),2))
+	var content:=VBoxContainer.new();content.add_theme_constant_override("separation",18);card.add_child(content)
+	content.add_child(label(title,28,C_GOLD));content.add_child(label(description,17,C_TEXT))
+	return card
+
+func show_testing_zone_menu() -> void:
+	if not is_testing_save():show_dungeons();return
+	screen="testing_zone_menu"
+	var root:=base_screen("Testing Zone")
+	root.add_child(label("Choose a controlled space for combat testing.",17,C_MUTED))
+	var modes:=HBoxContainer.new();modes.add_theme_constant_override("separation",22);modes.size_flags_vertical=Control.SIZE_EXPAND_FILL;root.add_child(modes)
+	var range_card:=testing_mode_card("Dummy Range","Use the existing stationary targets, defensive dummy, bosses, and combat telemetry to inspect individual abilities and interactions.")
+	modes.add_child(range_card);var range_content:=range_card.get_child(0) as VBoxContainer;range_content.add_spacer(false)
+	var enter_range:=button("Enter Dummy Range",start_testing_zone,240);enter_range.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;range_content.add_child(enter_range)
+	var endless_card:=testing_mode_card("Endless Arena","Fight a continuous stream of enemies at one fixed level. Defeated enemies are replaced, and the selected level never increases automatically.")
+	modes.add_child(endless_card);var endless_content:=endless_card.get_child(0) as VBoxContainer
+	var level_row:=HBoxContainer.new();level_row.alignment=BoxContainer.ALIGNMENT_CENTER;level_row.add_theme_constant_override("separation",14);endless_content.add_child(level_row)
+	level_row.add_child(label("Enemy Level",18,C_MUTED))
+	var level_picker:=SpinBox.new();level_picker.name="TestingEndlessLevel";level_picker.min_value=1;level_picker.max_value=CombatSystem.LEVEL_CAP;level_picker.step=1;level_picker.allow_greater=false;level_picker.allow_lesser=false;level_picker.value=testing_endless_level;level_picker.custom_minimum_size=Vector2(120,46);level_picker.value_changed.connect(func(value:float):testing_endless_level=int(value));level_row.add_child(level_picker)
+	endless_content.add_spacer(false)
+	var enter_endless:=button("Begin Endless Arena",func():start_testing_endless(testing_endless_level),250);enter_endless.name="TestingEndlessStart";enter_endless.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;endless_content.add_child(enter_endless)
 
 func show_zone_map(zone:int) -> void:
 	if zone==0:
