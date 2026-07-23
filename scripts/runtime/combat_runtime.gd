@@ -120,8 +120,23 @@ func update_testing_endless(delta:float) -> void:
 		if not bool(enemy.get("testing_endless_enemy",false)) or enemy.hp>0 or not enemy.rewarded:continue
 		enemy.defeated_clear_time=float(enemy.get("defeated_clear_time",0.0))+delta
 		if enemy.defeated_clear_time>=TESTING_ENDLESS_DEFEATED_CLEAR_TIME:
-			enemies.remove_at(enemy_index);testing_endless_defeated+=1
+			remove_testing_endless_enemy_at(enemy_index);testing_endless_defeated+=1
 	var living_count:int=enemies.filter(func(enemy):return enemy.hp>0 and bool(enemy.get("testing_endless_enemy",false))).size()
 	testing_endless_spawn_timer=maxf(0.0,testing_endless_spawn_timer-delta)
 	if living_count<TESTING_ENDLESS_ACTIVE_LIMIT and testing_endless_spawn_timer<=0.0:
 		spawn_testing_endless_enemy();testing_endless_spawn_timer=TESTING_ENDLESS_SPAWN_INTERVAL
+
+func remap_enemy_index_after_removal(value:int,removed_index:int)->int:
+	return -1 if value==removed_index else value-1 if value>removed_index else value
+
+func remove_testing_endless_enemy_at(enemy_index:int)->void:
+	if enemy_index<0 or enemy_index>=enemies.size():return
+	for hero in heroes:
+		hero.target=remap_enemy_index_after_removal(int(hero.get("target",-1)),enemy_index)
+		for repeat in hero.get("pending_repeats",[]):
+			if repeat.has("enemy_target"):repeat.enemy_target=remap_enemy_index_after_removal(int(repeat.enemy_target),enemy_index)
+	focused_enemy_index=remap_enemy_index_after_removal(focused_enemy_index,enemy_index)
+	if drag_target_type=="enemy":
+		if drag_target_index==enemy_index:dragging_hero=false;drag_target_type="ground";drag_target_index=-1
+		elif drag_target_index>enemy_index:drag_target_index-=1
+	enemies.remove_at(enemy_index)

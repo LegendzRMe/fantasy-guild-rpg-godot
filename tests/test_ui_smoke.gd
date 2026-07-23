@@ -590,9 +590,12 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,int(item_rogue.thousand_cuts_count)==0 and hp_before_third-item_dummy.hp>(hp_before_three-hp_before_third)*.45,"Every third Basic Attack should trigger the two Thousand Cuts extra strikes without advancing its own counter.")
 	main.start_testing_endless(17)
 	TestSupport.check(errors,main.testing_zone_mode=="endless" and main.testing_endless_level==17 and main.enemies.size()==4 and main.enemies.all(func(enemy):return int(enemy.level)==17 and bool(enemy.get("testing_endless_enemy",false)) and enemy.rewarded),"Endless Arena should begin with non-rewarding enemies scaled to the selected fixed level.")
+	var endless_mage_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Mage");main.selected=endless_mage_index;main.focused_enemy_index=-1;main.heroes[endless_mage_index].target=-1;main.toast="";main.begin_ability(1)
+	TestSupport.check(errors,main.toast=="","An unavailable target-dependent combat ability should fail silently without adding HUD instructions.")
+	main.selected=0;main.dragging_hero=true;main.drag_target_type="enemy";main.drag_target_index=3;main.focused_enemy_index=3;main.heroes[0].target=3
 	for endless_enemy in main.enemies:endless_enemy.hp=0.0
 	main.update_testing_endless(.8);main.update_testing_endless(.4)
-	TestSupport.check(errors,main.testing_endless_defeated==4 and main.enemies.size()==1 and int(main.enemies[0].level)==17,"Endless Arena should clear defeated enemies, replace them continuously, and retain the selected enemy level.")
+	TestSupport.check(errors,main.testing_endless_defeated==4 and main.enemies.size()==1 and int(main.enemies[0].level)==17 and not main.dragging_hero and main.drag_target_index==-1 and main.focused_enemy_index==-1 and int(main.heroes[0].target)==-1,"Endless Arena should safely clear stale targeting state, replace defeated enemies continuously, and retain the selected enemy level.")
 	main.show_roster()
 	await main.get_tree().process_frame
 	TestSupport.check(errors,main.ui.find_child("TestingHeroLevel",true,false)!=null,"The testing Hero Roster should expose the hero level picker.")

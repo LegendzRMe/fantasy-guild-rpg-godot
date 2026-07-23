@@ -52,14 +52,14 @@ func begin_ability(slot:int,device:String="pc")->void:
 	if tutorial_active and tutorial_step==7 and heroes[selected]["class"]!="Cleric":return
 	if tutorial_active and tutorial_step==7:use_ability(0,heroes[selected].pos);return
 	var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
-	if not TalentSystem.ability_is_unlocked(hero_level,slot):flash("This ability unlocks at Level %d."%int(TalentSystem.ABILITY_UNLOCK_LEVELS[slot]));return
+	if not TalentSystem.ability_is_unlocked(hero_level,slot):return
 	var category=ABILITY_TARGETING[heroes[selected]["class"]][slot]
 	if heroes[selected]["class"]=="Guardian" and slot==3 and guardian_heroic_id(heroes[selected])=="guardian_l15_r2":category="enemy"
 	if heroes[selected]["class"]=="Mage" and slot==3 and str(heroes[selected].get("selected_heroic_id",""))=="mage_l15_r2":category="enemy"
 	var mode="instant" if category=="self" else str(state.casting_settings[device].get(category,"cursor"))
 	if mode=="instant" or mode=="cursor" or mode=="facing" or mode=="target":
 		if (category=="enemy" and combat_enemy_target()<0) or (category=="ally" and (heroes[selected].heal_target<0 or heroes[selected].heal_target>=heroes.size())):
-			flash("Choose a valid %s target first."%category);return
+			return
 		var cast_point=get_global_mouse_position()
 		if mode=="facing":cast_point=heroes[selected].pos+heroes[selected].facing_direction*ABILITY_RANGES[heroes[selected]["class"]][slot]
 		use_ability(slot,cast_point);return
@@ -69,20 +69,20 @@ func begin_trait()->void:
 	if selected<0 or selected>=heroes.size() or bool(heroes[selected].get("independent",false)):return
 	var hero:Dictionary=heroes[selected]
 	if str(hero.get("class",""))=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2"):
-		if not use_guardian_trait(hero):flash("Stoneform is not ready.")
+		use_guardian_trait(hero)
 		queue_redraw()
 	elif str(hero.get("class",""))=="Cleric":
-		if not use_cleric_trait(hero):flash("Fast Feet talent action is unavailable or not ready.")
+		use_cleric_trait(hero)
 		queue_redraw()
 	elif str(hero.get("class",""))=="Ranger" and RangerSystem.has_talent(hero,"ranger_l21_3"):
-		if float(hero.ranger_runtime.strafe_remaining)>0.0:flash("Gloom is unavailable during Strafe.");return
-		if not RangerSystem.activate_gloom(hero):flash("Gloom is not ready.")
+		if float(hero.ranger_runtime.strafe_remaining)>0.0:return
+		RangerSystem.activate_gloom(hero)
 		queue_redraw()
 	elif str(hero.get("class",""))=="Mage":
-		if not MageSystem.activate_trait(hero,battle_time):flash("Verdant Spheres is unavailable or already armed.")
+		if not MageSystem.activate_trait(hero,battle_time):return
 		else:
 			if MageSystem.has_talent(hero,"mage_l9_2"):deal_healing(hero,hero,MageSystem.scaled_ability_amount(hero,float(MageData.VALUES.fel_infusion_heal)),"basic_ability","Fel Infusion")
-			add_effect("cast",hero.pos,hero.pos,"VERDANT SPHERES",CLASSES.Mage.color)
+			add_effect("cast",hero.pos,hero.pos,"",CLASSES.Mage.color)
 		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:

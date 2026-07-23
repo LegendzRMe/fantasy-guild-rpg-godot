@@ -201,19 +201,12 @@ func _draw() -> void:
 				var marker_offset:=Vector2(-34,-49) if serpent_marker_index==0 else Vector2(34,-49)
 				draw_circle(h.pos+marker_offset,7,Color("263142"));draw_circle(h.pos+marker_offset,4.5,Color.WHITE)
 		if bool(h.get("independent",false)) and not victory_sequence:draw_string(ThemeDB.fallback_font,h.pos+Vector2(-42,-62),"ALLIED NPC",HORIZONTAL_ALIGNMENT_CENTER,84,12,C_GREEN)
-		if testing_zone_active and not victory_sequence:
-			var status_parts:Array[String]=[]
-			if int(h.get("soul_furnace_stacks",0))>0:status_parts.append("Soul x%d"%h.soul_furnace_stacks)
-			if not h.get("retribution_charges",[]).is_empty():status_parts.append("Ret %d"%h.retribution_charges.size())
-			if hero_has_passive(h,"borrowed_time"):status_parts.append("Mirror Ready" if h.borrowed_time_armed else "Mirror %.1f"%maxf(0.0,8.0-float(h.borrowed_time_timer)))
-			if hero_has_passive(h,"twin_incantation"):status_parts.append("Q %d/2"%h.q_charges)
-			if not status_parts.is_empty():draw_string(ThemeDB.fallback_font,h.pos+Vector2(-65,79),"  ".join(status_parts),HORIZONTAL_ALIGNMENT_CENTER,130,11,C_GOLD)
 	if dragging_hero:
 		draw_dashed_line(heroes[selected].pos,drag_cursor,Color(C_GOLD,.75),6,8)
 		var preview_color=C_GREEN if drag_target_type=="ally" else (C_RED if drag_target_type=="enemy" else C_GOLD)
 		var preview_pos=drag_cursor
-		if drag_target_type=="enemy":preview_pos=enemies[drag_target_index].pos
-		elif drag_target_type=="ally":preview_pos=heroes[drag_target_index].pos
+		if drag_target_type=="enemy" and drag_target_index>=0 and drag_target_index<enemies.size():preview_pos=enemies[drag_target_index].pos
+		elif drag_target_type=="ally" and drag_target_index>=0 and drag_target_index<heroes.size():preview_pos=heroes[drag_target_index].pos
 		draw_circle(preview_pos,42,Color(preview_color,.14));draw_arc(preview_pos,42,0,TAU,40,preview_color,4)
 	if ability_aiming and selected<heroes.size():
 		var aiming_hero=heroes[selected];var range_limit=float(ABILITY_RANGES[aiming_hero["class"]][aimed_ability_slot]);var aim_point=clamped_cast_point(aiming_hero,ability_aim_point,range_limit) if range_limit>0 else aiming_hero.pos
@@ -292,21 +285,6 @@ func _draw() -> void:
 					if slot==4:
 						var trait_state:=MageSystem.slot_state(active);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[trait_state.charges,trait_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 					elif slot==3 and MageSystem.has_talent(active,"mage_l27_r1") and not active.mage_runtime.phoenix.is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d"%int(active.mage_runtime.phoenix.reposition_charges),HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
-			if active["class"]=="Guardian" and not active.get("guardian_runtime",{}).is_empty():
-				var status_parts:Array=[]
-				if GuardianSystem.has_talent(active,"guardian_l24_3"):status_parts.append("PRESENCE READY" if battle_time>=float(active.guardian_runtime.imposing_ready_at) else "PRESENCE %.0fs"%(float(active.guardian_runtime.imposing_ready_at)-battle_time))
-				if GuardianSystem.has_talent(active,"guardian_l30_2"):status_parts.append("SHIELD READY" if battle_time>=float(active.guardian_runtime.hardened_ready_at) else "SHIELD %.0fs"%(float(active.guardian_runtime.hardened_ready_at)-battle_time))
-				if GuardianSystem.has_talent(active,"guardian_l30_3"):status_parts.append("REWIND %d/3"%GuardianSystem.rewind_sequence_count(active,battle_time) if battle_time>=float(active.guardian_runtime.rewind_ready_at) else "REWIND %.0fs"%(float(active.guardian_runtime.rewind_ready_at)-battle_time))
-				if not status_parts.is_empty():draw_string(ThemeDB.fallback_font,Vector2(450,620),"  •  ".join(status_parts),HORIZONTAL_ALIGNMENT_CENTER,390,11,C_MUTED)
-			elif active["class"]=="Cleric" and not active.get("cleric_runtime",{}).is_empty() and testing_zone_active:
-				var cleric_status:="FAST FEET  Q/E %.2fx  W %.2fx"%[ClericSystem.qwe_cooldown_rate(active),ClericSystem.w_cooldown_rate(active)] if ClericSystem.fast_feet_active(active) else "FAST FEET READY"
-				draw_string(ThemeDB.fallback_font,Vector2(450,620),cleric_status,HORIZONTAL_ALIGNMENT_CENTER,390,11,C_MUTED)
-			elif active["class"]=="Mage" and not active.get("mage_runtime",{}).is_empty():
-				var mage_status:Array=["AP %.0f%%"%(float(active.get("ability_power_percent",0.0))*100.0)]
-				if MageSystem.has_talent(active,"mage_l9_1"):mage_status.append("CONVECTION %d/20  x%d"%[int(active.mage_runtime.convection_progress),int(active.mage_runtime.convection_completions)])
-				if MageSystem.has_talent(active,"mage_l12_3"):mage_status.append("DYNAMO %d/5"%int(active.mage_runtime.arcane_dynamo_stacks))
-				if MageSystem.has_talent(active,"mage_l9_3"):mage_status.append("BARRIER READY" if float(active.mage_runtime.arcane_barrier_ready_in)<=0.0 else "BARRIER %.0fs"%float(active.mage_runtime.arcane_barrier_ready_in))
-				draw_string(ThemeDB.fallback_font,Vector2(410,620),"  •  ".join(mage_status),HORIZONTAL_ALIGNMENT_CENTER,470,11,C_MUTED)
 		draw_string(ThemeDB.fallback_font,Vector2(1080,50),"●  %d"%state.gold,HORIZONTAL_ALIGNMENT_RIGHT,115,20,C_GOLD);draw_circle(Vector2(1235,42),25,Color(0.08,.11,.16,.9)); draw_string(ThemeDB.fallback_font,Vector2(1222,50),"Ⅱ",HORIZONTAL_ALIGNMENT_LEFT,-1,22,C_TEXT)
 
 	if tutorial_active and tutorial_step==4:
@@ -371,7 +349,7 @@ func _draw() -> void:
 					draw_string(ThemeDB.fallback_font,marker_center+Vector2(-72,92),marker_text,HORIZONTAL_ALIGNMENT_CENTER,144,15,C_GOLD if marker_text.begins_with("NEW") else C_GREEN)
 				draw_string(ThemeDB.fallback_font,Vector2(440,585),victory_continue_prompt(),HORIZONTAL_ALIGNMENT_CENTER,400,24,C_MUTED)
 	draw_combat_debug_overlay()
-	if toast_time>0:draw_string(ThemeDB.fallback_font,Vector2(480,680),toast,HORIZONTAL_ALIGNMENT_LEFT,-1,17,C_GOLD)
+	if toast_time>0 and screen!="combat":draw_string(ThemeDB.fallback_font,Vector2(480,680),toast,HORIZONTAL_ALIGNMENT_LEFT,-1,17,C_GOLD)
 
 func health_bar(pos:Vector2,width:float,ratio:float,color:Color)->void:
 	draw_rect(Rect2(pos,Vector2(width,7)),Color("11151e"));draw_rect(Rect2(pos,Vector2(width*clamp(ratio,0,1),7)),color)
