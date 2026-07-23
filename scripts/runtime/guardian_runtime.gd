@@ -13,6 +13,10 @@ func guardian_heroic_id(hero:Dictionary)->String:
 func guardian_scaled(hero:Dictionary,key:String)->float:
 	return GuardianData.power_scaled(float(GuardianData.VALUES[key]),float(hero.get("power",GuardianData.scaled(float(GuardianData.VALUES.basic_attack_damage),int(hero.level)))))
 
+func guardian_area_visual(kind:String,center:Vector2,radius:float,duration:float,secondary:bool=false)->void:
+	var life:=maxf(0.08,duration)
+	effects.append({"kind":kind,"from":center,"to":center,"text":"","color":CLASSES["Guardian"].color,"life":life,"max_life":life,"radius":radius,"secondary":secondary})
+
 func guardian_damage_near(hero:Dictionary,point:Vector2,radius:float,amount:float,origin:String)->Array:
 	var hits:Array=[]
 	for foe in enemies:
@@ -49,6 +53,7 @@ func cast_storm_bolt(hero:Dictionary,cast_position:Vector2)->bool:
 
 func cast_thunder_clap(hero:Dictionary)->bool:
 	CombatRulesV1.preserve_command(hero)
+	guardian_area_visual("guardian_thunder_clap",hero.pos,float(GuardianData.SPACE.thunder_clap_radius),0.55)
 	var targets:Array=[]
 	for foe in enemies:
 		if foe.hp>0 and foe.pos.distance_to(hero.pos)<=float(GuardianData.SPACE.thunder_clap_radius):targets.append(foe)
@@ -61,7 +66,9 @@ func cast_thunder_clap(hero:Dictionary)->bool:
 		var healing:=deal_healing(hero,hero,float(hero.max_hp)*0.06*targets.size(),"basic_ability","Healing Static")
 		GuardianSystem.telemetry_add(hero,"healing_static_healing",float(healing.effective_amount))
 	if GuardianSystem.has_talent(hero,"guardian_l12_2"):hero.ability_cds[3]=float(hero.ability_cds[3])*pow(0.95,targets.size())
-	if GuardianSystem.has_talent(hero,"guardian_l12_3") and not targets.is_empty():hero.guardian_runtime.delayed_effects.append({"remaining":2.0,"point":hero.pos,"amount":amount*0.75,"radius":GuardianData.SPACE.thunder_clap_radius})
+	if GuardianSystem.has_talent(hero,"guardian_l12_3") and not targets.is_empty():
+		hero.guardian_runtime.delayed_effects.append({"remaining":2.0,"point":hero.pos,"amount":amount*0.75,"radius":GuardianData.SPACE.thunder_clap_radius})
+		guardian_area_visual("guardian_thunder_warning",hero.pos,float(GuardianData.SPACE.thunder_clap_radius),2.0,true)
 	hero.ability_cds[1]=float(GuardianData.VALUES.thunder_clap_cooldown);GuardianSystem.telemetry_append(hero,"thunder_clap_casts",targets.size());CombatRulesV1.restore_preserved_command(hero,true)
 	GuardianSystem.record_rewind_cast(hero,"w",battle_time)
 	return true
@@ -139,7 +146,7 @@ func update_guardian_runtime(delta:float)->void:
 		if float(result.stoneform_heal)>0.0:deal_healing(hero,hero,float(result.stoneform_heal),"periodic","Stoneform")
 		for effect_index in range(hero.guardian_runtime.delayed_effects.size()-1,-1,-1):
 			var effect:Dictionary=hero.guardian_runtime.delayed_effects[effect_index];effect.remaining=float(effect.remaining)-delta
-			if effect.remaining<=0.0:guardian_damage_near(hero,effect.point,float(effect.radius),float(effect.amount),"Thunder Burn");hero.guardian_runtime.delayed_effects.remove_at(effect_index)
+			if effect.remaining<=0.0:guardian_damage_near(hero,effect.point,float(effect.radius),float(effect.amount),"Thunder Burn");guardian_area_visual("guardian_thunder_clap",Vector2(effect.point),float(effect.radius),0.55,true);hero.guardian_runtime.delayed_effects.remove_at(effect_index)
 			else:hero.guardian_runtime.delayed_effects[effect_index]=effect
 		if GuardianSystem.has_talent(hero,"guardian_l21_1"):
 			hero.guardian_runtime.bronzebeard_tick=float(hero.guardian_runtime.bronzebeard_tick)-delta

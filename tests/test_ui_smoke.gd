@@ -516,7 +516,7 @@ static func run(main:Node) -> Array:
 	for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=Vector2(1100,100+enemy_index*70)
 	input_guardian.ability_cds[1]=0.0
 	var thunder_clap_cast:bool=bool(main.cast_guardian_ability(1,input_guardian.pos))
-	TestSupport.check(errors,thunder_clap_cast and input_guardian.guardian_runtime.telemetry.thunder_clap_casts[-1]==0,"Thunder Clap should complete safely and record its per-cast target count without a telemetry type crash.")
+	TestSupport.check(errors,thunder_clap_cast and input_guardian.guardian_runtime.telemetry.thunder_clap_casts[-1]==0 and main.effects.any(func(effect):return effect.kind=="guardian_thunder_clap" and is_equal_approx(float(effect.get("radius",0.0)),float(main.GuardianData.SPACE.thunder_clap_radius))),"Thunder Clap should complete safely, record its per-cast target count, and visibly represent its actual area.")
 	for enemy_index in main.enemies.size():main.enemies[enemy_index].pos=original_enemy_positions[enemy_index]
 	var defense_dummy:Dictionary=main.enemies[-1]
 	main.heroes[0].pos=defense_dummy.pos+Vector2(100,0);main.heroes[0].dest=main.heroes[0].pos;main.heroes[0].suppress_auto_target=true

@@ -404,6 +404,16 @@ func draw_combat_effect(fx:Dictionary)->void:
 		"cloud_serpent_projectile":
 			var serpent_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var serpent_direction:Vector2=fx.from.direction_to(fx.to)
 			draw_line(serpent_position-serpent_direction*20.0,serpent_position,Color("79dfe8",alpha*.58),4);draw_circle(serpent_position,8,Color("8feaf2",alpha*.26));draw_circle(serpent_position,4.5,col);draw_circle(serpent_position,2,Color.WHITE)
+		"guardian_thunder_clap":
+			var thunder_center:=Vector2(fx.to);var thunder_radius:=float(fx.get("radius",145.0));var thunder_spread:=clampf(progress*1.7,0.0,1.0);var thunder_color:=Color("b68cff") if bool(fx.get("secondary",false)) else Color("62b8ff")
+			draw_circle(thunder_center,thunder_radius*thunder_spread,Color(thunder_color,alpha*.10));draw_arc(thunder_center,thunder_radius*thunder_spread,0,TAU,64,Color(thunder_color,alpha),6)
+			draw_arc(thunder_center,thunder_radius*maxf(0.12,thunder_spread*.68),0,TAU,48,Color.WHITE,alpha*3.5)
+			for bolt_index in 8:
+				var bolt_angle:float=TAU*float(bolt_index)/8.0+float(progress)*.22;var bolt_start:Vector2=thunder_center+Vector2.RIGHT.rotated(bolt_angle)*thunder_radius*thunder_spread*.28;var bolt_mid:Vector2=thunder_center+Vector2.RIGHT.rotated(bolt_angle+.07)*thunder_radius*thunder_spread*.62;var bolt_end:Vector2=thunder_center+Vector2.RIGHT.rotated(bolt_angle-.04)*thunder_radius*thunder_spread*.92
+				draw_polyline(PackedVector2Array([bolt_start,bolt_mid,bolt_end]),Color(thunder_color,alpha*.88),3)
+		"guardian_thunder_warning":
+			var warning_center:=Vector2(fx.to);var warning_radius:=float(fx.get("radius",145.0));var warning_color:=Color("a879e8")
+			draw_circle(warning_center,warning_radius,Color(warning_color,.035));draw_arc(warning_center,warning_radius,0,TAU,64,Color(warning_color,.38),2);draw_arc(warning_center,warning_radius+4,-PI/2,-PI/2+TAU*(1.0-progress),64,Color(warning_color,.72),4)
 		"mage_gravity":
 			var gravity_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(gravity_position,9,Color(col,.24));draw_circle(gravity_position,4,Color.WHITE);draw_line(fx.from,gravity_position,Color(col,.45),3)
 		"mage_flamestrike_warning":
