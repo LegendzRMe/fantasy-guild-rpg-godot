@@ -84,6 +84,8 @@ func begin_trait()->void:
 			if MageSystem.has_talent(hero,"mage_l9_2"):deal_healing(hero,hero,MageSystem.scaled_ability_amount(hero,float(MageData.VALUES.fel_infusion_heal)),"basic_ability","Fel Infusion")
 			add_effect("cast",hero.pos,hero.pos,"",CLASSES.Mage.color)
 		queue_redraw()
+	elif str(hero.get("class",""))=="Warlock":
+		if use_warlock_trait(hero):queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false

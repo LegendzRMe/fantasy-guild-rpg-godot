@@ -31,6 +31,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		elif str(heroes[-1].get("class",""))=="Cleric":ClericSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Ranger":RangerSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Mage":MageSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Warlock":WarlockSystem.initialize_runtime(heroes[-1],is_testing_save())
 	queue_redraw()
 
 func start_testing_zone() -> void:
@@ -47,6 +48,7 @@ func start_testing_zone() -> void:
 		elif str(hero.get("class",""))=="Cleric":hero.cleric_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Ranger":hero.ranger_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Mage":hero.mage_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Warlock":hero.warlock_runtime.telemetry_enabled=true
 	testing_dummy_attacks_enabled=true
 	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
 	spawn_enemy(Vector2(650,120),"Dummy");enemies[-1]["passive_test_enemy"]=true
@@ -96,6 +98,7 @@ func start_testing_endless(enemy_level:int) -> void:
 		elif str(hero.get("class",""))=="Cleric":hero.cleric_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Ranger":hero.ranger_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Mage":hero.mage_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Warlock":hero.warlock_runtime.telemetry_enabled=true
 	for initial_enemy in 4:spawn_testing_endless_enemy()
 	queue_redraw()
 

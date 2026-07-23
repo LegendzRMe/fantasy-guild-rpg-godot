@@ -9,7 +9,7 @@ func item_feedback(text_value:String,position:Vector2,color:Color=C_GOLD)->void:
 func current_damage_taken_multiplier(unit:Dictionary)->float:
 	var multiplier:float=float(unit.get("damage_taken_multiplier",1.0))
 	for effect in unit.get("active_effects",[]):
-		if str(effect.get("id",""))=="vulnerable":multiplier*=float(effect.get("damage_taken_multiplier",1.15))
+		if effect.has("damage_taken_multiplier") and float(effect.get("remaining_duration",0.0))>0.0:multiplier*=float(effect.damage_taken_multiplier)
 	return multiplier
 
 func refresh_item_combat_stats(hero:Dictionary)->void:
@@ -103,6 +103,9 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	elif str(target.get("class",""))=="Ranger" and not target.get("ranger_runtime",{}).is_empty():
 		var ranger_armor:=RangerSystem.trait_armor(target)
 		if ranger_armor>0.0:damage_request["armor_sources"]=[{"id":"gloom","armor":ranger_armor,"remaining":1.0}]
+	elif str(target.get("class",""))=="Warlock" and not target.get("warlock_runtime",{}).is_empty():
+		var warlock_armor:=WarlockSystem.fel_armor(target)
+		if warlock_armor>0.0:damage_request["armor_sources"]=[{"id":"fel_armor","armor":warlock_armor,"remaining":float(target.warlock_runtime.fel_armor_remaining)}]
 	if source_action=="percentage_health":damage_request["outgoing_multiplier"]=1.0;damage_request["can_crit"]=false
 	if can_crit_override!=null:damage_request["can_crit"]=bool(can_crit_override)
 	var previews_mage_barrier:bool=str(target.get("class",""))=="Mage" and not target.get("mage_runtime",{}).is_empty() and str(source.get("combat_team",""))!=str(target.get("combat_team",""))
@@ -112,6 +115,12 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll);var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
 		if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
+	if str(target.get("class",""))=="Warlock" and not target.get("warlock_runtime",{}).is_empty() and float(result.get("health_damage",0.0))>0.0:
+		var circle:=WarlockSystem.try_demonic_circle(target,float(result.health_damage),{"health_cost":false})
+		if bool(circle.triggered):
+			target.hp=float(target.hp)+float(result.health_damage);result.health_damage=0.0;result.resolved_damage=float(result.shield_damage);result.defeated=false;result.overkill=0.0
+			clear_hero_command(target,"demonic circle");target.command_state=CombatRulesV1.CommandState.INCAPACITATED;target.incapacitated=true
+		else:WarlockSystem.convert_health_loss(target,float(result.health_damage),{"exclude_health_loss_cooldown_conversion":false})
 	if str(source.get("class",""))=="Mage" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("mage_runtime",{}).is_empty():
 		MageSystem.telemetry_add(source,"basic_attacks_released");MageSystem.telemetry_add(source,"basic_attack_hits")
 		var sunfire:=MageSystem.sunfire_release(source,true)
