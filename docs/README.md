@@ -7,7 +7,7 @@ Start with [`architecture.md`](architecture.md) for module ownership, dependency
 - [`shared_combat_rules_v1.md`](shared_combat_rules_v1.md): commands, Basic Actions, targeting, projectiles, casts, and interruption rules.
 - [`balance_principles_v1.md`](balance_principles_v1.md) and [`balance_simulator.md`](balance_simulator.md): numerical balance assumptions and developer tooling.
 - [`performance_and_builds.md`](performance_and_builds.md): repeatable validation, code/asset metrics, profiling, export templates, and release builds.
-- Focused reusable mechanics: ability charges, Ability Power, alternate action sets, Armor reduction, background channels, Blind, Combo Points, Fear/Silence, health-loss cooldown conversion, Living Bomb lineage, percentage-Health damage, periodic statuses, and stealth/detection.
+- Focused reusable mechanics: ability charges, Ability Power, alternate action sets, Armor reduction, background channels, Blind, shared Block charges, Combo Points, Evasion, Fear/Silence, health-loss cooldown conversion, Living Bomb lineage, named Shields, percentage-Health damage, periodic statuses, stealth/detection, and combat target categories.
 
 ## Class conversion specifications
 
@@ -17,6 +17,7 @@ Start with [`architecture.md`](architecture.md) for module ownership, dependency
 - Mage: [`mage_hots_conversion_v1.md`](mage_hots_conversion_v1.md), with the earlier implementation delta retained in [`mage_kaelthas_conversion_v1.md`](mage_kaelthas_conversion_v1.md)
 - Warlock: [`warlock_conversion_v1.md`](warlock_conversion_v1.md)
 - Rogue: [`rogue_conversion_v1.md`](rogue_conversion_v1.md)
+- Slayer: [`slayer_conversion_v1.md`](slayer_conversion_v1.md)
 
 Geometry calibration documents are development records for provisional combat-space values. They are not final visual specifications.
 

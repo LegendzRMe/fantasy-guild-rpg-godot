@@ -67,6 +67,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_mage_runtime(delta)
 	update_warlock_runtime(delta)
 	update_rogue_runtime(delta)
+	update_slayer_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 

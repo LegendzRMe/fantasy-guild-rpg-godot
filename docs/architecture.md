@@ -41,6 +41,7 @@ Owns mutable application, menu, map, tutorial, item-overlay, and combat state de
 - `scripts/runtime/cleric_runtime.gd`: Cleric V1 Q/W/E, Heroics, Serpent ownership, periodic healing, and class-specific testing hooks. It delegates Blind, Unstoppable, damage/healing, commands, and cooldown-rate math to focused shared/class systems.
 - `scripts/runtime/mage_runtime.gd`: Mage V1 Verdant Spheres, Q/W/E, Phoenix, Pyroblast, Living Bomb updates, and Mage-specific testing behavior. Reusable Ability Power and bomb-lineage rules remain outside the runtime.
 - `scripts/runtime/rogue_runtime.gd`: Rogue V1 normal/opening action sets, Combo Point finishers, concealment Heroics, owned Garrote effects, temporary presentation, and Rogue-range behavior.
+- `scripts/runtime/slayer_runtime.gd`: Slayer V1 Dive/Sweep movement, Evasion, Heroics, encounter talent updates, named Shields, and Slayer-range behavior. Shared Evasion, Block-charge, charge, target-category, percentage-Health, and status rules remain outside the runtime.
 - `scripts/runtime/enemy_combat_runtime.gd`: waves, spawning, encounter objectives, enemy target selection, and combat lookup helpers.
 - `scripts/runtime/ability_runtime.gd`: temporary class ability execution and cast-position resolution.
 - `scripts/runtime/combat_input_runtime.gd`: combat selection, drag commands, ability aiming, keyboard, mouse, touch, and tutorial input gates.
@@ -76,6 +77,8 @@ Mage follows that pattern through `mage_data.gd`, `mage_system.gd`, `mage_runtim
 Warlock follows the same split through `warlock_data.gd`, `warlock_system.gd`, `warlock_runtime.gd`, and `warlock_ability_presenter.gd`. Reusable periodic status records live in `periodic_status_system.gd`; Fear and Silence remain shared controls in `status_effect_system.gd`. Health-loss cooldown conversion and the background-channel exception are documented as narrow contracts rather than generic class behavior.
 
 Rogue follows the same split through `rogue_data.gd`, `rogue_system.gd`, `rogue_runtime.gd`, and `rogue_ability_presenter.gd`. Class-neutral Combo Points, alternate action sets, concealment/detection, and strongest-source Armor reduction live in focused systems so future forms, detectors, enemies, items, and debuffs can reuse the contracts without importing Rogue runtime code.
+
+Slayer follows the same split through `slayer_data.gd`, `slayer_system.gd`, `slayer_runtime.gd`, and `slayer_ability_presenter.gd`. Class-neutral Evasion, Block charges, ability charges, target-category qualification, percentage-Health requests, and control-duration profiles remain focused shared systems.
 
 ### `scripts/data/talent_data.gd`
 

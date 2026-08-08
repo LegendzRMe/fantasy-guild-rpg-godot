@@ -5,6 +5,7 @@ const ComboPointSystem=preload("res://scripts/systems/combo_point_system.gd")
 const AlternateActionSetSystem=preload("res://scripts/systems/alternate_action_set_system.gd")
 const StealthDetectionSystem=preload("res://scripts/systems/stealth_detection_system.gd")
 const StatusEffectSystem=preload("res://scripts/systems/status_effect_system.gd")
+const BlockChargeSystem=preload("res://scripts/systems/block_charge_system.gd")
 
 static func has_talent(unit:Dictionary,id:String)->bool:return id in unit.get("selected_talents",{}).values()
 static func scaled(unit:Dictionary,value:float)->float:return RogueData.scaled(value,int(unit.get("level",1)))*maxf(0.0,float(unit.get("power",RogueData.scaled(RogueData.VALUES.basic_attack_damage,int(unit.get("level",1))))))/maxf(0.001,RogueData.scaled(RogueData.VALUES.basic_attack_damage,int(unit.get("level",1))))
@@ -22,6 +23,7 @@ static func initialize_runtime(unit:Dictionary,telemetry_enabled:bool=false)->vo
 	ComboPointSystem.initialize(unit,maximum);StealthDetectionSystem.initialize(unit)
 	AlternateActionSetSystem.initialize(unit,{"normal":{0:"rogue_q",1:"rogue_w",2:"rogue_e"},"stealth":{0:"rogue_stealth_q",1:"rogue_stealth_w",2:"rogue_stealth_e"}},"normal")
 	unit["rogue_runtime"]={"vanish_active":false,"vanish_elapsed":0.0,"stationary_elapsed":0.0,"last_position":unit.get("pos",Vector2.ZERO),"opener_ready":false,"initiative_remaining":0.0,"slice_remaining":0.0,"slice_attacks":0,"fatal_finesse_stacks":0,"garrotes":[],"delayed_effects":[],"smoke_clouds":[],"smoke_free_used":{},"block_charges":0,"temporary_armor_sources":[],"telemetry_enabled":telemetry_enabled,"telemetry":default_telemetry(),"rng":RandomNumberGenerator.new()}
+	BlockChargeSystem.initialize_legacy(unit.rogue_runtime,3)
 	unit.rogue_runtime.rng.seed=int(unit.get("combat_id","").hash())
 
 static func telemetry_add(unit:Dictionary,key:String,value=1)->void:

@@ -4,5 +4,4 @@
 
 Sequential recharge restores one charge at a time and then begins the next timer. Independent recharge keeps one timer per spent charge. `reduce_active_recharge` changes only the currently active timer. `ui_state` is the single presentation contract for charge pips/counts, recharge, inter-cast delay, lockout, disabled, and unavailable states.
 
-Ranger Vault/Rain use sequential recharge. Existing Cleric charge behavior remains unchanged in combat, and the shared model's independent mode is covered for a future safe migration rather than forcing a risky behavior change in this feature.
-
+Ranger Vault/Rain use sequential recharge. Slayer Sweeping Strike also uses sequential recharge: baseline has one charge, completed Unbound has two, and Betrayer's Thirst reduces only the active recharge timer. Existing Cleric charge behavior remains unchanged in combat, and the shared model's independent mode is covered for a future safe migration rather than forcing a risky behavior change in this feature.

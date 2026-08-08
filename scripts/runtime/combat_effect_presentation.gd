@@ -76,6 +76,14 @@ func draw_combat_effect(fx:Dictionary)->void:
 			var rain_radius:=float(fx.get("radius",42.0));draw_circle(fx.to,rain_radius,Color("7f2aa6",alpha*.27));draw_line(fx.to-Vector2(18,75),fx.to,Color("db8cff",alpha),9);draw_arc(fx.to,rain_radius,0,TAU,40,Color("ffd6ff",alpha),5)
 		"warlock_life_tap":
 			var tap_color:=Color("e2a5ff") if bool(fx.get("free",false)) else Color("b15cff");draw_circle(fx.from,30+progress*32,Color(tap_color,alpha*.12));draw_arc(fx.from,30+progress*32,0,TAU,36,Color(tap_color,alpha),5)
+		"slayer_dive", "slayer_hunt":
+			var dash_pos:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var dash_dir:Vector2=fx.from.direction_to(fx.to);draw_line(fx.from,dash_pos,Color(col,.38),10);draw_line(dash_pos-dash_dir.rotated(.65)*15,dash_pos+dash_dir.rotated(.65)*15,col,5);draw_line(dash_pos-dash_dir.rotated(-.65)*15,dash_pos+dash_dir.rotated(-.65)*15,col,5)
+		"slayer_sweep":
+			var sweep_dir:Vector2=fx.from.direction_to(fx.to);var sweep_tip:Vector2=fx.from.lerp(fx.to,clampf(progress*1.5,0.0,1.0));var side:=sweep_dir.orthogonal()*float(fx.get("width",42.0));draw_colored_polygon(PackedVector2Array([fx.from-side*.25,sweep_tip-side,sweep_tip+side,fx.from+side*.25]),Color(col,.16));draw_line(sweep_tip-side,sweep_tip+side,col,5)
+		"slayer_evasion":
+			var evasion_radius:=float(fx.get("radius",54.0));draw_arc(fx.from,evasion_radius,progress*TAU,progress*TAU+PI*1.5,40,col,5);draw_arc(fx.from,evasion_radius-9,-progress*TAU,-progress*TAU+PI*1.5,36,Color.WHITE,2)
+		"slayer_metamorphosis":
+			var demon_radius:=float(fx.get("radius",84.0));draw_circle(fx.from,demon_radius*clampf(progress*1.8,0.0,1.0),Color(col,alpha*.18));draw_arc(fx.from,demon_radius,0,TAU,56,col,7)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":
@@ -102,6 +110,8 @@ func draw_role_icon(pos:Vector2,hero_class:String,ink:Color=Color("101827"))->vo
 		draw_line(pos+Vector2(-13,12),pos+Vector2(11,-12),ink,5);draw_line(pos+Vector2(-11,-12),pos+Vector2(13,12),ink,5)
 	elif hero_class=="Warlock":
 		draw_circle(pos,13,Color.TRANSPARENT,2);draw_arc(pos,14,0,TAU,28,ink,4);draw_colored_polygon(PackedVector2Array([pos+Vector2(0,-15),pos+Vector2(10,6),pos+Vector2(0,2),pos+Vector2(-10,6)]),ink)
+	elif hero_class=="Slayer":
+		draw_arc(pos+Vector2(-4,0),14,-1.1,1.1,18,ink,4);draw_arc(pos+Vector2(4,0),14,PI-1.1,PI+1.1,18,ink,4);draw_line(pos+Vector2(-12,12),pos+Vector2(12,-12),ink,3);draw_line(pos+Vector2(-12,-12),pos+Vector2(12,12),ink,3)
 	else:
 		# Ranged DPS use a bow marker. Future melee classes can use crossed swords.
 		draw_arc(pos+Vector2(-3,0),15,-PI/2,PI/2,18,ink,4);draw_line(pos+Vector2(-3,-15),pos+Vector2(-3,15),ink,2);draw_line(pos+Vector2(-3,0),pos+Vector2(15,0),ink,3);draw_colored_polygon(PackedVector2Array([pos+Vector2(15,0),pos+Vector2(8,-5),pos+Vector2(8,5)]),ink)

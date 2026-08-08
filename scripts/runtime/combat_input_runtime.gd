@@ -11,6 +11,9 @@ func load_level_one_mage_test(hero:Dictionary)->void:
 func load_rogue_test_build(hero:Dictionary,build_index:int)->void:
 	var build:Dictionary=RogueData.TEST_BUILDS[clampi(build_index,0,RogueData.TEST_BUILDS.size()-1)];var level:int=int(build.level);hero.level=level;hero.power=RogueData.scaled(float(RogueData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=RogueData.scaled(float(RogueData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);RogueSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_slayer_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=SlayerData.TEST_BUILDS[clampi(build_index,0,SlayerData.TEST_BUILDS.size()-1)];var level:int=int(build.level);hero.level=level;hero.power=SlayerData.scaled(float(SlayerData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=SlayerData.scaled(float(SlayerData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);SlayerSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
 func rogue_range_hero():
 	for hero in heroes:
 		if str(hero.get("class",""))=="Rogue":return hero
@@ -39,7 +42,7 @@ func handle_rogue_range_shortcut(event:InputEventKey)->bool:
 		KEY_F:
 			hero.rogue_runtime.fatal_finesse_stacks=0 if int(hero.rogue_runtime.fatal_finesse_stacks)>=int(RogueData.VALUES.fatal_max_stacks) else int(RogueData.VALUES.fatal_max_stacks);flash("Fatal Finesse: %d"%int(hero.rogue_runtime.fatal_finesse_stacks))
 		KEY_B:
-			hero.rogue_runtime.block_charges=3;flash("Combat Readiness: 3 Block")
+			BlockChargeSystem.grant_legacy(hero.rogue_runtime,3,3);flash("Combat Readiness: 3 Block")
 		KEY_M:
 			hero.selected_heroic_id="rogue_l15_r1";hero.ability_cds[3]=0.0;cast_rogue_heroic(hero);flash("Smoke Bomb triggered")
 		KEY_C:
@@ -106,6 +109,7 @@ func begin_ability(slot:int,device:String="pc")->void:
 	var category=ABILITY_TARGETING[heroes[selected]["class"]][slot]
 	if heroes[selected]["class"]=="Guardian" and slot==3 and guardian_heroic_id(heroes[selected])=="guardian_l15_r2":category="enemy"
 	if heroes[selected]["class"]=="Mage" and slot==3 and str(heroes[selected].get("selected_heroic_id",""))=="mage_l15_r2":category="enemy"
+	if heroes[selected]["class"]=="Slayer" and slot==3 and str(heroes[selected].get("selected_heroic_id",""))=="slayer_l15_r2":category="enemy"
 	var mode="instant" if category=="self" else str(state.casting_settings[device].get(category,"cursor"))
 	if mode=="instant" or mode=="cursor" or mode=="facing" or mode=="target":
 		if (category=="enemy" and combat_enemy_target()<0) or (category=="ally" and (heroes[selected].heal_target<0 or heroes[selected].heal_target>=heroes.size())):
@@ -138,6 +142,8 @@ func begin_trait()->void:
 		if use_warlock_trait(hero):queue_redraw()
 	elif str(hero.get("class",""))=="Rogue":
 		if use_rogue_trait(hero):queue_redraw()
+	elif str(hero.get("class",""))=="Slayer":
+		if use_slayer_trait(hero):queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -225,6 +231,11 @@ func finish_hero_drag()->void:
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
 	if handle_rogue_range_shortcut(event):return true
+	if testing_zone_active and testing_zone_mode=="slayer_range" and event.shift_pressed and event.keycode>=KEY_0 and event.keycode<=KEY_9:
+		var build_index:int=9 if event.keycode==KEY_0 else int(event.keycode-KEY_1)
+		for hero in heroes:
+			if str(hero.get("class",""))=="Slayer":load_slayer_test_build(hero,build_index)
+		flash("Slayer build: %s"%str(SlayerData.TEST_BUILDS[build_index].name));queue_redraw();return true
 	if testing_zone_active and testing_zone_mode=="rogue_range" and event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_6:
 		var build_index:int=int(event.keycode-KEY_1)
 		for hero in heroes:
