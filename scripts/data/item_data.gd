@@ -189,6 +189,6 @@ static func legacy_ashwood_instance(legacy_item:Dictionary)->Dictionary:
 	var instance_id:=str(legacy_item.get("id",""))
 	if instance_id=="":instance_id="legacy_%s"%display_name.to_lower().replace(" ","_").replace("'","")
 	if definition_id!="":return create_instance(definition_id,instance_id)
-	var hero_class:=str(legacy_item.get("class",""));var weapon_family:String=str({"Ranger":"bow","Mage":"wand","Warlock":"wand","Rogue":"dual_wield","Slayer":"dual_wield"}.get(hero_class,""))
-	var slot:="weapon" if weapon_family!="" else "chest";var armor_family:String=str({"Guardian":"plate","Cleric":"mail","Ranger":"mail","Rogue":"leather","Slayer":"leather","Mage":"cloth","Warlock":"cloth"}.get(hero_class,""))
+	var hero_class:=str(legacy_item.get("class",""));var weapon_family:String=str({"Ranger":"bow","Mage":"wand","Warlock":"wand","Priest":"wand","Rogue":"dual_wield","Slayer":"dual_wield"}.get(hero_class,""))
+	var slot:="weapon" if weapon_family!="" else "chest";var armor_family:String=str({"Guardian":"plate","Cleric":"mail","Ranger":"mail","Rogue":"leather","Slayer":"leather","Mage":"cloth","Warlock":"cloth","Priest":"cloth"}.get(hero_class,""))
 	return {"instance_id":instance_id,"definition_id":"legacy_%s"%display_name.to_lower().replace(" ","_").replace("'",""),"display_name":display_name,"slot":slot,"tier":1,"rarity":str(legacy_item.get("rarity","Common")),"armor_family_requirement":armor_family if slot!="weapon" else "","weapon_family_requirement":weapon_family,"allowed_classes":[hero_class] if hero_class!="" else [],"stat_modifiers":{},"passive_effect_ids":[],"icon_path":"","fallback_icon_type":weapon_family if slot=="weapon" else slot,"testing_only":false,"owner_state":"vault","equipped_hero_index":-1}

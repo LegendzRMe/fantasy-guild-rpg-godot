@@ -68,6 +68,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_warlock_runtime(delta)
 	update_rogue_runtime(delta)
 	update_slayer_runtime(delta)
+	update_priest_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 
@@ -80,6 +81,7 @@ func update_combat_heroes(delta:float) -> bool:
 			if str(h.get("class",""))=="Cleric" and not h.get("cleric_runtime",{}).is_empty() and slot<3:cooldown_rate=ClericSystem.w_cooldown_rate(h) if slot==1 else ClericSystem.qwe_cooldown_rate(h)
 			elif str(h.get("class",""))=="Ranger" and not h.get("ranger_runtime",{}).is_empty() and slot==1 and RangerSystem.has_talent(h,"ranger_l24_1") and int(h.ranger_runtime.hatred)>=int(RangerData.VALUES.hatred_max):cooldown_rate=1.5
 			elif str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty() and slot==1 and WarlockSystem.has_talent(h,"warlock_l12_1") and not h.get("active_channel",{}).is_empty():cooldown_rate=2.0
+			elif str(h.get("class",""))=="Priest" and not h.get("priest_runtime",{}).is_empty() and slot==2 and PriestSystem.has_talent(h,"priest_l21_2") and int(h.priest_runtime.push_stacks)>=int(PriestData.VALUES.push_max):cooldown_rate=float(PriestData.VALUES.push_e_rate)
 			h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta*cooldown_rate)
 		if str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty():h.ability_cds[4]=float(h.warlock_runtime.life_tap_lockout)
 		if h.hp>0:update_item_runtime(h,delta)

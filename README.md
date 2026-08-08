@@ -17,7 +17,7 @@ You can also import `project.godot` in the Godot editor and press **F6/F5**.
 - Drag-and-drop team builder with named saved teams
 - Full-screen world map and zone encounter paths
 - Multi-wave real-time combat with manual movement and targeting
-- Guardian, Cleric, Rogue, Ranger, Mage, and Warlock roles
+- Guardian, Cleric, Rogue, Ranger, Mage, Warlock, Slayer, and testing-only Priest roles
 - A data-driven, replayable Ashwood Marches campaign with seven mandatory encounters and a two-encounter optional branch
 - Narrative recruit decisions, objective battles, equipment rewards, and a permanent Special Hero choice
 - Enemy roles, boss telegraphs, and staged victory rewards
@@ -37,7 +37,7 @@ You can also import `project.godot` in the Godot editor and press **F6/F5**.
 - **F3** toggles the Shared Combat Rules debug overlay in the testing range.
 - Click the pause button to resume or retreat.
 
-In the testing save, select **TESTING** on the world map to choose the Dummy Range, a class range, or Endless Arena. The Rogue Range includes ordinary targets and a detector Boss for Combo Point, opener, Armor-reduction, and concealment testing. Slayer Range includes target-category, safe-landing, blocker, multi-target, Evasion, and sustain fixtures; `Shift+1..9` and `Shift+0` load its ten representative builds. Endless Arena continuously replaces defeated enemies at the selected level without increasing that level or awarding test-fight resources.
+In the testing save, select **TESTING** on the world map to choose the Dummy Range, a class range, or Endless Arena. The Rogue Range includes ordinary targets and a detector Boss for Combo Point, opener, Armor-reduction, and concealment testing. Slayer Range includes target-category, safe-landing, blocker, multi-target, Evasion, and sustain fixtures; `Shift+1..9` and `Shift+0` load its ten representative builds. Priest Range includes mixed target categories, automatic-heal positioning fixtures, Spirit controls, and three representative builds on `Shift+1..3`. Endless Arena continuously replaces defeated enemies at the selected level without increasing that level or awarding test-fight resources.
 
 The project uses original placeholder systems and artwork. Names, UI, game rules, and assets are subject to change during development.
 

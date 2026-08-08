@@ -84,6 +84,14 @@ func draw_combat_effect(fx:Dictionary)->void:
 			var evasion_radius:=float(fx.get("radius",54.0));draw_arc(fx.from,evasion_radius,progress*TAU,progress*TAU+PI*1.5,40,col,5);draw_arc(fx.from,evasion_radius-9,-progress*TAU,-progress*TAU+PI*1.5,36,Color.WHITE,2)
 		"slayer_metamorphosis":
 			var demon_radius:=float(fx.get("radius",84.0));draw_circle(fx.from,demon_radius*clampf(progress*1.8,0.0,1.0),Color(col,alpha*.18));draw_arc(fx.from,demon_radius,0,TAU,56,col,7)
+		"priest_flash_cast","priest_flash_heal":
+			draw_line(fx.from,fx.to,col,4);draw_arc(fx.to,24+progress*18,0,TAU,28,col,4)
+		"priest_star":
+			draw_line(fx.from,fx.to,Color(col,.55),3);draw_circle(fx.to,8+progress*3,col);draw_circle(fx.to,3,Color.WHITE)
+		"priest_chastise":
+			draw_line(fx.from,fx.to,Color(col,.8),maxf(3.0,float(fx.get("width",20.0))*.18));draw_line(fx.from,fx.to,Color.WHITE,2)
+		"priest_lightbomb_warning","priest_salvation":
+			var priest_radius:=float(fx.get("radius",80.0));draw_circle(fx.from,priest_radius,Color(col,.08));draw_arc(fx.from,priest_radius,0,TAU,48,col,4)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":
@@ -102,7 +110,7 @@ func draw_role_icon(pos:Vector2,hero_class:String,ink:Color=Color("101827"))->vo
 	if hero_class=="Guardian":
 		var shield=PackedVector2Array([pos+Vector2(-11,-13),pos+Vector2(11,-13),pos+Vector2(9,5),pos+Vector2(0,15),pos+Vector2(-9,5)])
 		draw_colored_polygon(shield,ink);draw_polyline(shield+PackedVector2Array([shield[0]]),Color.WHITE,2)
-	elif hero_class=="Cleric":
+	elif hero_class in ["Cleric","Priest"]:
 		draw_rect(Rect2(pos+Vector2(-5,-15),Vector2(10,30)),ink);draw_rect(Rect2(pos+Vector2(-15,-5),Vector2(30,10)),ink)
 	elif hero_class=="Mage":
 		draw_line(pos+Vector2(-11,13),pos+Vector2(8,-8),ink,5);draw_circle(pos+Vector2(11,-11),6,ink);draw_circle(pos+Vector2(11,-11),2,Color.WHITE)

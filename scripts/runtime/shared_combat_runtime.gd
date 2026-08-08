@@ -22,7 +22,9 @@ func hero_index_by_combat_id(combat_id:String)->int:
 
 func target_is_valid_for(unit:Dictionary,target,kind:String)->bool:
 	if target==null or bool(target.get("incapacitated",false)) or float(target.get("hp",0.0))<=0.0:return false
+	if bool(target.get("spirit_form",false)):return false
 	if kind=="enemy":
+		if CombatSystem.is_invulnerable(target):return false
 		if str(target.get("combat_team",""))==str(unit.get("combat_team","")):return false
 		if target.has("concealment") and not StealthDetectionSystem.directly_targetable(unit,target,Vector2(unit.get("pos",Vector2.ZERO)).distance_to(Vector2(target.get("pos",Vector2.ZERO)))):return false
 		return true
@@ -48,6 +50,12 @@ func issue_hero_move(hero:Dictionary,destination:Vector2)->void:
 	if not (str(hero.get("class",""))=="Ranger" and float(hero.get("ranger_runtime",{}).get("strafe_remaining",0.0))>0.0):interrupt_unit_action(hero,"movement")
 	CombatRulesV1.issue_move(hero,destination);hero.target=-1;hero.heal_target=-1
 
+func active_movement_multiplier(unit:Dictionary)->float:
+	var multiplier:=1.0
+	for effect in unit.get("active_effects",[]):
+		if float(effect.get("remaining_duration",0.0))>0.0:multiplier*=float(effect.get("movement_speed_multiplier",1.0))
+	return multiplier
+
 func begin_unit_cast(unit:Dictionary,slot:int,duration:float,is_heroic:bool=false,channel_duration:float=0.0,requires_line_of_sight:bool=true,full_cooldown:float=-1.0)->void:
 	CombatRulesV1.preserve_command(unit)
 	unit.command_state=CombatRulesV1.CommandState.CAST
@@ -55,6 +63,8 @@ func begin_unit_cast(unit:Dictionary,slot:int,duration:float,is_heroic:bool=fals
 	unit.active_cast={"slot":slot,"remaining":duration,"duration":duration,"is_heroic":is_heroic,"channel_duration":channel_duration,"requires_line_of_sight":requires_line_of_sight,"full_cooldown":resolved_cooldown,"target_id":str(unit.get("preserved_target_id","")),"released":false}
 
 func interrupt_unit_action(unit:Dictionary,reason:String)->bool:
+	if str(unit.get("class",""))=="Priest" and not unit.get("priest_runtime",{}).is_empty():PriestSystem.interrupt_flash_heal(unit)
+	if str(unit.get("class",""))=="Priest" and bool(unit.get("priest_runtime",{}).get("salvation_started",false)):unit.priest_runtime.salvation_started=false;PriestSystem.telemetry_add(unit,"salvation_interruptions")
 	if str(unit.get("class",""))=="Cleric" and bool(unit.get("cleric_runtime",{}).get("jug_active",false)):
 		unit.ability_cds[3]=ClericSystem.stop_jug(unit);CombatRulesV1.restore_preserved_command(unit,true);unit.last_command_failure="channel interrupted: %s"%reason;return true
 	if not unit.get("active_cast",{}).is_empty():
@@ -150,6 +160,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 	var has_true_control:bool=hero.get("active_effects",[]).any(func(effect):return str(effect.get("control_type","")) in ["stun","root","silence","fear"] and float(effect.get("remaining_duration",0.0))>0.0)
 	if has_true_control and (not hero.get("active_cast",{}).is_empty() or not hero.get("active_channel",{}).is_empty() or bool(hero.get("cleric_runtime",{}).get("jug_active",false))):interrupt_unit_action(hero,"crowd control")
 	if hero.hp<=0.0:
+		if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() and not PriestSystem.spirit_active(hero):PriestSystem.enter_spirit(hero);clear_hero_command(hero,"spirit form");return
 		if not bool(hero.get("incapacitated",false)):
 			hero["was_defeated"]=true
 			if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty():ComboPointSystem.reset(hero);RogueSystem.telemetry_add(hero,"combo_defeat_resets");RogueSystem.break_vanish(hero)
@@ -172,7 +183,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 			if enemies[enemy_index].hp>0 and hero.pos.distance_to(enemies[enemy_index].pos)<automatic_distance:automatic_enemy_index=enemy_index;automatic_distance=hero.pos.distance_to(enemies[enemy_index].pos)
 		if automatic_enemy_index>=0:assign_hero_enemy(int(hero.get("battle_index",heroes.find(hero))),automatic_enemy_index)
 	if int(hero.command_state)==CombatRulesV1.CommandState.MOVE:
-		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers);hero.dest=hero.move_destination
+		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers);hero.dest=hero.move_destination
 		if hero.pos.distance_to(hero.move_destination)<=4.0:hero.command_state=CombatRulesV1.CommandState.IDLE;hero.dest=hero.pos
 		elif hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"movement path blocked")
 		else:hero.path_failure_timer=0.0;hero.facing_direction=before.direction_to(hero.pos)
@@ -184,12 +195,12 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 		if bool(hero.assignment_had_line_of_sight) and not has_los:clear_hero_command(hero,"line of sight lost");return
 		var usable_range:=float(hero.range)-CombatRulesV1.RANGE_TOLERANCE;var distance:float=hero.pos.distance_to(target.pos)
 		if not has_los:
-			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers)
+			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers)
 			if hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"no reachable line of sight")
 			return
 		hero.assignment_had_line_of_sight=true;hero.path_failure_timer=0.0
 		if distance>usable_range:
-			var stop_point:Vector2=target.pos+target.pos.direction_to(hero.pos)*usable_range;var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,stop_point,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers);hero.facing_direction=before.direction_to(hero.pos);return
+			var stop_point:Vector2=target.pos+target.pos.direction_to(hero.pos)*usable_range;var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,stop_point,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers);hero.facing_direction=before.direction_to(hero.pos);return
 		hero.facing_direction=hero.pos.direction_to(target.pos);CombatRulesV1.begin_basic_action(hero,str(target.combat_id),kind,battle_time);return
 	if int(hero.command_state)==CombatRulesV1.CommandState.IDLE:
 		var defense_target=idle_defense_target(hero)

@@ -101,6 +101,9 @@ func build_damage_request(target:Dictionary,resolved_amount:float,source_action:
 		var armor_sources:Array=target.slayer_runtime.temporary_armor_sources.duplicate(true);var block_source:=BlockChargeSystem.armor_source(target,SlayerSystem.scaled(target,float(SlayerData.VALUES.block_armor)),"reflexive_block","slayer_block")
 		if not block_source.is_empty():armor_sources.append(block_source)
 		if not armor_sources.is_empty():request["armor_sources"]=armor_sources
+	var shared_armor:Array=target.get("temporary_armor_sources",[]).duplicate(true)
+	if not shared_armor.is_empty():
+		var combined:Array=request.get("armor_sources",[]).duplicate(true);combined.append_array(shared_armor);request["armor_sources"]=combined
 	if source_action=="percentage_health":request["outgoing_multiplier"]=1.0;request["can_crit"]=false
 	if can_crit_override!=null:request["can_crit"]=bool(can_crit_override)
 	return request
@@ -130,6 +133,12 @@ func finalize_damage_events(source:Dictionary,target:Dictionary,result:Dictionar
 			if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty():SlayerSystem.process_defeat(hero,target)
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
+	if CombatSystem.is_protected(target):
+		for prevention_effect in target.get("active_effects",[]):
+			if str(prevention_effect.get("id","")) not in ["protected","invulnerable"]:continue
+			var prevention_owner=unit_by_combat_id(str(prevention_effect.get("owner_id","")))
+			if prevention_owner!=null and str(prevention_owner.get("class",""))=="Priest":PriestSystem.telemetry_add(prevention_owner,"salvation_prevented",maxf(0.0,amount))
+		return {"raw_amount":maxf(0.0,amount),"resolved_damage":0.0,"health_damage":0.0,"shield_damage":0.0,"armor_prevented":0.0,"protected_prevented":maxf(0.0,amount),"defeated":false,"critical":false,"immune":true,"evaded":false,"overkill":0.0,"shield_absorptions":[]}
 	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
 	if EvasionSystem.should_evade(target,source_action,hostile,bool(source.get("bypass_evasion",false))):
 		var miss:=EvasionSystem.miss_result(source_action,damage_type);combat_events.append(CombatSystem.create_event("basic_attack_evaded",source,target,miss,{"source_action":source_action,"action_tags":[source_action],"origin":origin}));if str(target.get("class",""))=="Slayer":SlayerSystem.telemetry_add(target,"evaded_attacks");return miss
@@ -214,11 +223,26 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 				var shield_gain:=SlayerSystem.add_unending_thirst(source,float(heal.overhealing));if shield_gain>0.0:apply_unit_shield(source,source,shield_gain,"Unending Thirst","slayer_unending_thirst",INF)
 		if SlayerSystem.has_talent(source,"slayer_l30_1") and SlayerSystem.successful(result):CombatSystem.apply_control(target,"slow",float(SlayerData.VALUES.nexus_duration),float(SlayerData.VALUES.nexus_slow))
 	if str(source.get("class",""))=="Slayer" and not source.get("slayer_runtime",{}).is_empty():SlayerSystem.note_damage_participation(source,target,float(result.get("resolved_damage",0.0)))
+	if str(source.get("class",""))=="Priest" and source_action=="basic_attack" and originating_effect_id in ["","priest_surge"] and not source.get("priest_runtime",{}).is_empty():
+		var priest_basic:=PriestSystem.note_basic_attack(source,target,result,originating_effect_id)
+		if bool(priest_basic.get("successful",false)):
+			var pursued_target=PriestSystem.most_wounded(heroes,source,float(PriestData.SPACE.pursued_radius))
+			if pursued_target!=null:var pursued:=deal_healing(source,pursued_target,PriestSystem.trait_amount(source,float(PriestData.VALUES.pursued_heal)),"basic_heal","Pursued by Grace","priest_trait");PriestSystem.telemetry_add(source,"pursued_heals");PriestSystem.telemetry_add(source,"pursued_effective",float(pursued.effective_amount));PriestSystem.telemetry_add(source,"pursued_overhealing",float(pursued.overhealing))
+			if float(source.priest_runtime.blessed_remaining)>0.0:
+				for ally in heroes:if ally.hp>0.0 and ally.pos.distance_to(source.pos)<=float(PriestData.SPACE.blessed_champion_radius):var blessed:=deal_healing(source,ally,float(source.priest_runtime.blessed_snapshot)*float(PriestData.VALUES.blessed_champion_rate),"basic_heal","Blessed Champion","priest_blessed_champion");PriestSystem.telemetry_add(source,"blessed_champion_heals",float(blessed.effective_amount))
+			if bool(priest_basic.get("trigger_surge",false)):deal_damage(source,target,float(source.get("damage",0.0)),"basic_attack","physical","Surge of Light",false,"priest_surge",[],true)
+			if bool(priest_basic.get("refresh_renew",false)):
+				for renew in source.priest_runtime.periodic_heals:if str(renew.get("id",""))=="priest_renew":renew.remaining_duration=float(PriestData.VALUES.renew_duration);PriestSystem.telemetry_add(source,"renew_refreshes")
+			if bool(priest_basic.get("trigger_varian",false)):
+				source.priest_runtime.periodic_damage=source.priest_runtime.periodic_damage.filter(func(instance):return str(instance.get("target_id",""))!=str(target.combat_id));source.priest_runtime.periodic_damage.append(PeriodicStatusSystem.create("priest_varian",str(source.combat_id),str(target.combat_id),PriestSystem.ability_amount(source,float(PriestData.VALUES.varian_damage))/float(PriestData.VALUES.varian_duration),float(PriestData.VALUES.varian_duration),float(PriestData.VALUES.varian_tick)))
+	if str(target.get("class",""))=="Priest" and not target.get("priest_runtime",{}).is_empty() and float(result.get("health_damage",0.0))>float(target.max_hp)*float(PriestData.VALUES.blessed_recovery_threshold) and PriestSystem.has_talent(target,"priest_l18_2") and float(target.priest_runtime.blessed_recovery_ready_in)<=0.0:
+		target.priest_runtime.periodic_heals.append(PeriodicStatusSystem.create("priest_blessed_recovery",str(target.combat_id),str(target.combat_id),float(target.max_hp)*float(PriestData.VALUES.blessed_recovery_fraction)/float(PriestData.VALUES.blessed_recovery_duration),float(PriestData.VALUES.blessed_recovery_duration),1.0));target.priest_runtime.blessed_recovery_ready_in=float(PriestData.VALUES.blessed_recovery_cooldown)
 	if testing_zone_active and "training" in target.get("combat_tags",[]) and float(result.get("resolved_damage",0.0))>0.0:target["seconds_since_damage"]=0.0
 	finalize_damage_events(source,target,result,source_action,damage_type,origin,source_is_summon,originating_effect_id,trigger_chain,before_ratio,retribution_bonus)
 	return result
 
 func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="")->Dictionary:
+	if bool(target.get("spirit_form",false)):return {"raw_amount":amount,"effective_amount":0.0,"overhealing":maxf(0.0,amount),"critical":false}
 	var incoming_multiplier:=1.0
 	for hero in heroes:
 		if str(hero.get("class",""))!="Cleric" or not ClericSystem.has_talent(hero,"cleric_l24_3"):continue
@@ -235,6 +259,7 @@ func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action
 	return result
 
 func apply_unit_shield(source:Dictionary,target:Dictionary,amount:float,origin=null,source_id:String="shield",cap:float=INF,duration:float=0.0)->Dictionary:
+	if bool(target.get("spirit_form",false)):return {"amount":0.0,"requested_amount":amount,"blocked":true}
 	var result:=CombatSystem.apply_shield(target,amount,{"creator_index":int(source.get("battle_index",-1)),"source_id":source_id,"origin":origin,"cap":cap,"duration":duration,"source_action":"basic_ability"});var event:=CombatSystem.create_event("shield_applied",source,target,result,{"source_action":"basic_ability","action_tags":["basic_ability","shield"],"origin":origin});combat_events.append(event);return result
 
 func update_timed_combat_effects(unit:Dictionary,delta:float)->void:
