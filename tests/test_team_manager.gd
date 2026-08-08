@@ -28,4 +28,8 @@ static func run() -> Array:
 	TestSupport.check(errors,TeamManager.add_member([0],1,class_heroes)==[0] and not TeamManager.is_valid_party([0,1],class_heroes),"A party should reject a second Hero of the same class.")
 	TestSupport.check(errors,TeamManager.sanitize_team([0,1,2],class_heroes)==[0,2],"Save migration should keep the first class representative and remove later duplicates.")
 	TestSupport.check(errors,TeamManager.is_valid_party([0,2],class_heroes) and TeamManager.is_valid_party([1,3],class_heroes),"Separate raid parties may independently contain the same class.")
+	var stable_heroes:=[{"hero_id":"brann","class_id":"guardian"},{"hero_id":"sera","class_id":"cleric"},{"hero_id":"wren","class_id":"ranger"}]
+	TestSupport.check(errors,TeamManager.persisted_team([2,0],stable_heroes)==["wren","brann"],"Persisted teams should use stable Hero IDs while preserving formation order.")
+	TestSupport.check(errors,TeamManager.runtime_team(["wren","missing","brann"],stable_heroes)==[2,0],"Loading an ID-based team should resolve valid members and discard missing Heroes.")
+	TestSupport.check(errors,TeamManager.runtime_team([2,0],stable_heroes)==[2,0],"Legacy index-based teams should remain readable during migration.")
 	return errors

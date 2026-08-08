@@ -1,0 +1,51 @@
+{
+    "captured_utc": "2026-07-31T02:38:50",
+    "format_version": 1,
+    "godot_version": "4.7-stable (official)",
+    "mode": "headless deterministic application-update benchmark",
+    "platform": "Windows",
+    "processor_count": 20,
+    "project_version": "0.1.0",
+    "scenarios": [
+        {
+            "enemies": 0,
+            "fixed_delta_seconds": 0.0166666666666667,
+            "heroes": 0,
+            "samples": 600,
+            "scenario": "guild_hall_idle",
+            "scene_nodes": 55,
+            "update_ms_mean": 0.126633333333333,
+            "update_ms_median": 0.089,
+            "update_ms_p95": 0.094,
+            "update_ms_p99": 0.127,
+            "update_ms_max": 11.281
+        },
+        {
+            "enemies": 7,
+            "fixed_delta_seconds": 0.0166666666666667,
+            "heroes": 4,
+            "samples": 600,
+            "scenario": "testing_range_four_heroes",
+            "scene_nodes": 4,
+            "update_ms_mean": 0.332278333333333,
+            "update_ms_median": 0.277,
+            "update_ms_p95": 0.39,
+            "update_ms_p99": 0.515,
+            "update_ms_max": 14.172
+        },
+        {
+            "enemies": 12,
+            "fixed_delta_seconds": 0.0166666666666667,
+            "heroes": 4,
+            "samples": 600,
+            "scenario": "endless_level_30_twelve_enemies",
+            "scene_nodes": 4,
+            "update_ms_mean": 0.446975,
+            "update_ms_median": 0.391,
+            "update_ms_p95": 0.527,
+            "update_ms_p99": 0.641,
+            "update_ms_max": 12.096
+        }
+    ],
+    "warmup_frames": 120
+}

@@ -126,14 +126,7 @@ func _add_owner_row(outer:VBoxContainer,data:Dictionary,rarity_color:Color)->voi
 	owner.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
 	row.add_child(owner)
 
-func configure(data:Dictionary,actions:Array=[],comparison:Dictionary={})->void:
-	card_data=data.duplicate(true)
-	for child in get_children():child.queue_free()
-	custom_minimum_size=Vector2(460,620)
-	size_flags_horizontal=Control.SIZE_SHRINK_CENTER
-	size_flags_vertical=Control.SIZE_SHRINK_CENTER
-	var rarity:=str(data.get("rarity","Common"))
-	var rarity_color:=Color(ItemData.RARITY_COLORS.get(rarity,"718096")) if rarity!="Material" else STORED_COLOR
+func _card_style(rarity_color:Color)->StyleBoxFlat:
 	var panel:=StyleBoxFlat.new()
 	panel.bg_color=CARD_BACKGROUND
 	panel.border_color=rarity_color
@@ -146,12 +139,9 @@ func configure(data:Dictionary,actions:Array=[],comparison:Dictionary={})->void:
 	panel.content_margin_right=24
 	panel.content_margin_top=18
 	panel.content_margin_bottom=18
-	add_theme_stylebox_override("panel",panel)
+	return panel
 
-	var outer:=VBoxContainer.new()
-	outer.add_theme_constant_override("separation",8)
-	add_child(outer)
-
+func _add_card_header(outer:VBoxContainer,data:Dictionary,rarity:String,rarity_color:Color)->void:
 	var top_line:=HBoxContainer.new()
 	top_line.custom_minimum_size.y=28
 	top_line.add_theme_constant_override("separation",16)
@@ -176,6 +166,7 @@ func configure(data:Dictionary,actions:Array=[],comparison:Dictionary={})->void:
 	outer.add_child(item_type)
 	outer.add_child(_rule(rarity_color))
 
+func _add_card_description(outer:VBoxContainer,data:Dictionary,comparison:Dictionary,rarity_color:Color)->void:
 	var scroll:=ScrollContainer.new()
 	scroll.name="ItemCardDescriptionScroll"
 	scroll.custom_minimum_size.y=165
@@ -211,21 +202,38 @@ func configure(data:Dictionary,actions:Array=[],comparison:Dictionary={})->void:
 		var comparison_title:=_label("EQUIPMENT PREVIEW",14,Color("f5c451"));comparison_title.name="ItemCardComparisonTitle";content.add_child(comparison_title)
 		var comparison_summary:=_label(str(comparison.get("summary","")),14,TEXT_COLOR);comparison_summary.name="ItemCardComparisonSummary";content.add_child(comparison_summary)
 
+func _add_card_actions(outer:VBoxContainer,actions:Array)->void:
+	if actions.is_empty():return
+	var action_row:=HBoxContainer.new()
+	action_row.name="ItemCardActions"
+	action_row.alignment=BoxContainer.ALIGNMENT_CENTER
+	action_row.add_theme_constant_override("separation",12)
+	outer.add_child(action_row)
+	var action_width:=178.0 if actions.size()<=2 else 126.0
+	for action in actions:
+		var action_button:=Button.new()
+		action_button.name="ItemCardAction"+str(action.get("id","Action")).replace("_"," ").capitalize().replace(" ","")
+		action_button.text=str(action.get("label",action.get("id","Action"))).to_upper()
+		action_button.custom_minimum_size=Vector2(action_width,46)
+		action_button.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+		action_button.disabled=not bool(action.get("enabled",true))
+		action_button.tooltip_text=str(action.get("reason",""))
+		action_button.pressed.connect(func(action_id=str(action.get("id",""))):action_requested.emit(action_id))
+		action_row.add_child(action_button)
+
+func configure(data:Dictionary,actions:Array=[],comparison:Dictionary={})->void:
+	card_data=data.duplicate(true)
+	for child in get_children():child.queue_free()
+	custom_minimum_size=Vector2(460,620)
+	size_flags_horizontal=Control.SIZE_SHRINK_CENTER
+	size_flags_vertical=Control.SIZE_SHRINK_CENTER
+	var rarity:=str(data.get("rarity","Common"))
+	var rarity_color:=Color(ItemData.RARITY_COLORS.get(rarity,"718096")) if rarity!="Material" else STORED_COLOR
+	add_theme_stylebox_override("panel",_card_style(rarity_color))
+	var outer:=VBoxContainer.new()
+	outer.add_theme_constant_override("separation",8)
+	add_child(outer)
+	_add_card_header(outer,data,rarity,rarity_color)
+	_add_card_description(outer,data,comparison,rarity_color)
 	_add_owner_row(outer,data,rarity_color)
-	if not actions.is_empty():
-		var action_row:=HBoxContainer.new()
-		action_row.name="ItemCardActions"
-		action_row.alignment=BoxContainer.ALIGNMENT_CENTER
-		action_row.add_theme_constant_override("separation",12)
-		outer.add_child(action_row)
-		var action_width:=178.0 if actions.size()<=2 else 126.0
-		for action in actions:
-			var action_button:=Button.new()
-			action_button.name="ItemCardAction"+str(action.get("id","Action")).replace("_"," ").capitalize().replace(" ","")
-			action_button.text=str(action.get("label",action.get("id","Action"))).to_upper()
-			action_button.custom_minimum_size=Vector2(action_width,46)
-			action_button.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
-			action_button.disabled=not bool(action.get("enabled",true))
-			action_button.tooltip_text=str(action.get("reason",""))
-			action_button.pressed.connect(func(action_id=str(action.get("id",""))):action_requested.emit(action_id))
-			action_row.add_child(action_button)
+	_add_card_actions(outer,actions)

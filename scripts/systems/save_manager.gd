@@ -7,7 +7,33 @@ const InventorySystem = preload("res://scripts/systems/inventory_system.gd")
 const CombatSystem = preload("res://scripts/systems/combat_system.gd")
 const TalentSystem = preload("res://scripts/systems/talent_system.gd")
 const TeamManager = preload("res://scripts/systems/team_manager.gd")
+const ProfessionSystem = preload("res://scripts/systems/profession_system.gd")
+const GuildHallData = preload("res://scripts/data/guild_hall_data.gd")
+const GuildMemberData = preload("res://scripts/data/guild_member_data.gd")
+const RecruitmentData = preload("res://scripts/data/recruitment_data.gd")
+const RecruitmentSystem = preload("res://scripts/systems/recruitment_system.gd")
+const GameClockSystem = preload("res://scripts/systems/game_clock_system.gd")
+const TavernFacilityData = preload("res://scripts/data/tavern_facility_data.gd")
+const TavernFacilitySystem = preload("res://scripts/systems/tavern_facility_system.gd")
+const CookingData = preload("res://scripts/data/cooking_data.gd")
+const CookingSystem = preload("res://scripts/systems/cooking_system.gd")
+const TavernManagementData = preload("res://scripts/data/tavern_management_data.gd")
+const TavernManagementSystem = preload("res://scripts/systems/tavern_management_system.gd")
+const CampaignSystem = preload("res://scripts/systems/campaign_system.gd")
+const SaveSchema = preload("res://scripts/systems/save_schema.gd")
 const LEGACY_SAVE_PATH := "user://guild_save.json"
+const SAVE_SCHEMA_VERSION := 6
+
+static func component_versions() -> Dictionary:
+	return {
+		"professions":ProfessionSystem.SAVE_VERSION,
+		"recruitment":RecruitmentSystem.SAVE_VERSION,
+		"tavern_facility":TavernFacilitySystem.SAVE_VERSION,
+		"cooking":CookingSystem.SAVE_VERSION,
+		"tavern_management":TavernManagementSystem.SAVE_VERSION,
+		"campaign":CampaignSystem.SAVE_VERSION,
+		"storage":InventorySystem.ITEM_STORAGE_LOCATION_VERSION
+	}
 
 static func save_slot_path(slot:int) -> String:
 	return "user://guild_save_%d.json" % (slot+1)
@@ -42,17 +68,18 @@ static func default_casting_settings() -> Dictionary:
 	return {"pc":{"ground":"cursor","directional":"cursor","area":"instant","enemy":"target","ally":"target"},"mobile":{"ground":"facing","directional":"facing","area":"instant","enemy":"target","ally":"target"}}
 
 static func hero_state(hero_name:String,hero_class:String,level:int,gear:int,member_type:String="guild_recruit",special:bool=false,legacy_rank:int=0,extras:Dictionary={})->Dictionary:
-	var identity_type:="special" if special else "standard"
-	var hero_id:=str(extras.get("hero_id",hero_name.to_snake_case()))
-	var hero:={"hero_id":hero_id,"class_id":GameData.class_id_for(hero_class),"identity_type":identity_type,"named_hero_definition_id":str(extras.get("named_hero_definition_id",extras.get("special_identifier",""))) if special else "","name":hero_name,"display_name":hero_name,"class":hero_class,"editable_name":not special,"editable_appearance":not special,"can_edit_name":not special,"can_edit_appearance":not special,"appearance_data":{},"playable_race_id":"","level":level,"xp":0,"experience":0,"gear":gear,"selected_talents":{},"planned_talents":{},"selected_heroic_id":"","equipment":[],"equipment_slots":ItemData.empty_equipment_slots(),"member_type":member_type,"is_special_hero":special,"legacy_rank":legacy_rank,"prestige_rank":legacy_rank,"prestige_reward_floor_rank":legacy_rank if special else 0,"completed_prestige_cycles":0,"active_prestige_challenge_id":"","completed_prestige_challenge_ids":[],"prestige_specialization_ids":[],"prestige_reward_history":[],"prestige_five_legacy_id":"","is_guild_champion":false,"profession_progress":{},"pvp_progress":{},"guild_position_id":"","active_prestige_challenge":"","completed_prestige_challenges":[],"legacy_perk_ids":[],"prestige_unlock_tags":[]}
-	hero.merge(extras,true)
-	return hero
+	return GuildMemberData.create(hero_name,hero_class,level,gear,member_type,special,legacy_rank,extras)
 
-static func fresh_state() -> Dictionary:
-	return {"guild_name":"", "faction":"Unaffiliated", "guild_prestige_rank":1, "guild_renown":0, "prestige_tokens":0, "class_talent_discovery":{}, "tutorial_complete":false, "major_systems_unlocked":false, "seen_page_intros":{}, "zone0":AshwoodManager.default_progress(), "casting_settings":default_casting_settings(), "item_instances":[], "material_stacks":[], "next_item_instance_id":1, "next_material_stack_id":1, "gold":0, "ore":8, "herbs":8, "dust":4, "tonics":0, "vault_level":1, "vault_limit":30, "dungeon_clears":[0,0], "zone_progress":[0,0], "zone_branches":[[false,false],[false,false]], "unlocked_dungeon":0, "selected_team":[0,1], "active_team":[0,1], "saved_teams":[[],[],[],[],[]], "team_names":["Team 1","Team 2","Team 3","Team 4","Team 5"], "heroes":[
+static func _fresh_state_base() -> Dictionary:
+	return {"save_version":SAVE_SCHEMA_VERSION,"component_versions":component_versions(),"guild_name":"", "faction":"Unaffiliated", "guild_prestige_rank":1, "guild_renown":0, "prestige_tokens":0, "class_talent_discovery":{}, "tutorial_complete":false,"major_systems_unlocked":false,"seen_page_intros":{},"codex_seen_entries":{}, "zone0":AshwoodManager.default_progress(), "casting_settings":default_casting_settings(), "game_clock":GameClockSystem.default_state(), "recruitment":RecruitmentData.default_state(), "tavern_facility":TavernFacilityData.default_state(), "cooking":CookingData.default_state(), "tavern_management":TavernManagementData.default_state(), "guild_hall_room_unlocks":GuildHallData.default_room_unlocks(), "guild_hall_new_rooms":[], "guild_hall_scroll_position":GuildHallData.DEFAULT_SCROLL_POSITION, "guild_hall_tutorial_step":0, "guild_hall_tutorial_complete":false, "guild_hall_scroll_hint_dismissed":false, "item_instances":[], "material_stacks":[], "next_item_instance_id":1, "next_material_stack_id":1, "guild_recipes":{}, "discovered_rune_patterns":[], "rune_collection":{}, "profession_orders":[], "next_profession_order_id":1, "profession_completion_alerts":[], "profession_debug":{}, "gold":0, "ore":8, "herbs":8, "dust":4, "tonics":0, "provisions":0, "vault_level":1, "vault_limit":30, "depot_level":1, "depot_limit":30, "dungeon_clears":[0,0], "zone_progress":[0,0], "zone_branches":[[false,false],[false,false]], "unlocked_dungeon":0, "selected_team":[0,1], "active_team":[0,1], "saved_teams":[[],[],[],[],[]], "team_names":["Team 1","Team 2","Team 3","Team 4","Team 5"], "heroes":[
 		hero_state("Brann","Guardian",1,10,"founding_recruit"),
 		hero_state("Sera","Cleric",1,10,"founding_recruit")
 	]}
+
+static func fresh_state() -> Dictionary:
+	var state:=_fresh_state_base()
+	state["campaign"]=CampaignSystem.default_state()
+	return state
 
 static func testing_heroes() -> Array:
 	return [
@@ -92,10 +119,13 @@ static func testing_state() -> Dictionary:
 		"ore":999,
 		"herbs":999,
 		"dust":999,
+		"provisions":999,
 		"prestige_tokens":999,
 		"class_talent_discovery":{"guardian":30,"cleric":30,"rogue":30,"ranger":30,"mage":30,"warlock":30},
-		"vault_level":6,
-		"vault_limit":180,
+		"vault_level":10,
+		"vault_limit":300,
+		"depot_level":10,
+		"depot_limit":300,
 		"dungeon_clears":[3,3],
 		"zone_progress":[10,10],
 		"zone_branches":[[true,true],[true,true]],
@@ -107,6 +137,7 @@ static func testing_state() -> Dictionary:
 	},true)
 	state.item_instances=ItemData.testing_instances()
 	state=migrate_state(state,true,true)
+	CampaignSystem.unlock_all_regions(state);state.campaign.council_unlocked=true;state.campaign.combat_hall_unlocked=true;state.guild_hall_room_unlocks["council_chamber"]=false;state.guild_hall_room_unlocks["combat_hall"]=true
 	return state
 
 static func load_state(slot:int) -> Dictionary:
@@ -126,10 +157,13 @@ static func load_state(slot:int) -> Dictionary:
 
 static func migrate_state(state:Dictionary, save_declared_tutorial:bool, testing_save:bool=false) -> Dictionary:
 	var defaults:=fresh_state()
-	for array_key in ["heroes","selected_team","active_team","saved_teams","team_names","zone_progress","zone_branches","item_instances","material_stacks"]:
-		if not state.get(array_key) is Array:state[array_key]=defaults[array_key].duplicate(true)
-	for dictionary_key in ["seen_page_intros","casting_settings","zone0","class_talent_discovery"]:
-		if not state.get(dictionary_key) is Dictionary:state[dictionary_key]=defaults[dictionary_key].duplicate(true)
+	state["save_version"]=SAVE_SCHEMA_VERSION
+	SaveSchema.repair_root(state,defaults)
+	# JSON arrays can still parse while containing invalid entries. Discard only
+	# unusable records before migration code calls Dictionary methods on them.
+	state["heroes"]=state.heroes.filter(func(entry):return entry is Dictionary)
+	state["item_instances"]=state.item_instances.filter(func(entry):return entry is Dictionary)
+	state["material_stacks"]=state.material_stacks.filter(func(entry):return entry is Dictionary)
 	# The early prototype's generic dungeon token had no defined economy. It is
 	# intentionally discarded instead of being converted into either real currency.
 	state.erase("tokens")
@@ -167,7 +201,7 @@ static func migrate_state(state:Dictionary, save_declared_tutorial:bool, testing
 	else:
 		var casting_defaults:=default_casting_settings()
 		for device in casting_defaults:
-			if not state.casting_settings.has(device):
+			if not state.casting_settings.has(device) or not state.casting_settings[device] is Dictionary:
 				state.casting_settings[device]=casting_defaults[device].duplicate(true)
 			else:
 				for category in casting_defaults[device]:
@@ -240,11 +274,9 @@ static func migrate_state(state:Dictionary, save_declared_tutorial:bool, testing
 		state.class_talent_discovery=TalentSystem.record_class_discovery(state.class_talent_discovery,str(hero.class_id),int(hero.level))
 	if testing_save or str(state.get("guild_name",""))=="Testing Guild":
 		for class_definition in GameData.CLASSES.values():state.class_talent_discovery[str(class_definition.class_id)]=30
-	state["selected_team"]=TeamManager.sanitize_team(state.selected_team,state.heroes)
-	state["active_team"]=TeamManager.sanitize_team(state.active_team,state.heroes)
-	for saved_index in state.saved_teams.size():
-		if state.saved_teams[saved_index] is Array:state.saved_teams[saved_index]=TeamManager.sanitize_team(state.saved_teams[saved_index],state.heroes)
-		else:state.saved_teams[saved_index]=[]
+	state["selected_team"]=TeamManager.runtime_team(state.selected_team,state.heroes)
+	state["active_team"]=TeamManager.runtime_team(state.active_team,state.heroes)
+	state["saved_teams"]=TeamManager.runtime_saved_teams(state.saved_teams,state.heroes)
 	# Ashwood's original prototype inventory stored disconnected text records.
 	# Convert those exact owned instances once, preserving their equipped hero.
 	var existing_ids:Dictionary={}
@@ -262,14 +294,42 @@ static func migrate_state(state:Dictionary, save_declared_tutorial:bool, testing
 	state.zone0["inventory"]=[]
 	ItemData.reconcile_ownership(state)
 	InventorySystem.ensure_storage_state(state)
+	ProfessionSystem.ensure_state(state)
+	GuildHallData.ensure_state(state)
+	GameClockSystem.ensure_state(state)
+	TavernFacilitySystem.ensure_state(state)
+	RecruitmentSystem.ensure_state(state)
+	CookingSystem.ensure_state(state)
+	TavernManagementSystem.ensure_state(state)
+	CampaignSystem.ensure_state(state)
+	state.component_versions.merge(component_versions(),true)
 	return state
 
 static func save_state(slot:int, state:Dictionary) -> bool:
+	state["save_version"]=SAVE_SCHEMA_VERSION
+	if not state.get("component_versions") is Dictionary:state["component_versions"]={}
 	InventorySystem.ensure_storage_state(state)
+	ProfessionSystem.ensure_state(state)
+	GuildHallData.ensure_state(state)
+	GameClockSystem.ensure_state(state)
+	TavernFacilitySystem.ensure_state(state)
+	RecruitmentSystem.ensure_state(state)
+	CookingSystem.ensure_state(state)
+	TavernManagementSystem.ensure_state(state)
+	CampaignSystem.ensure_state(state)
+	state.component_versions.merge(component_versions(),true)
+	var schema_errors:=SaveSchema.validation_errors(state)
+	if not schema_errors.is_empty():
+		push_error("Guild save schema validation failed: %s"%" ".join(schema_errors))
+		return false
 	var live_path:=save_slot_path(slot)
 	var temporary_path:=save_temporary_path(slot)
 	var backup_path:=save_backup_path(slot)
-	var serialized:=JSON.stringify(state)
+	var persisted_state:=state.duplicate(true)
+	persisted_state.selected_team=TeamManager.persisted_team(state.selected_team,state.heroes)
+	persisted_state.active_team=TeamManager.persisted_team(state.active_team,state.heroes)
+	persisted_state.saved_teams=TeamManager.persisted_saved_teams(state.saved_teams,state.heroes)
+	var serialized:=JSON.stringify(persisted_state)
 	var file:=FileAccess.open(temporary_path,FileAccess.WRITE)
 	if file==null:
 		push_error("Unable to open temporary guild save for writing: %s"%temporary_path)

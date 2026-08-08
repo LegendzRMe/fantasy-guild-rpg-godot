@@ -14,8 +14,18 @@ Owns mutable application, menu, map, tutorial, item-overlay, and combat state de
 
 ### Application and screen layers
 
-- `scripts/runtime/app_core.gd`: startup, saves, shared controls, navigation, Guild Hall, settings, filters, and cross-screen input.
-- `scripts/ui/hero_roster_screen.gd`: Hero Roster, equipment slots, item cards, equipment comparison, and item/hero selectors.
+- `scripts/runtime/app_core.gd`: startup, saves, shared UI construction, menus, settings, guild creation, and navigation helpers.
+- `scripts/runtime/app_contracts.gd`: narrow screen, storage, story, and combat extension contracts shared across the inheritance stack.
+- `scripts/runtime/app_team_interaction_runtime.gd`: party membership, drag/drop, input routing, roster filtering, and shared team-card controls.
+- `scripts/runtime/app_vault_interaction_runtime.gd`: Vault press, drag, page-hover, transfer, and drop behavior.
+- `scripts/runtime/app_interaction_runtime.gd`: compact testing helpers and shared team/role presentation.
+- `scripts/runtime/persistence_coordinator.gd`: composed dirty/save/retry state used by the application without adding persistence fields to the screen inheritance API.
+- `scripts/ui/guild_hall_runtime.gd`: Guild Hall navigation, room presentation, the codex, battle entry, and Hall-specific input.
+- `scripts/ui/item_equipment_runtime.gd`: shared item cards, equipment comparison, equipment carousels, and item-to-Hero selection workflows.
+- `scripts/ui/roster_ability_runtime.gd`: read-only recruitment preview and roster ability details.
+- `scripts/ui/roster_talent_runtime.gd`: talent planning, confirmation, details, and victory-time talent selection.
+- `scripts/ui/roster_profession_runtime.gd`: roster profession training, choices, runes, and section workspace composition.
+- `scripts/ui/hero_roster_screen.gd`: Hero Roster layout, party summary, reusable detail cards, and equipment-slot entry points.
 - `scripts/ui/team_builder_screen.gd`: active-team selection, naming, and Team Builder layout.
 - `scripts/ui/world_map_screen.gd`: world/zone maps, Ashwood encounter selection, Command Table, Merchant Contacts, and Professions.
 - `scripts/ui/item_storage_screen.gd`: Item Storage filters, sorting, bag unlocks, and vault layout.
@@ -30,13 +40,15 @@ Owns mutable application, menu, map, tutorial, item-overlay, and combat state de
 - `scripts/runtime/guardian_runtime.gd`: Guardian V1 ability execution, world projectiles, delayed effects, Heroics, and class-specific testing hooks. It delegates reusable damage, Armor, control, geometry, command, and projectile rules to shared systems.
 - `scripts/runtime/cleric_runtime.gd`: Cleric V1 Q/W/E, Heroics, Serpent ownership, periodic healing, and class-specific testing hooks. It delegates Blind, Unstoppable, damage/healing, commands, and cooldown-rate math to focused shared/class systems.
 - `scripts/runtime/mage_runtime.gd`: Mage V1 Verdant Spheres, Q/W/E, Phoenix, Pyroblast, Living Bomb updates, and Mage-specific testing behavior. Reusable Ability Power and bomb-lineage rules remain outside the runtime.
+- `scripts/runtime/rogue_runtime.gd`: Rogue V1 normal/opening action sets, Combo Point finishers, concealment Heroics, owned Garrote effects, temporary presentation, and Rogue-range behavior.
 - `scripts/runtime/enemy_combat_runtime.gd`: waves, spawning, encounter objectives, enemy target selection, and combat lookup helpers.
 - `scripts/runtime/ability_runtime.gd`: temporary class ability execution and cast-position resolution.
 - `scripts/runtime/combat_input_runtime.gd`: combat selection, drag commands, ability aiming, keyboard, mouse, touch, and tutorial input gates.
 - `scripts/runtime/combat_runtime.gd`: thin live-combat update coordinator; feature behavior belongs in the focused layers above.
 - `scripts/runtime/ashwood_runtime.gd`: recruits, Ashwood rewards, story decisions, and encounter-result overlays.
 - `scripts/runtime/victory_runtime.gd`: generic victory sequencing, XP animation, and reward grants.
-- `scripts/runtime/combat_presentation.gd`: battlefield, tutorial, effect, health-bar, role-icon, and victory drawing.
+- `scripts/runtime/combat_effect_presentation.gd`: effect markers, health bars, combat labels, and role icons.
+- `scripts/runtime/combat_presentation.gd`: battlefield and HUD composition, tutorial/testing overlays, ability bar, pause state, and victory drawing.
 
 These layers preserve the original method API through narrow contracts. That lets existing callbacks and saves behave the same while keeping each combat concern searchable without loading a monolithic coordinator.
 
@@ -63,6 +75,8 @@ Mage follows that pattern through `mage_data.gd`, `mage_system.gd`, `mage_runtim
 
 Warlock follows the same split through `warlock_data.gd`, `warlock_system.gd`, `warlock_runtime.gd`, and `warlock_ability_presenter.gd`. Reusable periodic status records live in `periodic_status_system.gd`; Fear and Silence remain shared controls in `status_effect_system.gd`. Health-loss cooldown conversion and the background-channel exception are documented as narrow contracts rather than generic class behavior.
 
+Rogue follows the same split through `rogue_data.gd`, `rogue_system.gd`, `rogue_runtime.gd`, and `rogue_ability_presenter.gd`. Class-neutral Combo Points, alternate action sets, concealment/detection, and strongest-source Armor reduction live in focused systems so future forms, detectors, enemies, items, and debuffs can reuse the contracts without importing Rogue runtime code.
+
 ### `scripts/data/talent_data.gd`
 
 Owns the shared ability and talent milestones plus tier structure. Future class-specific talent content can be added beside this foundation without duplicating unlock levels in UI or combat code. `game_data.gd` retains compatibility aliases so existing consumers do not need a broad rewrite.
@@ -78,6 +92,10 @@ Owns pure Ashwood progression defaults, compatibility migration, encounter unloc
 ### `scripts/systems/save_manager.gd`
 
 Owns save paths, live and testing defaults, verified temporary writes, last-known-good backups, JSON persistence, compatibility migration, malformed-field repair, and deletion.
+
+`scripts/systems/save_schema.gd` owns root field-shape repair and pre-write validation. The root `save_version` is owned only by `save_manager.gd`; independently evolving features record their versions in `component_versions`.
+
+`scripts/runtime/persistence_coordinator.gd` owns dirty-state tracking, debounced routine saves, retry state, and user-visible failure status. Critical transactions still request immediate verified saves, while routine combat rewards and clock progress are coalesced to avoid disk work inside frame-sensitive loops.
 
 Save invariants:
 
@@ -97,8 +115,19 @@ Save invariants:
 - `class_talent_discovery` permanently records the highest level reached by each class. The testing guild reveals every current class through Level 30.
 - Saved parties are sanitized in order: invalid references, duplicate heroes, and later Heroes whose class is already present are removed.
 - The ten Legendary foundation items are seeded only into the testing guild, one copy each, and always begin in the Vault rather than auto-equipped.
+- `game_clock` is the shared saved Guild Hall clock. Pause and 1x/2x/4x speed apply to recruitment time; combat pause also freezes the clock.
+- `recruitment` owns the Level 1 Tavern budget, hourly countdown, single candidate, departure timer, and activity log. Missing or malformed legacy fields migrate additively.
 
 Do not replace the dictionary-based save format with Godot resources unless a separately planned migration protects existing JSON saves.
+
+### Tavern recruitment
+
+- `scripts/data/recruitment_data.gd` owns the fixed Level 1 configuration, Ashwood-only pool, disclosure tuning, and future-facing nullable extension fields.
+- `scripts/systems/game_clock_system.gd` owns shared saved game minutes, pause, and speed. Recruitment receives elapsed game minutes and does not maintain a second clock.
+- `scripts/systems/recruitment_system.gd` owns candidate generation, hourly Gold spending, disclosure, locking, expiry, rejection, and atomic conversion into a canonical guild member.
+- Candidate levels use the rounded average level of active guild members because the current zone has no combat-recommended-level progression value. Ashwood recruitment is explicitly clamped to Levels 1–4.
+- Candidate quality and disclosure are independent. Unsupported character traits and Titles remain nullable and display as unavailable rather than creating future systems.
+- `scripts/ui/tavern_screen.gd` is inserted into the existing screen inheritance chain and uses the Hero Roster's read-only recruitment-preview presentation.
 
 ### `scripts/systems/team_manager.gd`
 
@@ -106,7 +135,7 @@ Owns pure team-membership, ordered-slot reordering, and saved-team array operati
 
 Team invariants:
 
-- Hero indices refer to entries in the save's `heroes` array.
+- Runtime team arrays use Hero indices for efficient access. Serialized `selected_team`, `active_team`, and saved-team members use stable `hero_id` strings and migrate legacy index-based saves on load.
 - Active teams contain at most four heroes.
 - A roster may contain duplicate classes, but each four-Hero party contains at most one Hero of each class. Raids validate this rule independently for each party.
 - Team array order is meaningful: slots one through four deploy at the front, top, bottom, and back of the combat diamond.
@@ -191,7 +220,9 @@ Owns the shared, viewport-bounded item-card presentation used by Item Storage, H
 
 ### `tests/` and `tools/validate.ps1`
 
-The tests protect save defaults and migration, per-save settings, equipment ownership, canonical combat math and terminology, all ten Legendary item definitions and live runtime effects, Prestige helpers, team behavior, roster queries, Ashwood progression and data shape, guild-system locks, and the four-card save menu. The validator runs tests with an isolated `APPDATA`, so it cannot modify normal Godot user saves.
+The tests protect save defaults and migration, persistence debounce state, per-save settings, equipment ownership, canonical combat math and terminology, all ten Legendary item definitions and live runtime effects, Prestige helpers, team behavior, roster queries, Ashwood progression and data shape, guild-system locks, and the four-card save menu. Stateful UI coverage is split into focused roster/team, Ashwood, storage, combat, Guild Hall, and testing-tool workflows. The small smoke orchestrator runs every workflow in a stable order. The validator runs tests with an isolated `APPDATA`, so it cannot modify normal Godot user saves.
+
+`tools/godot_helpers.ps1` provides shared Godot executable discovery for run, validation, and build commands. `tools/audit.ps1` reports the largest scripts and methods, long-line concentrations, large assets, and selected coupling indicators without changing the worktree. The validator also rejects known double-encoded UTF-8 sequences in source and documentation.
 
 ## Dependency Direction
 
@@ -199,6 +230,7 @@ Runtime and screen layers may depend on data, systems, and UI helpers. Pure syst
 
 ```text
 main.gd -> runtime/combat_presentation.gd
+  -> runtime/combat_effect_presentation.gd
   -> runtime/victory_runtime.gd
   -> runtime/ashwood_runtime.gd
   -> runtime/combat_runtime.gd
@@ -214,7 +246,16 @@ main.gd -> runtime/combat_presentation.gd
   -> ui/world_map_screen.gd
   -> ui/team_builder_screen.gd
   -> ui/hero_roster_screen.gd
+  -> ui/roster_profession_runtime.gd
+  -> ui/roster_talent_runtime.gd
+  -> ui/roster_ability_runtime.gd
+  -> ui/item_equipment_runtime.gd
+  -> ui/guild_hall_runtime.gd
+  -> runtime/app_interaction_runtime.gd
+  -> runtime/app_vault_interaction_runtime.gd
+  -> runtime/app_team_interaction_runtime.gd
   -> runtime/app_core.gd
+  -> runtime/app_contracts.gd
   -> runtime/app_state.gd
   |-- data/game_data.gd
   |-- data/class_data.gd
@@ -252,11 +293,12 @@ If Godot cannot be discovered automatically:
 
 The validator performs:
 
-1. Headless Godot editor parsing
-2. Automated GDScript tests in isolated user data
-3. A short headless project startup
-4. Runtime-log error inspection
-5. `git diff --check`
+1. Dependency priming and headless Godot editor parsing
+2. Automated texture-quality regression checks
+3. Automated GDScript tests in isolated user data
+4. A short headless source-project startup
+5. Export-pack generation and isolated packaged startup
+6. Runtime-log, UTF-8, and `git diff --check` inspection
 
 ## Refactoring Rules
 

@@ -3,6 +3,7 @@ extends RefCounted
 const ItemData = preload("res://scripts/data/item_data.gd")
 
 const ZONE_ID := "ashwood_marches"
+const RECRUITMENT_LEVEL_RANGE := {"minimum":1,"maximum":4}
 const MANDATORY_ORDER := ["first_battle","first_recruit","caravan","raider_cache","second_recruit","crossing","finale"]
 const OPTIONAL_ORDER := ["ruined_chapel","rune_servant"]
 const MAP_CONNECTIONS := [
@@ -22,7 +23,7 @@ const RARITY_COLORS := {
 
 const RECRUITS := {
 	"ranger":{"name":"Wren","class":"Ranger","signature":"Trailseeker"},
-	"rogue":{"name":"Kestrel","class":"Rogue","signature":"Veiled Strike"},
+	"rogue":{"name":"Kestrel","class":"Rogue","signature":"Sinister Strike"},
 	"mage":{"name":"Nyx","class":"Mage","signature":"Arcane Focus"},
 	"warlock":{"name":"Morrow","class":"Warlock","signature":"Blackflame Pact"}
 }

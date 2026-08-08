@@ -8,6 +8,56 @@ func load_mage_test_build(hero:Dictionary,heroic_id:String)->void:
 func load_level_one_mage_test(hero:Dictionary)->void:
 	hero.level=1;hero.power=float(MageData.VALUES.basic_attack_damage);hero.base_power=hero.power;hero.max_hp=float(MageData.VALUES.health);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id="";hero.selected_talents={};MageSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_rogue_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=RogueData.TEST_BUILDS[clampi(build_index,0,RogueData.TEST_BUILDS.size()-1)];var level:int=int(build.level);hero.level=level;hero.power=RogueData.scaled(float(RogueData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=RogueData.scaled(float(RogueData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);RogueSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func rogue_range_hero():
+	for hero in heroes:
+		if str(hero.get("class",""))=="Rogue":return hero
+	return null
+
+func handle_rogue_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="rogue_range" or not event.alt_pressed:return false
+	var hero=rogue_range_hero();if hero==null:return false
+	if event.keycode>=KEY_1 and event.keycode<=KEY_5:
+		var values:=[0,1,2,3,5];hero.combo_points=mini(ComboPointSystem.maximum(hero),values[int(event.keycode-KEY_1)]);flash("Combo Points: %d"%int(hero.combo_points));queue_redraw();return true
+	match event.keycode:
+		KEY_V:
+			RogueSystem.break_vanish(hero);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];for id in hero.alternate_cooldowns:hero.alternate_cooldowns[id]=0.0;flash("Vanish and cooldowns reset")
+		KEY_S:
+			RogueSystem.break_vanish(hero);hero.ability_cds[4]=0.0;RogueSystem.activate_vanish(hero);flash("Stealth forced")
+		KEY_I:
+			RogueSystem.break_vanish(hero);hero.ability_cds[4]=0.0;RogueSystem.activate_vanish(hero);hero.concealment.unrevealable_remaining=0.0;hero.concealment.invisible=true;hero.rogue_runtime.stationary_elapsed=float(RogueData.VALUES.vanish_invisible_stationary);flash("Invisible forced")
+		KEY_R:
+			hero.concealment.unrevealable_remaining=0.0;StealthDetectionSystem.reveal(hero,3.0);flash("Reveal applied")
+		KEY_D:
+			for enemy in enemies:
+				if "detector" in enemy.get("combat_tags",[]):enemy.detection_profile={} if bool(enemy.get("detection_profile",{}).get("detect_stealthed",false)) else {"detect_stealthed":true,"detect_invisible":true,"detection_radius":210.0}
+			flash("Detector profile toggled")
+		KEY_P:
+			hero.rogue_runtime.garrotes=[];for enemy in enemies:enemy.bloodletting_stacks=[];flash("Rogue periodic statuses removed")
+		KEY_F:
+			hero.rogue_runtime.fatal_finesse_stacks=0 if int(hero.rogue_runtime.fatal_finesse_stacks)>=int(RogueData.VALUES.fatal_max_stacks) else int(RogueData.VALUES.fatal_max_stacks);flash("Fatal Finesse: %d"%int(hero.rogue_runtime.fatal_finesse_stacks))
+		KEY_B:
+			hero.rogue_runtime.block_charges=3;flash("Combat Readiness: 3 Block")
+		KEY_M:
+			hero.selected_heroic_id="rogue_l15_r1";hero.ability_cds[3]=0.0;cast_rogue_heroic(hero);flash("Smoke Bomb triggered")
+		KEY_C:
+			hero.selected_heroic_id="rogue_l15_r2";hero.ability_cds[3]=0.0;cast_rogue_heroic(hero);flash("Cloak triggered")
+		KEY_T:
+			for enemy in enemies:
+				if "boss" in enemy.get("combat_tags",[]):enemy.control_profile={"stun_multiplier":1.0,"blind_immune":false,"silence_multiplier":1.0} if bool(enemy.get("control_profile",{}).get("blind_immune",true)) else {"stun_multiplier":0.0,"blind_immune":true,"silence_multiplier":0.0}
+			flash("Boss control profiles toggled")
+		KEY_H:
+			var healer=enemies.filter(func(enemy):return str(enemy.get("test_fixture",""))=="external_healer");var targets=enemies.filter(func(enemy):return str(enemy.get("test_fixture",""))=="healable_target");if not healer.is_empty() and not targets.is_empty():targets[0].hp=maxf(1.0,float(targets[0].hp)-300.0);deal_healing(healer[0],targets[0],250.0,"basic_heal","Rogue Range")
+			flash("External healing triggered")
+		KEY_J:
+			var self_targets=enemies.filter(func(enemy):return bool(enemy.get("self_heal_test",false)));if not self_targets.is_empty():self_targets[0].hp=maxf(1.0,float(self_targets[0].hp)-300.0);deal_healing(self_targets[0],self_targets[0],250.0,"basic_heal","Rogue Range")
+			flash("Self-healing triggered")
+		_:
+			return false
+	queue_redraw();return true
+
 func player_controlled_hero_indices() -> Array:
 	var result:=[]
 	for hero_index in heroes.size():
@@ -86,6 +136,8 @@ func begin_trait()->void:
 		queue_redraw()
 	elif str(hero.get("class",""))=="Warlock":
 		if use_warlock_trait(hero):queue_redraw()
+	elif str(hero.get("class",""))=="Rogue":
+		if use_rogue_trait(hero):queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -171,6 +223,132 @@ func finish_hero_drag()->void:
 	else:issue_hero_move(heroes[selected],Vector2(clamp(drag_cursor.x,55.0,1225.0),clamp(drag_cursor.y,70.0,570.0)));heroes[selected].suppress_auto_target=true;focused_enemy_index=-1
 	queue_redraw()
 
+func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_rogue_range_shortcut(event):return true
+	if testing_zone_active and testing_zone_mode=="rogue_range" and event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_6:
+		var build_index:int=int(event.keycode-KEY_1)
+		for hero in heroes:
+			if str(hero.get("class",""))=="Rogue":load_rogue_test_build(hero,build_index)
+		flash("Rogue build: %s"%str(RogueData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if event.keycode==KEY_F3 and testing_zone_active:debug_combat_overlay=not debug_combat_overlay;queue_redraw();return true
+	if event.keycode==KEY_F4 and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Guardian":GuardianSystem.add_quest(hero,45,"testing_control",battle_time);flash("Guardian quest +45")
+		return true
+	if event.keycode==KEY_F5 and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Guardian":hero.selected_heroic_id="guardian_l15_r2" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l15_r1";hero.selected_talents["tier_3"]=hero.selected_heroic_id;flash("Heroic: %s"%GuardianData.WORKING_NAMES[hero.selected_heroic_id])
+		return true
+	if event.keycode==KEY_F6 and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Guardian":hero.selected_talents={"tier_1":"guardian_l9_1","tier_2":"guardian_l12_2","tier_3":guardian_heroic_id(hero),"tier_4":"guardian_l18_2","tier_5":"guardian_l21_2","tier_6":"guardian_l24_1","tier_7":"guardian_l27_r1" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l27_r2","tier_8":"guardian_l30_1"};hero.guardian_runtime.ability_charges=GuardianSystem.default_charges(hero);flash("Guardian test talents loaded")
+		return true
+	if event.keycode==KEY_F7 and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Cleric":hero.selected_heroic_id="cleric_l15_r1";hero.selected_talents={"tier_1":"cleric_l9_1","tier_2":"cleric_l12_2","tier_3":"cleric_l15_r1","tier_4":"cleric_l18_1","tier_5":"cleric_l21_2","tier_6":"cleric_l24_1","tier_7":"cleric_l27_r1","tier_8":"cleric_l30_1"};ClericSystem.initialize_runtime(hero,true);flash("Cleric Jug test build loaded")
+		return true
+	if event.keycode==KEY_F8 and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Cleric":hero.selected_heroic_id="cleric_l15_r2";hero.selected_talents={"tier_1":"cleric_l9_2","tier_2":"cleric_l12_3","tier_3":"cleric_l15_r2","tier_4":"cleric_l18_2","tier_5":"cleric_l21_1","tier_6":"cleric_l24_3","tier_7":"cleric_l27_r2","tier_8":"cleric_l30_2"};ClericSystem.initialize_runtime(hero,true);flash("Cleric Dragon test build loaded")
+		return true
+	if event.keycode==KEY_F9 and event.ctrl_pressed and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Mage":load_level_one_mage_test(hero)
+		flash("Level 1 Mage baseline loaded");return true
+	if event.keycode==KEY_F9 and event.shift_pressed and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Mage":load_mage_test_build(hero,"mage_l15_r1")
+		flash("Level 30 Mage Phoenix chain build loaded");return true
+	if event.keycode==KEY_F10 and event.shift_pressed and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Mage":load_mage_test_build(hero,"mage_l15_r2")
+		flash("Level 30 Mage Pyro control build loaded");return true
+	if event.keycode==KEY_F9 and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():hero.mage_runtime.trait.current_charges=hero.mage_runtime.trait.max_charges;hero.mage_runtime.trait.recharge_timers=[];hero.mage_runtime.trait.armed=false
+		flash("Mage Trait charges reset");return true
+	if event.keycode==KEY_F10 and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():hero.mage_runtime.arcane_dynamo_stacks=int(MageData.VALUES.arcane_dynamo_max);hero.mage_runtime.arcane_dynamo_remaining=float(MageData.VALUES.arcane_dynamo_duration);hero.mage_runtime.arcane_barrier_ready_in=0.0;MageSystem.refresh_ability_power(hero)
+		flash("Mage Dynamo max; Barrier ready");return true
+	if event.keycode==KEY_F11 and testing_zone_active:
+		for hero in heroes:
+			if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():
+				for foe in enemies:
+					if foe.hp>0:apply_living_bomb(hero,foe,true)
+		flash("Living Bomb cluster armed");return true
+	if event.keycode==KEY_F12 and testing_zone_active:
+		for foe in enemies:
+			if foe.hp>0 and ("boss" in foe.get("combat_tags",[]) or "elite" in foe.get("combat_tags",[])):foe.hp=maxf(1.0,float(foe.max_hp)*0.10)
+		flash("Boss and Elite targets set to 10% Health");return true
+	return false
+
+func handle_combat_key_pressed(event:InputEventKey)->void:
+	if event.keycode==KEY_SPACE:paused=!paused;queue_redraw()
+	if event.keycode==KEY_TAB and not event.echo:
+		cycle_selected_enemy()
+		get_viewport().set_input_as_handled()
+	if event.keycode>=KEY_1 and event.keycode<=KEY_8:
+		var selectable_heroes:Array=player_controlled_hero_indices()
+		var requested_slot:int=event.keycode-KEY_1
+		if requested_slot<selectable_heroes.size():selected=selectable_heroes[requested_slot];queue_redraw()
+	if not event.echo and event.keycode==KEY_Q:begin_ability(0)
+	if not event.echo and event.keycode==KEY_W:begin_ability(1)
+	if not event.echo and event.keycode==KEY_E:begin_ability(2)
+	if not event.echo and event.keycode==KEY_R:begin_ability(3)
+	if not event.echo and event.keycode==KEY_D:begin_trait()
+
+func handle_combat_mouse_press(event:InputEventMouseButton)->bool:
+	if event.button_index==MOUSE_BUTTON_RIGHT:
+		if ability_aiming:cancel_ability_aim()
+		elif not paused:clear_selected_combat_target()
+		get_viewport().set_input_as_handled();return true
+	if event.button_index==MOUSE_BUTTON_WHEEL_UP:
+		cycle_selected_hero(-1);get_viewport().set_input_as_handled();return true
+	if event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
+		cycle_selected_hero(1);get_viewport().set_input_as_handled();return true
+	if event.button_index!=MOUSE_BUTTON_LEFT:return false
+	var point:=event.position
+	if tutorial_active:
+		tutorial_pointer_press(point,"pc");get_viewport().set_input_as_handled();return true
+	if ability_aiming and aimed_cast_mode=="confirm":
+		if confirm_aim_at(point):get_viewport().set_input_as_handled()
+		return true
+	if point.x>1190 and point.y<70:paused=true;queue_redraw();return true
+	if paused:
+		if Rect2(490,285,300,58).has_point(point):paused=false;queue_redraw()
+		elif testing_zone_active and testing_zone_mode=="range" and Rect2(490,360,300,58).has_point(point):toggle_testing_dummy_attacks()
+		elif Rect2(490,435 if testing_zone_active else 360,300,58).has_point(point):paused=false;show_combat_hall() if testing_zone_active else show_zone_map(dungeon_id)
+		return true
+	if point.y>575 and point.y<635 and point.x>420 and point.x<875:
+		var selectable_heroes:Array=player_controlled_hero_indices();var requested_slot:int=clampi(int((point.x-424)/54),0,7)
+		if requested_slot<selectable_heroes.size():selected=selectable_heroes[requested_slot];queue_redraw()
+		return true
+	if point.y>635 and point.x>445 and point.x<835:
+		var action_slot:=clampi(int((point.x-445)/78),0,4)
+		if action_slot==4:begin_trait()
+		else:begin_ability(action_slot)
+		return true
+	for i in heroes.size():
+		if not bool(heroes[i].get("independent",false)) and heroes[i].pos.distance_to(point)<58:
+			selected=i;dragging_hero=true;drag_cursor=point;drag_start=point;drag_has_moved=false;drag_target_type="ground";drag_target_index=-1;queue_redraw();return true
+	return false
+
+func handle_combat_touch(event:InputEventScreenTouch)->bool:
+	if tutorial_active:
+		if event.pressed:tutorial_pointer_press(event.position,"mobile")
+		elif dragging_hero:update_hero_drag(event.position);finish_hero_drag()
+		get_viewport().set_input_as_handled();return true
+	if event.pressed and ability_aiming and aimed_cast_mode=="confirm":confirm_aim_at(event.position);return true
+	if event.pressed and event.position.y>635 and event.position.x>445 and event.position.x<835:
+		var action_slot:=clampi(int((event.position.x-445)/78),0,4)
+		if action_slot==4:begin_trait()
+		else:begin_ability(action_slot,"mobile")
+		return true
+	if not event.pressed and ability_aiming and aimed_cast_mode=="release":confirm_aim_at(event.position);return true
+	if event.pressed and not paused and event.position.y<635:clear_selected_combat_target()
+	return false
+
 func _unhandled_input(event:InputEvent) -> void:
 	if screen!="combat":return
 	if victory_talent_overlay!=null and is_instance_valid(victory_talent_overlay):return
@@ -201,135 +379,19 @@ func _unhandled_input(event:InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed:
+		if handle_combat_testing_shortcut(event):get_viewport().set_input_as_handled();return
 		if event.keycode==KEY_ESCAPE and ability_aiming:cancel_ability_aim();get_viewport().set_input_as_handled();return
-		if event.keycode==KEY_F3 and testing_zone_active:debug_combat_overlay=not debug_combat_overlay;queue_redraw();return
-		if event.keycode==KEY_F4 and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Guardian":GuardianSystem.add_quest(hero,45,"testing_control",battle_time);flash("Guardian quest +45")
-			return
-		if event.keycode==KEY_F5 and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Guardian":hero.selected_heroic_id="guardian_l15_r2" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l15_r1";hero.selected_talents["tier_3"]=hero.selected_heroic_id;flash("Heroic: %s"%GuardianData.WORKING_NAMES[hero.selected_heroic_id])
-			return
-		if event.keycode==KEY_F6 and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Guardian":hero.selected_talents={"tier_1":"guardian_l9_1","tier_2":"guardian_l12_2","tier_3":guardian_heroic_id(hero),"tier_4":"guardian_l18_2","tier_5":"guardian_l21_2","tier_6":"guardian_l24_1","tier_7":"guardian_l27_r1" if guardian_heroic_id(hero)=="guardian_l15_r1" else "guardian_l27_r2","tier_8":"guardian_l30_1"};hero.guardian_runtime.ability_charges=GuardianSystem.default_charges(hero);flash("Guardian test talents loaded")
-			return
-		if event.keycode==KEY_F7 and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Cleric":hero.selected_heroic_id="cleric_l15_r1";hero.selected_talents={"tier_1":"cleric_l9_1","tier_2":"cleric_l12_2","tier_3":"cleric_l15_r1","tier_4":"cleric_l18_1","tier_5":"cleric_l21_2","tier_6":"cleric_l24_1","tier_7":"cleric_l27_r1","tier_8":"cleric_l30_1"};ClericSystem.initialize_runtime(hero,true);flash("Cleric Jug test build loaded")
-			return
-		if event.keycode==KEY_F8 and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Cleric":hero.selected_heroic_id="cleric_l15_r2";hero.selected_talents={"tier_1":"cleric_l9_2","tier_2":"cleric_l12_3","tier_3":"cleric_l15_r2","tier_4":"cleric_l18_2","tier_5":"cleric_l21_1","tier_6":"cleric_l24_3","tier_7":"cleric_l27_r2","tier_8":"cleric_l30_2"};ClericSystem.initialize_runtime(hero,true);flash("Cleric Dragon test build loaded")
-			return
-		if event.keycode==KEY_F9 and event.ctrl_pressed and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Mage":load_level_one_mage_test(hero)
-			flash("Level 1 Mage baseline loaded");return
-		if event.keycode==KEY_F9 and event.shift_pressed and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Mage":load_mage_test_build(hero,"mage_l15_r1")
-			flash("Level 30 Mage Phoenix chain build loaded");return
-		if event.keycode==KEY_F10 and event.shift_pressed and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Mage":load_mage_test_build(hero,"mage_l15_r2")
-			flash("Level 30 Mage Pyro control build loaded");return
-		if event.keycode==KEY_F9 and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():hero.mage_runtime.trait.current_charges=hero.mage_runtime.trait.max_charges;hero.mage_runtime.trait.recharge_timers=[];hero.mage_runtime.trait.armed=false
-			flash("Mage Trait charges reset");return
-		if event.keycode==KEY_F10 and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():hero.mage_runtime.arcane_dynamo_stacks=int(MageData.VALUES.arcane_dynamo_max);hero.mage_runtime.arcane_dynamo_remaining=float(MageData.VALUES.arcane_dynamo_duration);hero.mage_runtime.arcane_barrier_ready_in=0.0;MageSystem.refresh_ability_power(hero)
-			flash("Mage Dynamo max; Barrier ready");return
-		if event.keycode==KEY_F11 and testing_zone_active:
-			for hero in heroes:
-				if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():
-					for foe in enemies:
-						if foe.hp>0:apply_living_bomb(hero,foe,true)
-			flash("Living Bomb cluster armed");return
-		if event.keycode==KEY_F12 and testing_zone_active:
-			for foe in enemies:
-				if foe.hp>0 and ("boss" in foe.get("combat_tags",[]) or "elite" in foe.get("combat_tags",[])):foe.hp=maxf(1.0,float(foe.max_hp)*0.10)
-			flash("Boss and Elite targets set to 10% Health");return
-		if event.keycode==KEY_SPACE:paused=!paused;queue_redraw()
-		if event.keycode==KEY_TAB and not event.echo:
-			cycle_selected_enemy()
-			get_viewport().set_input_as_handled()
-		if event.keycode>=KEY_1 and event.keycode<=KEY_4:
-			var selectable_heroes:Array=player_controlled_hero_indices()
-			var requested_slot:int=event.keycode-KEY_1
-			if requested_slot<selectable_heroes.size():selected=selectable_heroes[requested_slot];queue_redraw()
-		if not event.echo and event.keycode==KEY_Q:begin_ability(0)
-		if not event.echo and event.keycode==KEY_W:begin_ability(1)
-		if not event.echo and event.keycode==KEY_E:begin_ability(2)
-		if not event.echo and event.keycode==KEY_R:begin_ability(3)
-		if not event.echo and event.keycode==KEY_D:begin_trait()
+		handle_combat_key_pressed(event)
 	if event is InputEventKey and not event.pressed and ability_aiming and aimed_cast_mode=="release":
 		var released_slot={KEY_Q:0,KEY_W:1,KEY_E:2,KEY_R:3}.get(event.keycode,-1)
 		if released_slot==aimed_ability_slot:confirm_aim_at(get_global_mouse_position());return
-	if event is InputEventMouseButton and event.pressed:
-		if event.button_index==MOUSE_BUTTON_RIGHT:
-			if ability_aiming:cancel_ability_aim()
-			elif not paused:clear_selected_combat_target()
-			get_viewport().set_input_as_handled();return
-		if event.button_index==MOUSE_BUTTON_WHEEL_UP:
-			cycle_selected_hero(-1)
-			get_viewport().set_input_as_handled()
-			return
-		if event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
-			cycle_selected_hero(1)
-			get_viewport().set_input_as_handled()
-			return
-	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
-		var p=event.position
-		if tutorial_active:
-			tutorial_pointer_press(p,"pc")
-			get_viewport().set_input_as_handled()
-			return
-		if ability_aiming and aimed_cast_mode=="confirm":
-			if confirm_aim_at(p):get_viewport().set_input_as_handled()
-			return
-		if p.x>1190 and p.y<70: paused=true; queue_redraw(); return
-		if paused:
-			if Rect2(490,285,300,58).has_point(p):paused=false;queue_redraw()
-			elif testing_zone_active and testing_zone_mode=="range" and Rect2(490,360,300,58).has_point(p):toggle_testing_dummy_attacks()
-			elif Rect2(490,435 if testing_zone_active else 360,300,58).has_point(p):paused=false;show_dungeons() if testing_zone_active else show_zone_map(dungeon_id)
-			return
-		if p.y>575 and p.y<635 and p.x>420 and p.x<875:
-			var selectable_heroes:Array=player_controlled_hero_indices()
-			var requested_slot:int=clampi(int((p.x-424)/54),0,7)
-			if requested_slot<selectable_heroes.size():selected=selectable_heroes[requested_slot];queue_redraw()
-			return
-		if p.y>635 and p.x>445 and p.x<835:
-			var action_slot:=clampi(int((p.x-445)/78),0,4)
-			if action_slot==4:begin_trait()
-			else:begin_ability(action_slot)
-			return
-		for i in heroes.size():
-			if not bool(heroes[i].get("independent",false)) and heroes[i].pos.distance_to(p)<58:
-				selected=i;if tutorial_active and tutorial_step==3:tutorial_hero_clicked=true
-				dragging_hero=true;drag_cursor=p;drag_start=p;drag_has_moved=false;drag_target_type="ground";drag_target_index=-1;queue_redraw();return
+	if event is InputEventMouseButton and event.pressed and handle_combat_mouse_press(event):return
 	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed and ability_aiming and aimed_cast_mode=="release":
 		confirm_aim_at(event.position);return
 	if event is InputEventMouseMotion and ability_aiming:ability_aim_point=event.position;queue_redraw()
 	if event is InputEventScreenDrag and ability_aiming:ability_aim_point=event.position;queue_redraw();return
 
-	if event is InputEventScreenTouch:
-		if tutorial_active:
-			if event.pressed:tutorial_pointer_press(event.position,"mobile")
-			elif dragging_hero:update_hero_drag(event.position);finish_hero_drag()
-			get_viewport().set_input_as_handled()
-			return
-		if event.pressed and ability_aiming and aimed_cast_mode=="confirm":confirm_aim_at(event.position);return
-		if event.pressed and event.position.y>635 and event.position.x>445 and event.position.x<835:
-			var action_slot:=clampi(int((event.position.x-445)/78),0,4)
-			if action_slot==4:begin_trait()
-			else:begin_ability(action_slot,"mobile")
-			return
-		if not event.pressed and ability_aiming and aimed_cast_mode=="release":confirm_aim_at(event.position);return
-		if event.pressed and not paused and event.position.y<635:clear_selected_combat_target()
+	if event is InputEventScreenTouch and handle_combat_touch(event):return
 	if event is InputEventScreenDrag and tutorial_active and dragging_hero:update_hero_drag(event.position);return
 	if event is InputEventMouseMotion and dragging_hero:update_hero_drag(event.position)
 	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed and dragging_hero:

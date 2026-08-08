@@ -49,7 +49,8 @@ static func empty_equipment_slots()->Dictionary:
 static func create_instance(definition_id:String,instance_id:String)->Dictionary:
 	var definition:Dictionary=ITEMS.get(definition_id,{})
 	var slot:String=str(definition.get("slot",""));var weapon_family:String=str(definition.get("weapon_family_requirement",definition.get("weapon_proficiency_requirement","")))
-	return {"instance_id":instance_id,"definition_id":definition_id,"display_name":definition.get("display_name",definition_id),"slot":slot,"tier":definition.get("tier",1),"rarity":definition.get("rarity","Common"),"armor_family_requirement":definition.get("armor_family_requirement",""),"weapon_family_requirement":weapon_family,"allowed_classes":definition.get("allowed_classes",definition.get("testing_allowed_classes",[])).duplicate(),"stat_modifiers":definition.get("stat_modifiers",{}).duplicate(true),"passive_effect_ids":definition.get("passive_effect_ids",[]).duplicate(),"icon_path":definition.get("icon_path",""),"fallback_icon_type":definition.get("fallback_icon_type",weapon_family if slot=="weapon" and weapon_family!="" else slot),"testing_only":bool(definition.get("testing_only",false)),"owner_state":"vault","equipped_hero_index":-1}
+	var rarity:String=str(definition.get("rarity","Common"));var traits:Array=definition.get("passive_effect_ids",[]).duplicate()
+	return {"instance_id":instance_id,"definition_id":definition_id,"item_form_id":definition_id,"display_name":definition.get("display_name",definition_id),"slot":slot,"item_family":"weapon" if slot=="weapon" else slot if slot!="" else "misc","tier":definition.get("tier",1),"rarity":rarity,"item_level":maxi(1,int(definition.get("tier",1))),"item_xp":0,"armor_family_requirement":definition.get("armor_family_requirement",""),"weapon_family_requirement":weapon_family,"allowed_classes":definition.get("allowed_classes",definition.get("testing_allowed_classes",[])).duplicate(),"stat_modifiers":definition.get("stat_modifiers",{}).duplicate(true),"passive_effect_ids":traits.duplicate(),"traits":traits,"trait_capacity":{"Common":1,"Uncommon":2,"Rare":3,"Epic":4,"Legendary":4}.get(rarity,1),"tags":[],"element":"","region":"","faction":"","boss_identity":"","source_type":"world","contained_parent_items":[],"enchanting_preparation":{},"favourite":false,"reserved":false,"breeding_stock":false,"never_disenchant":false,"never_separate":false,"awaiting_player_review":false,"world_only":false,"craft_only":false,"icon_path":definition.get("icon_path",""),"fallback_icon_type":definition.get("fallback_icon_type",weapon_family if slot=="weapon" and weapon_family!="" else slot),"testing_only":bool(definition.get("testing_only",false)),"owner_state":"vault","equipped_hero_index":-1}
 
 static func testing_instances()->Array:
 	var result:Array=[]
@@ -103,7 +104,8 @@ static func item_by_instance_id(item_instances:Array,instance_id:String)->Dictio
 	return {}
 
 static func reconcile_ownership(state:Dictionary)->void:
-	for item in state.get("item_instances",[]):item["owner_state"]="vault";item["equipped_hero_index"]=-1
+	for item in state.get("item_instances",[]):
+		var location:=str(item.get("storage_location","vault"));item["owner_state"]="depot" if location=="depot" else "vault";item["equipped_hero_index"]=-1
 	var claimed_instances:Dictionary={}
 	for hero_index in state.get("heroes",[]).size():
 		var hero:Dictionary=state.heroes[hero_index]
@@ -113,7 +115,7 @@ static func reconcile_ownership(state:Dictionary)->void:
 			if claimed_instances.has(str(instance_id)):hero.equipment_slots[slot]=null;continue
 			var item:=item_by_instance_id(state.item_instances,str(instance_id))
 			if item.is_empty():hero.equipment_slots[slot]=null
-			else:claimed_instances[str(instance_id)]=true;item.owner_state="equipped";item.equipped_hero_index=hero_index
+			else:claimed_instances[str(instance_id)]=true;item.owner_state="equipped";item.storage_location="vault";item.equipped_hero_index=hero_index
 
 static func equip_in_state(state:Dictionary,hero_index:int,instance_id:String,classes:Dictionary)->Dictionary:
 	if hero_index<0 or hero_index>=state.heroes.size():return {"success":false,"reason":"Invalid hero"}
@@ -127,8 +129,8 @@ static func equip_in_state(state:Dictionary,hero_index:int,instance_id:String,cl
 			if str(state.heroes[previous_owner].equipment_slots.get(previous_slot,""))==instance_id:state.heroes[previous_owner].equipment_slots[previous_slot]=null
 	if replaced_id!=null:
 		var replaced:=item_by_instance_id(state.item_instances,str(replaced_id))
-		if not replaced.is_empty():replaced.owner_state="vault";replaced.equipped_hero_index=-1
-	hero.equipment_slots[slot]=instance_id;item.owner_state="equipped";item.equipped_hero_index=hero_index
+		if not replaced.is_empty():replaced.owner_state="vault";replaced.storage_location="vault";replaced.equipped_hero_index=-1
+	hero.equipment_slots[slot]=instance_id;item.owner_state="equipped";item.storage_location="vault";item.equipped_hero_index=hero_index
 	return {"success":true,"reason":"","replaced_instance_id":replaced_id,"previous_owner":previous_owner}
 
 static func unequip_from_state(state:Dictionary,hero_index:int,slot:String)->Dictionary:
@@ -136,7 +138,7 @@ static func unequip_from_state(state:Dictionary,hero_index:int,slot:String)->Dic
 	var instance_id=state.heroes[hero_index].equipment_slots.get(slot,null)
 	if instance_id==null:return {"success":true,"instance_id":null}
 	state.heroes[hero_index].equipment_slots[slot]=null;var item:=item_by_instance_id(state.item_instances,str(instance_id))
-	if not item.is_empty():item.owner_state="vault";item.equipped_hero_index=-1
+	if not item.is_empty():item.owner_state="vault";item.storage_location="vault";item.equipped_hero_index=-1
 	return {"success":true,"instance_id":instance_id}
 
 static func item_tooltip(item:Dictionary)->String:
@@ -176,7 +178,7 @@ static func item_card_data(item:Dictionary,heroes:Array=[])->Dictionary:
 	var owner_index:=int(item.get("equipped_hero_index",-1));var owner_name:="";var owner_class:=""
 	if owner_index>=0 and owner_index<heroes.size():owner_name=str(heroes[owner_index].get("name","Hero"));owner_class=str(heroes[owner_index].get("class",""))
 	var slot:=str(definition.get("slot",""));var weapon_family:=str(definition.get("weapon_family_requirement",""))
-	return {"kind":"equipment","instance_id":item.get("instance_id",""),"definition_id":item.get("definition_id",""),"display_name":definition.get("display_name","Item"),"tier":int(definition.get("tier",1)),"tier_text":"Tier %s"%roman_tier(int(definition.get("tier",1))),"rarity":definition.get("rarity","Common"),"slot":slot,"slot_text":slot.capitalize(),"armor_family_requirement":definition.get("armor_family_requirement",""),"weapon_family_requirement":weapon_family,"icon_path":definition.get("icon_path",item.get("icon_path","")),"fallback_icon_type":definition.get("fallback_icon_type",item.get("fallback_icon_type",weapon_family if slot=="weapon" else slot)),"stats":stats,"passives":passives,"owner_index":owner_index,"owner_name":owner_name,"owner_class":owner_class,"status":"Equipped by %s  •  %s"%[owner_name,owner_class] if owner_name!="" else "Stored in Guild Vault"}
+	return {"kind":"equipment","instance_id":item.get("instance_id",""),"definition_id":item.get("definition_id",""),"display_name":definition.get("display_name","Item"),"tier":int(definition.get("tier",1)),"tier_text":"Tier %s"%roman_tier(int(definition.get("tier",1))),"rarity":definition.get("rarity","Common"),"slot":slot,"slot_text":slot.capitalize(),"armor_family_requirement":definition.get("armor_family_requirement",""),"weapon_family_requirement":weapon_family,"icon_path":definition.get("icon_path",item.get("icon_path","")),"fallback_icon_type":definition.get("fallback_icon_type",item.get("fallback_icon_type",weapon_family if slot=="weapon" else slot)),"stats":stats,"passives":passives,"owner_index":owner_index,"owner_name":owner_name,"owner_class":owner_class,"status":"Equipped by %s  •  %s"%[owner_name,owner_class] if owner_name!="" else "Available to Workshop" if str(item.get("storage_location","vault"))=="depot" else "Stored in Guild Vault"}
 
 static func legacy_ashwood_instance(legacy_item:Dictionary)->Dictionary:
 	var display_name:=str(legacy_item.get("name","Ashwood Item"));var definition_id:=""

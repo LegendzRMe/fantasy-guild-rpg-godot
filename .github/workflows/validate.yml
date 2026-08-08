@@ -1,0 +1,50 @@
+name: Validate
+
+on:
+    push:
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+env:
+    GODOT_VERSION: ${{ vars.GODOT_VERSION || '4.7-stable' }}
+
+jobs:
+    validate:
+        runs-on: windows-latest
+        timeout-minutes: 15
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
+
+            - name: Download pinned Godot
+              shell: pwsh
+              run: |
+                  $archive = Join-Path $env:RUNNER_TEMP "godot.zip"
+                  $engineDirectory = Join-Path $env:RUNNER_TEMP "godot"
+                  $url = "https://github.com/godotengine/godot-builds/releases/download/$env:GODOT_VERSION/Godot_v$env:GODOT_VERSION`_win64.exe.zip"
+                  Invoke-WebRequest -Uri $url -OutFile $archive
+                  Expand-Archive -LiteralPath $archive -DestinationPath $engineDirectory
+                  $executable = Get-ChildItem -LiteralPath $engineDirectory -Filter "Godot*.exe" -File |
+                      Where-Object { $_.Name -notmatch "console" } |
+                      Select-Object -First 1
+                  if (-not $executable) { throw "Godot executable was not present in the downloaded archive." }
+                  "GODOT_EXECUTABLE=$($executable.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+            - name: Run complete validation
+              shell: pwsh
+              run: .\tools\validate.ps1 -GodotPath $env:GODOT_EXECUTABLE
+
+            - name: Record project audit
+              if: always()
+              shell: pwsh
+              run: .\tools\audit.ps1 | Tee-Object -FilePath project-audit.txt
+
+            - name: Upload audit
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: project-audit
+                  path: project-audit.txt

@@ -1,15 +1,39 @@
 extends "res://scripts/runtime/app_shell.gd"
 
 func battle_formation_position(slot_index:int) -> Vector2:
+	if slot_index>=4:
+		var raid_positions:=[Vector2(205,160),Vector2(105,210),Vector2(205,285),Vector2(105,335),Vector2(205,410),Vector2(105,460),Vector2(205,535),Vector2(105,585)]
+		return raid_positions[clampi(slot_index,0,raid_positions.size()-1)]
 	var diamond_positions:=[Vector2(210,320),Vector2(145,215),Vector2(145,425),Vector2(90,320)]
 	return diamond_positions[clampi(slot_index,0,diamond_positions.size()-1)]
 
-func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
+func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_resolved:bool=false,party_limit:int=4) -> void:
 	var requested_party:Array=state.selected_team if party_override.is_empty() else party_override
-	var validated_party:=TeamManager.sanitize_team(requested_party,state.heroes)
+	var validated_party:Array=[]
+	if party_limit<=4:validated_party=TeamManager.sanitize_team(requested_party,state.heroes)
+	else:
+		for raw_index in requested_party:
+			var hero_index:=int(raw_index)
+			if hero_index>=0 and hero_index<state.heroes.size() and hero_index not in validated_party:validated_party.append(hero_index)
+			if validated_party.size()>=party_limit:break
 	if validated_party.is_empty():
 		flash("Choose at least one hero before starting battle.")
 		return
+	var unavailable:Array=[]
+	for hero_index in validated_party:
+		var hero_id:=str(state.heroes[int(hero_index)].get("hero_id",""));var availability:=TavernFacilitySystem.member_status(state,hero_id)
+		if not bool(availability.available):unavailable.append("%s (%s)"%[str(state.heroes[int(hero_index)].display_name),str(availability.label)])
+	if not unavailable.is_empty():flash("Unavailable: "+", ".join(unavailable));return
+	if not profession_conflict_resolved:
+		var conflicting_orders:Array=[]
+		for hero_index in validated_party:
+			var order_id:=str(state.heroes[int(hero_index)].profession_progress.get("current_profession_order_id",""))
+			if order_id!="":conflicting_orders.append(order_id)
+		if not conflicting_orders.is_empty():
+			var dialog:=ConfirmationDialog.new();dialog.title="ACTIVE PROFESSION ORDERS";dialog.dialog_text="One or more selected members are working on profession orders.\n\nPause their orders and begin the mission, or cancel the orders and return their reserved inputs. Nothing will be cancelled silently.";dialog.ok_button_text="Pause Orders and Begin";dialog.add_button("Cancel Orders and Begin",false,"cancel_orders")
+			dialog.confirmed.connect(func():for order_id in conflicting_orders:ProfessionSystem.pause_profession_order(state,str(order_id),true);save_game();start_battle(id,node,party_override,true,party_limit))
+			dialog.custom_action.connect(func(action):if action=="cancel_orders":for order_id in conflicting_orders:ProfessionSystem.cancel_profession_order(state,str(order_id));save_game();dialog.hide();start_battle(id,node,party_override,true,party_limit))
+			ui.add_child(dialog);dialog.popup_centered(Vector2i(650,330));return
 	if party_override.is_empty():
 		state.selected_team=validated_party.duplicate()
 		if current_team_slot<0:state.active_team=validated_party.duplicate()
@@ -17,12 +41,20 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 	testing_zone_mode="range"
 	testing_endless_spawn_timer=0.0;testing_endless_spawn_count=0;testing_endless_defeated=0
 	current_ashwood_encounter=""
+	current_campaign_battle={}
 	battle_objective={};objective_progress=0;objective_health=0;objective_max_health=0;objective_complete=true;objective_pressure_spawned=false;objective_notice="";objective_notice_time=0;objective_banner_time=0;objective_combat_intro="";rune_active=false;rune_timer=0;rune_charge=0;rune_radius=0
 	dungeon_id=id; encounter_id=node; clear_all();combat_events.clear();item_feedback_feed.clear();battle_material_results.clear();combat_blockers.clear();combat_projectiles.clear();incapacitated_hero_ids.clear();next_enemy_combat_id=1;next_projectile_combat_id=1;debug_combat_overlay=CombatRulesV1.DEBUG_COMBAT_OVERLAY_ENABLED; ui.visible=false; combat_layer.visible=true; screen="combat"; battle_time=0; spawn_timer=0; battle_over=false; paused=false; selected=0;focused_enemy_index=-1; wave_index=0; total_waves=3+(1 if node>=3 else 0); wave_spawn_remaining=0; wave_break=.8; waiting_wave=false; battle_gold_earned=0
-	battle_hero_indices=validated_party.slice(0,4)
+	battle_hero_indices=validated_party.slice(0,party_limit)
+	var consumed_tavern_buff:=false
 	for i in battle_hero_indices.size():
-		var start_position:=battle_formation_position(i);var data=state.heroes[battle_hero_indices[i]];var runtime_stats:=hero_final_stats(data);var equipped:=hero_equipped_items(data);heroes.append({"name":data.name,"class":data["class"],"hero_index":battle_hero_indices[i],"battle_index":i,"level":runtime_stats.level,"combat_affiliation":"player","independent":false,"pos":start_position,"dest":start_position,"facing_direction":Vector2.RIGHT,"stats":runtime_stats,"equipped_items":equipped,"active_effects":[],"passive_cooldowns":{},"hp":runtime_stats.health,"max_hp":runtime_stats.health,"base_power":runtime_stats.power,"power":runtime_stats.power,"armor":runtime_stats.armor,"basic_action_type":runtime_stats.basic_action_type,"basic_action_coefficient":runtime_stats.basic_action_power_coefficient,"basic_action_power_ratio":runtime_stats.basic_action_amount/maxf(0.001,runtime_stats.power),"basic_action_amount":runtime_stats.basic_action_amount,"damage":runtime_stats.basic_action_amount,"basic_heal_amount":runtime_stats.basic_heal_amount,"range":runtime_stats.basic_action_range,"movement_speed":runtime_stats.movement_speed,"base_basic_action_interval":runtime_stats.basic_action_interval,"basic_attack_interval":runtime_stats.basic_action_interval,"basic_heal_interval":runtime_stats.basic_action_interval,"critical_chance":runtime_stats.critical_chance,"critical_damage":runtime_stats.critical_damage,"threat_modifier":runtime_stats.threat_modifier,"damage_multiplier":runtime_stats.damage_multiplier,"healing_multiplier":runtime_stats.healing_multiplier,"damage_taken_multiplier":runtime_stats.damage_taken_multiplier,"healing_taken_multiplier":runtime_stats.healing_taken_multiplier,"basic_attack_damage_type":runtime_stats.basic_action_damage_type,"target":-1,"heal_target":-1,"suppress_auto_target":false,"cooldown":0.0,"ability_cds":[0.0,0.0,0.0,0.0,0.0],"shield":0.0,"shield_sources":[],"last_hit":0.0,"bloodletting_stacks":[],"thousand_cuts_count":0,"retribution_charges":[],"soul_furnace_stacks":0,"last_dawn_ready":true,"borrowed_time_timer":0.0,"borrowed_time_armed":false,"pending_repeats":[],"q_charges":2 if has_item_passive(equipped,"twin_incantation") else 1,"q_charge_timers":[]})
-		var stable_hero_id:=str(data.get("hero_id",data.get("id",battle_hero_indices[i])))
+		var start_position:=battle_formation_position(i);var data=state.heroes[battle_hero_indices[i]];var equipped:=hero_equipped_items(data);var stable_hero_id:=str(data.get("hero_id",data.get("id",battle_hero_indices[i])));var rest_buff:=TavernFacilitySystem.consume_mission_buff(state,stable_hero_id)
+		var meal_modifiers:={}
+		for stat_id in ["health_multiplier","armor","movement_speed","basic_action_speed","damage_multiplier"]:
+			if rest_buff.has(stat_id):meal_modifiers[stat_id]=rest_buff[stat_id]
+		var runtime_stats:=hero_final_stats(data,[{"stat_modifiers":meal_modifiers}] if not meal_modifiers.is_empty() else []);var temporary_hp:=float(runtime_stats.health)*float(rest_buff.get("temporary_hp_percent",0.0));if not rest_buff.is_empty():consumed_tavern_buff=true
+		heroes.append({"name":data.name,"class":data["class"],"hero_index":battle_hero_indices[i],"battle_index":i,"level":runtime_stats.level,"combat_affiliation":"player","independent":false,"pos":start_position,"dest":start_position,"facing_direction":Vector2.RIGHT,"stats":runtime_stats,"equipped_items":equipped,"active_effects":[],"passive_cooldowns":{},"hp":runtime_stats.health,"max_hp":runtime_stats.health,"temporary_hp":temporary_hp,"temporary_hp_max":temporary_hp,"was_defeated":false,"base_power":runtime_stats.power,"power":runtime_stats.power,"armor":runtime_stats.armor,"basic_action_type":runtime_stats.basic_action_type,"basic_action_coefficient":runtime_stats.basic_action_power_coefficient,"basic_action_power_ratio":runtime_stats.basic_action_amount/maxf(0.001,runtime_stats.power),"basic_action_amount":runtime_stats.basic_action_amount,"damage":runtime_stats.basic_action_amount,"basic_heal_amount":runtime_stats.basic_heal_amount,"range":runtime_stats.basic_action_range,"movement_speed":runtime_stats.movement_speed,"base_basic_action_interval":runtime_stats.basic_action_interval,"basic_attack_interval":runtime_stats.basic_action_interval,"basic_heal_interval":runtime_stats.basic_action_interval,"critical_chance":runtime_stats.critical_chance,"critical_damage":runtime_stats.critical_damage,"threat_modifier":runtime_stats.threat_modifier,"damage_multiplier":runtime_stats.damage_multiplier,"healing_multiplier":runtime_stats.healing_multiplier,"damage_taken_multiplier":runtime_stats.damage_taken_multiplier,"healing_taken_multiplier":runtime_stats.healing_taken_multiplier,"basic_attack_damage_type":runtime_stats.basic_action_damage_type,"target":-1,"heal_target":-1,"suppress_auto_target":false,"cooldown":0.0,"ability_cds":[0.0,0.0,0.0,0.0,0.0],"shield":0.0,"shield_sources":[],"last_hit":0.0,"bloodletting_stacks":[],"thousand_cuts_count":0,"retribution_charges":[],"soul_furnace_stacks":0,"last_dawn_ready":true,"borrowed_time_timer":0.0,"borrowed_time_armed":false,"pending_repeats":[],"q_charges":2 if has_item_passive(equipped,"twin_incantation") else 1,"q_charge_timers":[]})
+		heroes[-1]["tavern_meal"]=rest_buff.duplicate(true)
+		heroes[-1]["chefs_touch_id"]=str(data.get("cooking_meal_state",{}).get("chefs_touch_id","")) if str(state.get("cooking",{}).get("special_guest_hero_id",""))==stable_hero_id else ""
 		CombatRulesV1.initialize_unit(heroes[-1],"hero:%s"%stable_hero_id,"player")
 		heroes[-1]["selected_talents"]=data.get("selected_talents",{}).duplicate(true)
 		heroes[-1]["selected_heroic_id"]=str(data.get("selected_heroic_id",""))
@@ -32,15 +64,14 @@ func start_battle(id:int,node:int=0,party_override:Array=[]) -> void:
 		elif str(heroes[-1].get("class",""))=="Ranger":RangerSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Mage":MageSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Warlock":WarlockSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Rogue":RogueSystem.initialize_runtime(heroes[-1],is_testing_save())
+	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
 func start_warlock_testing_zone() -> void:
-	var test_party:Array=[]
-	for wanted_class in ["Warlock","Guardian","Cleric","Ranger"]:
-		for hero_index in state.heroes.size():
-			if state.heroes[hero_index]["class"]==wanted_class and hero_index not in test_party:test_party.append(hero_index);break
+	var test_party:Array=selected_party_indices()
 	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Warlock"):
-		flash("Add a Warlock to the testing roster first.");show_testing_zone_menu();return
+		flash("Add a Warlock to the selected team first.");show_testing_zone_menu();return
 	start_battle(0,-1,test_party)
 	testing_zone_active=true;testing_zone_mode="range"
 	for hero in heroes:
@@ -56,12 +87,33 @@ func start_warlock_testing_zone() -> void:
 		if enemy.type in ["Dummy","Defense Dummy"]:enemy.hp=5000.0;enemy.max_hp=5000.0
 	queue_redraw()
 
+func start_rogue_testing_zone() -> void:
+	var test_party:Array=selected_party_indices()
+	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Rogue"):
+		flash("Add a Rogue to the selected team first.");show_testing_zone_menu();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="rogue_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	for hero in heroes:
+		if str(hero.get("class",""))=="Rogue":hero.rogue_runtime.telemetry_enabled=true
+	# Ordinary cluster for Blade Flurry, Fatal Finesse, and isolation checks.
+	for position in [Vector2(520,145),Vector2(610,145),Vector2(565,220),Vector2(655,220)]:spawn_enemy(position,"Dummy");enemies[-1]["passive_test_enemy"]=true
+	spawn_enemy(Vector2(790,145),"Defense Dummy");enemies[-1]["passive_test_enemy"]=true;enemies[-1].armor=30.0;enemies[-1].combat_tags.append("armored")
+	spawn_enemy(Vector2(930,145),"Brute");enemies[-1]["passive_test_enemy"]=true;enemies[-1].combat_tags.append("armored")
+	# Detector and non-detector Bosses expose separate authored profiles.
+	spawn_enemy(Vector2(1050,225),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["detection_profile"]={"detect_stealthed":true,"detect_invisible":true,"detection_radius":210.0};enemies[-1]["control_profile"]={"stun_multiplier":0.25,"blind_immune":true,"silence_multiplier":0.5};enemies[-1].combat_tags.append("detector")
+	spawn_enemy(Vector2(1040,475),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["detection_profile"]={};enemies[-1]["control_profile"]={"stun_multiplier":0.0,"blind_immune":true,"silence_multiplier":1.0};enemies[-1].combat_tags.append("non_detector")
+	# Healing, summon, and non-qualifying fixtures for Strangle and Fatal Finesse.
+	spawn_enemy(Vector2(760,500),"Shaman");enemies[-1]["test_fixture"]="external_healer"
+	spawn_enemy(Vector2(850,500),"Raider");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["test_fixture"]="healable_target"
+	spawn_enemy(Vector2(650,500),"Brute");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["test_fixture"]="self_healer";enemies[-1]["self_heal_test"]=true
+	spawn_enemy(Vector2(455,500),"Swift");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["summoned_unit"]=true
+	spawn_enemy(Vector2(365,500),"Dummy");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["object"]=true;enemies[-1].combat_tags.append("temporary")
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:rogue_wall",Rect2(700,280,70,135)))
+	for enemy in enemies:
+		enemy.rewarded=true;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0;enemy.hp=6000.0;enemy.max_hp=6000.0
+	queue_redraw()
+
 func start_testing_zone() -> void:
-	var test_party:Array=[]
-	for wanted_class in ["Guardian","Cleric","Ranger","Mage"]:
-		for hero_index in state.heroes.size():
-			if state.heroes[hero_index]["class"]==wanted_class and hero_index not in test_party:test_party.append(hero_index);break
-	if test_party.is_empty():test_party=state.selected_team.duplicate()
+	var test_party:Array=selected_party_indices()
 	start_battle(0,-1,test_party)
 	testing_zone_active=true
 	testing_zone_mode="range"
@@ -89,12 +141,11 @@ func start_testing_zone() -> void:
 	if heroes.size()>2:heroes[2].hp*=0.75
 	queue_redraw()
 
+func selected_party_indices() -> Array:
+	return TeamManager.sanitize_team(state.selected_team,state.heroes)
+
 func testing_party_indices() -> Array:
-	var test_party:Array=[]
-	for wanted_class in ["Guardian","Cleric","Ranger","Mage"]:
-		for hero_index in state.heroes.size():
-			if state.heroes[hero_index]["class"]==wanted_class and hero_index not in test_party:test_party.append(hero_index);break
-	return state.selected_team.duplicate() if test_party.is_empty() else test_party
+	return selected_party_indices()
 
 func apply_testing_enemy_level(enemy:Dictionary,enemy_level:int) -> void:
 	var safe_level:=CombatSystem.clamp_level(enemy_level)

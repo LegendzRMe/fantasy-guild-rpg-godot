@@ -6,6 +6,37 @@ static func hero_class_id(hero:Dictionary)->String:
 	var class_id:=str(hero.get("class_id",""))
 	return class_id if class_id!="" else str(hero.get("class","")).to_snake_case()
 
+static func hero_index_for_id(heroes:Array,hero_id:String)->int:
+	for index in heroes.size():
+		if str(heroes[index].get("hero_id",""))==hero_id:return index
+	return -1
+
+static func runtime_team(team:Array,heroes:Array)->Array:
+	var indices:Array=[]
+	for member in team:
+		var index:=hero_index_for_id(heroes,str(member)) if member is String else int(member)
+		if index>=0:indices.append(index)
+	return sanitize_team(indices,heroes)
+
+static func persisted_team(team:Array,heroes:Array)->Array:
+	var ids:Array=[]
+	for member_index in sanitize_team(team,heroes):
+		var hero_id:=str(heroes[int(member_index)].get("hero_id",""))
+		if hero_id!="":ids.append(hero_id)
+	return ids
+
+static func runtime_saved_teams(saved_teams:Array,heroes:Array)->Array:
+	var result:Array=[]
+	for team in saved_teams:result.append(runtime_team(team,heroes) if team is Array else [])
+	while result.size()<5:result.append([])
+	return result.slice(0,5)
+
+static func persisted_saved_teams(saved_teams:Array,heroes:Array)->Array:
+	var result:Array=[]
+	for team in saved_teams:result.append(persisted_team(team,heroes) if team is Array else [])
+	while result.size()<5:result.append([])
+	return result.slice(0,5)
+
 static func can_add_member(team:Array,member_index:int,heroes:Array)->bool:
 	if member_index<0 or member_index>=heroes.size() or has_member(team,member_index):return false
 	var requested_class:=hero_class_id(heroes[member_index])

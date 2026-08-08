@@ -35,7 +35,9 @@ func spawn_wave_enemy() -> void:
 	var is_boss=wave_index==total_waves and wave_spawn_remaining==1
 	var role="Boss" if is_boss else GameData.WAVE_ENEMY_ROLES[(wave_index+wave_spawn_remaining+encounter_id)%GameData.WAVE_ENEMY_ROLES.size()]
 	var side=(wave_index+wave_spawn_remaining)%4; var entry=[Vector2(1200,120+(wave_spawn_remaining*97)%410),Vector2(260+(wave_spawn_remaining*151)%850,75),Vector2(1200,545-(wave_spawn_remaining*89)%410),Vector2(280+(wave_spawn_remaining*127)%820,565)][side]
-	spawn_enemy(entry,role); wave_spawn_remaining-=1; spawn_timer=.65
+	spawn_enemy(entry,role)
+	if is_boss and str(current_campaign_battle.get("region_id",""))=="grand_corruption_front" and str(current_campaign_battle.get("location_id",""))=="gateway_site":enemies[-1].type="Nazareth";enemies[-1].name="Nazareth"
+	wave_spawn_remaining-=1; spawn_timer=.65
 
 func spawn_enemy(pos:Vector2,type:String) -> void:
 	var enemy:=GameData.create_enemy(type,pos,dungeon_id)
@@ -94,7 +96,7 @@ func update_ashwood_objective(delta:float) -> void:
 				for enemy in enemies:
 					if enemy.hp>0:deal_damage(rescue_source,enemy,180.0,"basic_ability","physical","signal_rescue")
 				add_first_recruit_to_battle()
-				set_objective_notice("The signal is complete â€” the rescued fighter joins the attack!",3.5)
+				set_objective_notice("The signal is complete — the rescued fighter joins the attack!",3.5)
 	elif objective_type=="survival" and not objective_complete:
 		objective_progress=min(1.0,objective_progress+delta/max(1.0,float(battle_objective.duration)))
 		if objective_progress>=1.0:
@@ -127,7 +129,7 @@ func update_ashwood_rune(delta:float) -> void:
 			for hero in heroes:
 				if hero.hp>0 and hero.pos.distance_to(rune_center)<118:
 					var damage=58.0 if current_ashwood_encounter=="finale" else 46.0
-					var rune_result:=deal_damage(rune_source,hero,damage,"periodic","magical","ashwood_rune");hero.last_hit=3;add_effect("hit",rune_center,hero.pos,"-%d"%int(rune_result.health_damage+rune_result.shield_damage),C_RED)
+					var rune_result:=deal_damage(rune_source,hero,damage,"periodic","magical","ashwood_rune");hero.last_hit=3;add_effect("hit",rune_center,hero.pos,"-%d"%int(rune_result.resolved_damage),C_RED)
 			rune_active=false;rune_timer=0;rune_charge=0;rune_radius=0
 		return
 	rune_timer+=delta
@@ -196,6 +198,15 @@ func enemy_target_threat(enemy:Dictionary,target_index:int) -> float:
 	if target_index==OBJECTIVE_THREAT_TARGET:return float(enemy.get("objective_threat",0.0)) if objective_is_threat_target() else -1.0
 	if target_index<0 or target_index>=heroes.size() or heroes[target_index].hp<=0:return -1.0
 	return float(enemy.get("threat",{}).get(target_index,0.0))
+
+func reduce_hero_threat(hero_index:int,reduction:float)->void:
+	if hero_index<0 or hero_index>=heroes.size():return
+	var multiplier:float=1.0-clampf(reduction,0.0,1.0)
+	for enemy in enemies:
+		var threat_table:Dictionary=enemy.get("threat",{})
+		if not threat_table.has(hero_index):continue
+		threat_table[hero_index]=maxf(0.0,float(threat_table.get(hero_index,0.0))*multiplier)
+		enemy.threat=threat_table
 
 func taunt_enemy(enemy:Dictionary,hero_index:int) -> void:
 	if bool(enemy.get("ignores_tank_aggro",false)):return

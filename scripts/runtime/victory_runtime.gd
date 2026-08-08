@@ -1,10 +1,18 @@
-extends "res://scripts/runtime/ashwood_runtime.gd"
+extends "res://scripts/runtime/campaign_runtime.gd"
 
 func finish_battle(win:bool)->void:
+	for hero in heroes:
+		if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty():RogueSystem.telemetry_add(hero,"combo_encounter_resets");RogueSystem.reset_encounter(hero)
 	battle_over=true
+	if not tutorial_active and not testing_zone_active:
+		var recovery_members:=TavernFacilitySystem.record_battle_defeats(state,heroes)
+		if not recovery_members.is_empty():save_game()
 	victory_talent_prompt_handled=false;victory_talent_queue.clear();victory_talent_choice_index=0;close_victory_talent_overlay()
 	if current_ashwood_encounter!="":
 		finish_ashwood_battle(win)
+		return
+	if not current_campaign_battle.is_empty():
+		finish_campaign_battle(win)
 		return
 	if win:
 		var previous_levels:=[]

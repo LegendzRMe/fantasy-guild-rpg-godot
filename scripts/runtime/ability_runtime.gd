@@ -1,4 +1,4 @@
-extends "res://scripts/runtime/warlock_runtime.gd"
+extends "res://scripts/runtime/rogue_runtime.gd"
 
 func clamped_cast_point(hero:Dictionary,point:Vector2,range_limit:float)->Vector2:
 	if range_limit<=0:return hero.pos
@@ -48,6 +48,9 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 	if h["class"]=="Warlock":
 		cast_warlock_ability(slot,cast_position,item_repeat)
 		return
+	if h["class"]=="Rogue":
+		cast_rogue_ability(slot,cast_position,item_repeat)
+		return
 	var ability_range=float(ABILITY_RANGES[h["class"]][slot])
 	var resolved_point=clamped_cast_point(h,cast_position,ability_range) if ability_range>0 else h.pos
 	if resolved_point.distance_to(h.pos)>1:h.facing_direction=h.pos.direction_to(resolved_point)
@@ -58,7 +61,10 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 			h.q_charges=int(h.q_charges)-1;h.q_charge_timers.append(base_cooldown);h.ability_cds[0]=0.0 if h.q_charges>0 else base_cooldown
 		else:h.ability_cds[slot]=base_cooldown
 	var ability_action:="heroic" if slot==3 else "basic_ability";var ability_damage_type:="magical" if h["class"] in ["Cleric","Mage","Warlock"] else "physical";combat_events.append(CombatSystem.create_event("heroic_cast" if slot==3 else "basic_ability_cast",h,h,{"amount":0.0,"critical":false,"source_action":ability_action},{"action_tags":[ability_action],"origin":ABILITIES[h["class"]][slot]}))
-	add_effect("heroic" if slot==3 else "cast",h.pos,h.pos,("ECHO: " if item_repeat else "")+ABILITIES[h["class"]][slot],CLASSES[h["class"]].color)
+	var display_name:=str(ABILITIES[h["class"]][slot]);var effect_color:Color=CLASSES[h["class"]].color
+	if slot<3 and selected<battle_hero_indices.size():
+		var saved_hero:Dictionary=state.heroes[battle_hero_indices[selected]];var ability_id:="%s:%s"%[str(saved_hero.class_id),["q","w","e"][slot]];var rune_presentation:Dictionary=ProfessionSystem.ability_presentation(state,str(saved_hero.hero_id),ability_id,display_name);display_name=str(rune_presentation.display_name);if str(rune_presentation.get("effect_tint",""))!="":effect_color=Color(str(rune_presentation.effect_tint))
+	add_effect("heroic" if slot==3 else "cast",h.pos,h.pos,("ECHO: " if item_repeat else "")+display_name,effect_color)
 	match h["class"]:
 		"Guardian":
 			if slot==0:
@@ -70,12 +76,6 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 				h.pos=resolved_point;h.dest=h.pos
 				for foe_rush in enemies:if foe_rush.hp>0 and foe_rush.pos.distance_to(h.pos)<105:deal_damage(h,foe_rush,scaled_ability_amount(h,38.0),ability_action,"physical",ABILITIES[h["class"]][slot])
 			else:for ally_bastion in heroes:if ally_bastion.hp>0:apply_unit_shield(h,ally_bastion,scaled_ability_amount(h,30.0),ABILITIES[h["class"]][slot])
-		"Rogue":
-			if slot==0 and ability_enemy_target>=0:deal_damage(h,enemies[ability_enemy_target],scaled_ability_amount(h,72.0),ability_action,ability_damage_type,ABILITIES[h["class"]][slot])
-			elif slot==1:h.pos=resolved_point;h.dest=h.pos
-			elif slot==2:for foe_knives in enemies:if foe_knives.hp>0 and foe_knives.pos.distance_to(h.pos)<120:deal_damage(h,foe_knives,scaled_ability_amount(h,46.0),ability_action,ability_damage_type,ABILITIES[h["class"]][slot])
-			elif ability_enemy_target>=0:deal_damage(h,enemies[ability_enemy_target],scaled_ability_amount(h,105.0),ability_action,ability_damage_type,ABILITIES[h["class"]][slot])
-
 	if not item_repeat and slot==2 and hero_has_passive(h,"twin_incantation") and int(h.q_charges)<2:
 		h.q_charges=int(h.q_charges)+1
 		if not h.q_charge_timers.is_empty():h.q_charge_timers.remove_at(0)

@@ -112,6 +112,15 @@ func grant_ashwood_rewards(encounter_data:Dictionary,first_clear:bool) -> Dictio
 	var drops:=[]
 	for spec in item_specs:
 		var item=ashwood_item_from_spec(spec);var storage_result:=InventorySystem.add_equipment(state,item);var drop:=item.duplicate(true);drop["collected"]=bool(storage_result.get("success",false));drop["not_collected_reason"]=str(storage_result.get("reason",""));drop["name"]=str(drop.get("display_name","Item"))+("  —  NOT COLLECTED: VAULT FULL" if not drop.collected else "");drop["class"]=str(item.get("allowed_classes",["Equipment"])[0]) if not item.get("allowed_classes",[]).is_empty() else "Equipment";drops.append(drop)
+	var profession_rewards:Array=[]
+	if first_clear and current_ashwood_encounter=="raider_cache":ProfessionSystem.discover_recipe(state,"forge_ashwood_bulwark",true);profession_rewards.append("Ashwood Bulwark recipe")
+	if first_clear and current_ashwood_encounter=="ruined_chapel":ProfessionSystem.discover_rune_pattern(state,"pattern_frostfall");profession_rewards.append("Frostfall Rune pattern")
+	if first_clear and current_ashwood_encounter=="rune_servant":ProfessionSystem.discover_rune_pattern(state,"pattern_runic_bolt");profession_rewards.append("Runic Bolt Rune pattern")
+	if first_clear and current_ashwood_encounter=="finale":ProfessionSystem.discover_recipe(state,"forge_marchwarden_evolution",true);profession_rewards.append("Marchwarden Evolution recipe")
+	if bool(state.get("profession_debug",{}).get("guaranteed_world_recipe_drop",false)):
+		ProfessionSystem.discover_recipe(state,"forge_marchwarden_evolution",true);profession_rewards.append("DEBUG guaranteed evolution recipe")
+	if current_ashwood_encounter in ["caravan","raider_cache","crossing","finale"]:
+		var profession_material:="ashwood_influence" if current_ashwood_encounter=="crossing" else "arcane_essence" if current_ashwood_encounter=="finale" else "ore";var profession_amount:=2 if first_clear else 1;var profession_result:=InventorySystem.add_material(state,profession_material,profession_amount);if bool(profession_result.success):profession_rewards.append("%d %s"%[profession_amount,profession_material.replace("_"," ").capitalize()])
 	var level_ups:=[]
 	var xp_progress:=[]
 	for hero_index in previous_progress:
@@ -119,7 +128,7 @@ func grant_ashwood_rewards(encounter_data:Dictionary,first_clear:bool) -> Dictio
 		var current:Dictionary=state.heroes[hero_index]
 		xp_progress.append({"hero_index":hero_index,"hero":current.name,"before_level":int(previous.level),"before_xp":int(previous.xp),"after_level":int(current.level),"after_xp":int(current.xp)})
 		if current.level>previous.level:level_ups.append({"hero":current.name,"level":current.level,"hero_index":hero_index,"talent_tiers":TalentSystem.newly_unlocked_tiers(int(previous.level),int(current.level))})
-	return {"gold":int(reward.gold),"xp":int(reward.xp),"drops":drops,"level_ups":level_ups,"xp_progress":xp_progress}
+	return {"gold":int(reward.gold),"xp":int(reward.xp),"drops":drops,"profession_rewards":profession_rewards,"level_ups":level_ups,"xp_progress":xp_progress}
 
 func ashwood_story_is_pending(encounter_key:String) -> bool:
 	var encounter_data:=AshwoodData.encounter(encounter_key,state.zone0)
@@ -243,6 +252,7 @@ func show_ashwood_victory() -> void:
 	else:
 		for item in reward.drops.slice(0,2):content.add_child(label("%s  •  %s %s"%[item.name,item.rarity,item["class"]],15,AshwoodData.RARITY_COLORS[item.rarity]))
 		if reward.drops.size()>2:content.add_child(label("+%d more item(s)"%(reward.drops.size()-2),13,C_MUTED))
+	for profession_reward in reward.get("profession_rewards",[]):content.add_child(label("Profession discovery  •  %s"%str(profession_reward),14,Color("c692ff")))
 	for level_up in reward.level_ups:
 		var unlock_note:="  •  TALENT TIER UNLOCKED" if not level_up.get("talent_tiers",[]).is_empty() else ""
 		content.add_child(label("%s reached Level %d%s"%[level_up.hero,level_up.level,unlock_note],15,C_GREEN))
