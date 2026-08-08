@@ -145,13 +145,13 @@ func ashwood_combat_complete() -> bool:
 
 func lowest_hero()->int:
 	var idx=-1; var ratio=2.0
-	for i in heroes.size(): if heroes[i].hp>0 and heroes[i].hp/heroes[i].max_hp<ratio: ratio=heroes[i].hp/heroes[i].max_hp; idx=i
+	for i in heroes.size(): if heroes[i].hp>0 and not bool(heroes[i].get("spirit_form",false)) and heroes[i].hp/heroes[i].max_hp<ratio: ratio=heroes[i].hp/heroes[i].max_hp; idx=i
 	return idx
 
 func nearest_wounded_hero(pos:Vector2)->int:
 	var idx=-1;var distance=99999.0
 	for i in heroes.size():
-		if heroes[i].hp>0 and heroes[i].hp<heroes[i].max_hp:
+		if heroes[i].hp>0 and not bool(heroes[i].get("spirit_form",false)) and heroes[i].hp<heroes[i].max_hp:
 			var ally_distance=pos.distance_to(heroes[i].pos)
 			if ally_distance<distance:distance=ally_distance;idx=i
 	return idx
@@ -159,7 +159,7 @@ func nearest_wounded_hero(pos:Vector2)->int:
 func nearest_living_hero(pos:Vector2)->int:
 	var idx=-1; var dist=99999.0
 	for i in heroes.size():
-		if heroes[i].hp>0:
+		if heroes[i].hp>0 and not bool(heroes[i].get("spirit_form",false)):
 			var d=pos.distance_to(heroes[i].pos)*(0.55 if heroes[i]["class"]=="Guardian" else 1.0); if d<dist:dist=d;idx=i
 	return idx
 
@@ -167,7 +167,7 @@ func nearest_hero_in_range(pos:Vector2,range_limit:float)->int:
 
 	var idx:=-1;var closest:=range_limit
 	for i in heroes.size():
-		if heroes[i].hp<=0:continue
+		if heroes[i].hp<=0 or bool(heroes[i].get("spirit_form",false)):continue
 		var distance:=pos.distance_to(heroes[i].pos)
 		if distance<=closest:closest=distance;idx=i
 	return idx
@@ -184,7 +184,7 @@ func nearest_backline_hero(pos:Vector2) -> int:
 	var best:int=-1
 	var distance:float=INF
 	for hero_index in heroes.size():
-		if heroes[hero_index].hp<=0 or heroes[hero_index]["class"]=="Guardian":continue
+		if heroes[hero_index].hp<=0 or bool(heroes[hero_index].get("spirit_form",false)) or heroes[hero_index]["class"]=="Guardian":continue
 		var candidate_distance:float=pos.distance_to(heroes[hero_index].pos)
 		if candidate_distance<distance:distance=candidate_distance;best=hero_index
 	return best
@@ -196,7 +196,7 @@ func objective_is_threat_target() -> bool:
 
 func enemy_target_threat(enemy:Dictionary,target_index:int) -> float:
 	if target_index==OBJECTIVE_THREAT_TARGET:return float(enemy.get("objective_threat",0.0)) if objective_is_threat_target() else -1.0
-	if target_index<0 or target_index>=heroes.size() or heroes[target_index].hp<=0:return -1.0
+	if target_index<0 or target_index>=heroes.size() or heroes[target_index].hp<=0 or bool(heroes[target_index].get("spirit_form",false)):return -1.0
 	return float(enemy.get("threat",{}).get(target_index,0.0))
 
 func reduce_hero_threat(hero_index:int,reduction:float)->void:

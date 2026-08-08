@@ -16,6 +16,11 @@ static func make_instance(effect_id:String, owner_id:String, target_id:String, d
 	}
 	return result
 
+static func create(effect_id:String,owner_id:String,target_id:String,tick_amount:float,duration:float,tick_interval:float)->Dictionary:
+	var result:=make_instance(effect_id,owner_id,target_id,duration,tick_interval,{"tick_amount":tick_amount})
+	result["tick_amount"]=tick_amount
+	return result
+
 static func add_stack(instances:Array, incoming:Dictionary, maximum:int) -> Array:
 	var result := instances.duplicate(true)
 	var matching:Array=[]

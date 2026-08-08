@@ -259,7 +259,7 @@ func populate_roster_workspace(content: VBoxContainer, hero: Dictionary, info: D
 			if heroic_unlocked and selected_heroic_id != "":
 				var heroic_name := (
 					guardian_talent_name(selected_heroic_id)
-					if hero["class"] in ["Guardian", "Cleric", "Rogue", "Ranger", "Mage", "Warlock"]
+					if hero["class"] in ["Guardian", "Cleric", "Rogue", "Ranger", "Mage", "Warlock", "Priest"]
 					else str(ABILITIES[hero["class"]][3])
 				)
 				var heroic_description := (

@@ -14,6 +14,32 @@ func load_rogue_test_build(hero:Dictionary,build_index:int)->void:
 func load_slayer_test_build(hero:Dictionary,build_index:int)->void:
 	var build:Dictionary=SlayerData.TEST_BUILDS[clampi(build_index,0,SlayerData.TEST_BUILDS.size()-1)];var level:int=int(build.level);hero.level=level;hero.power=SlayerData.scaled(float(SlayerData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=SlayerData.scaled(float(SlayerData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);SlayerSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_priest_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=PriestData.TEST_BUILDS[clampi(build_index,0,PriestData.TEST_BUILDS.size()-1)];var level:int=int(build.level);hero.level=level;hero.power=PriestData.scaled(float(PriestData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=PriestData.scaled(float(PriestData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);PriestSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func priest_range_hero():
+	for hero in heroes:
+		if str(hero.get("class",""))=="Priest":return hero
+	return null
+
+func handle_priest_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="priest_range":return false
+	var hero=priest_range_hero();if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_3:
+		var build_index:=int(event.keycode-KEY_1);load_priest_test_build(hero,build_index);flash("Priest build: %s"%str(PriestData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.alt_pressed:return false
+	match event.keycode:
+		KEY_K:hero.hp=0.0;flash("Eternal Vanguard triggered")
+		KEY_V:
+			if PriestSystem.spirit_active(hero):hero.priest_runtime.spirit_remaining=0.01;flash("Spirit Form ending")
+		KEY_R:hero.priest_runtime.redemption_ready_in=180.0 if float(hero.priest_runtime.redemption_ready_in)<=0.0 else 0.0;flash("Redemption cooldown: %d"%int(hero.priest_runtime.redemption_ready_in))
+		KEY_H:
+			for ally in heroes:ally.hp=ally.max_hp
+			flash("All allies restored")
+		_:
+			return false
+	queue_redraw();return true
+
 func rogue_range_hero():
 	for hero in heroes:
 		if str(hero.get("class",""))=="Rogue":return hero
@@ -230,6 +256,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_priest_range_shortcut(event):return true
 	if handle_rogue_range_shortcut(event):return true
 	if testing_zone_active and testing_zone_mode=="slayer_range" and event.shift_pressed and event.keycode>=KEY_0 and event.keycode<=KEY_9:
 		var build_index:int=9 if event.keycode==KEY_0 else int(event.keycode-KEY_1)

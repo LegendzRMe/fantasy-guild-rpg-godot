@@ -334,7 +334,7 @@ func filter_bar(refresh: Callable, include_sort: bool = false, compact: bool = f
 	classes.custom_minimum_size = Vector2(132 if narrow else (145 if compact else 165), control_height)
 	if compact:
 		apply_sharp_compact_style(classes)
-	var class_values = ["All classes", "Guardian", "Cleric", "Rogue", "Ranger", "Mage", "Warlock", "Slayer"]
+	var class_values = ["All classes", "Guardian", "Cleric", "Priest", "Rogue", "Ranger", "Mage", "Warlock", "Slayer"]
 	for value in class_values:
 		classes.add_item(value)
 	classes.select(class_values.find(hero_class_filter))

@@ -66,6 +66,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Warlock":WarlockSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Rogue":RogueSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Slayer":SlayerSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Priest":PriestSystem.initialize_runtime(heroes[-1],is_testing_save())
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -143,6 +144,7 @@ func start_testing_zone() -> void:
 		elif str(hero.get("class",""))=="Ranger":hero.ranger_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Mage":hero.mage_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Warlock":hero.warlock_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Priest":hero.priest_runtime.telemetry_enabled=true
 	testing_dummy_attacks_enabled=true
 	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
 	spawn_enemy(Vector2(650,120),"Dummy");enemies[-1]["passive_test_enemy"]=true
@@ -159,6 +161,29 @@ func start_testing_zone() -> void:
 		enemy.rewarded=true;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0
 	if heroes.size()>1:heroes[0].hp*=0.55
 	if heroes.size()>2:heroes[2].hp*=0.75
+	queue_redraw()
+
+func start_priest_testing_zone() -> void:
+	var test_party:Array=selected_party_indices()
+	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Priest"):
+		flash("Add a Priest to the selected team first.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="priest_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	for hero in heroes:if str(hero.get("class",""))=="Priest":hero.priest_runtime.telemetry_enabled=true
+	var fixtures:=[
+		{"position":Vector2(485,135),"type":"Raider","tags":[]},
+		{"position":Vector2(575,135),"type":"Brute","tags":["elite"]},
+		{"position":Vector2(665,135),"type":"Archer","tags":["named"]},
+		{"position":Vector2(755,135),"type":"Swift","tags":["summon"]},
+		{"position":Vector2(845,135),"type":"Raider","tags":["temporary_combat"]},
+		{"position":Vector2(935,135),"type":"Dummy","tags":["training"]}
+	]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);enemies[-1].passive_test_enemy=true
+		for tag in fixture.tags:if tag not in enemies[-1].combat_tags:enemies[-1].combat_tags.append(tag)
+	spawn_enemy(Vector2(1030,245),"Boss");enemies[-1].passive_test_enemy=true;enemies[-1].control_profile={"root_multiplier":0.25,"stun_multiplier":0.25}
+	spawn_enemy(Vector2(910,500),"Defense Dummy");enemies[-1].passive_test_enemy=false
+	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,6000.0);enemy.max_hp=enemy.hp
+	for ally in heroes:if str(ally.get("class",""))!="Priest":ally.hp*=0.55
 	queue_redraw()
 
 func selected_party_indices() -> Array:
@@ -192,6 +217,7 @@ func start_testing_endless(enemy_level:int) -> void:
 		elif str(hero.get("class",""))=="Ranger":hero.ranger_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Mage":hero.mage_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Warlock":hero.warlock_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Priest":hero.priest_runtime.telemetry_enabled=true
 	for initial_enemy in 4:spawn_testing_endless_enemy()
 	queue_redraw()
 

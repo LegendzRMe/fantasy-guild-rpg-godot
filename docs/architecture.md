@@ -42,6 +42,7 @@ Owns mutable application, menu, map, tutorial, item-overlay, and combat state de
 - `scripts/runtime/mage_runtime.gd`: Mage V1 Verdant Spheres, Q/W/E, Phoenix, Pyroblast, Living Bomb updates, and Mage-specific testing behavior. Reusable Ability Power and bomb-lineage rules remain outside the runtime.
 - `scripts/runtime/rogue_runtime.gd`: Rogue V1 normal/opening action sets, Combo Point finishers, concealment Heroics, owned Garrote effects, temporary presentation, and Rogue-range behavior.
 - `scripts/runtime/slayer_runtime.gd`: Slayer V1 Dive/Sweep movement, Evasion, Heroics, encounter talent updates, named Shields, and Slayer-range behavior. Shared Evasion, Block-charge, charge, target-category, percentage-Health, and status rules remain outside the runtime.
+- `scripts/runtime/priest_runtime.gd`: Priest V1 automatic ally resolution, traveling Divine Star, Chastise, Heroics, Spirit Form, talent effects, and Priest-range orchestration. Deterministic selection and state math remain in focused shared/class systems.
 - `scripts/runtime/enemy_combat_runtime.gd`: waves, spawning, encounter objectives, enemy target selection, and combat lookup helpers.
 - `scripts/runtime/ability_runtime.gd`: temporary class ability execution and cast-position resolution.
 - `scripts/runtime/combat_input_runtime.gd`: combat selection, drag commands, ability aiming, keyboard, mouse, touch, and tutorial input gates.
@@ -79,6 +80,8 @@ Warlock follows the same split through `warlock_data.gd`, `warlock_system.gd`, `
 Rogue follows the same split through `rogue_data.gd`, `rogue_system.gd`, `rogue_runtime.gd`, and `rogue_ability_presenter.gd`. Class-neutral Combo Points, alternate action sets, concealment/detection, and strongest-source Armor reduction live in focused systems so future forms, detectors, enemies, items, and debuffs can reuse the contracts without importing Rogue runtime code.
 
 Slayer follows the same split through `slayer_data.gd`, `slayer_system.gd`, `slayer_runtime.gd`, and `slayer_ability_presenter.gd`. Class-neutral Evasion, Block charges, ability charges, target-category qualification, percentage-Health requests, and control-duration profiles remain focused shared systems.
+
+Priest follows the same split through `priest_data.gd`, `priest_system.gd`, `priest_runtime.gd`, and `priest_ability_presenter.gd`. Class-neutral deterministic ally resolution and Protected/Invulnerable queries are reusable without importing Priest runtime code.
 
 ### `scripts/data/talent_data.gd`
 

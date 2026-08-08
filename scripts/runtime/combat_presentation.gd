@@ -253,6 +253,11 @@ func draw_combat_heroes() -> void:
 			draw_circle(h.pos+h.facing_direction*43,5,Color(col,.72))
 		if i==selected and not victory_sequence and not bool(h.get("independent",false)):
 			draw_circle(h.pos,66,Color(C_GOLD,.18));draw_circle(h.pos,59,C_GOLD,4)
+		if not victory_sequence and bool(h.get("spirit_form",false)):
+			var spirit_pulse:=0.5+0.5*sin(battle_time*3.2)
+			draw_circle(h.pos,69,Color("f7f2ff",.08+.08*spirit_pulse))
+			draw_arc(h.pos,64,battle_time*.8,battle_time*.8+PI*1.55,42,Color("f4eaff",.72),4)
+			draw_arc(h.pos,58,-battle_time*.6,-battle_time*.6+PI*1.25,36,Color("c9b8ff",.56),3)
 		if h.shield>0 and not victory_sequence:draw_circle(h.pos,63,Color("5fa8ff"),4)
 		var role_ink:=Color("d9f3ff",.38) if concealment_visual=="invisible" else Color("eadcff",.72) if concealment_visual=="vanished" else Color("101827")
 		draw_circle(h.pos,48,col);draw_role_icon(h.pos,h["class"],role_ink);if not victory_sequence:draw_rogue_concealment(h,concealment_visual);if not victory_sequence and (h.hp<h.max_hp or h.last_hit>0 or h.shield>0):health_bar_with_shield(h.pos+Vector2(-54,-70),108,h)
@@ -308,6 +313,8 @@ func draw_testing_status_hud()->void:
 		draw_rect(Rect2(470,18,340,42),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(486,44),"ROGUE RANGE  -  SHIFT+1-6 BUILDS",HORIZONTAL_ALIGNMENT_CENTER,308,13,C_GOLD)
 	if testing_zone_active and testing_zone_mode=="slayer_range" and not victory_sequence:
 		draw_rect(Rect2(460,18,360,42),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(476,44),"SLAYER RANGE  -  SHIFT+1-9 / 0 BUILDS",HORIZONTAL_ALIGNMENT_CENTER,328,13,C_GOLD)
+	if testing_zone_active and testing_zone_mode=="priest_range" and not victory_sequence:
+		draw_rect(Rect2(425,18,430,42),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(441,44),"PRIEST RANGE  -  SHIFT+1-3 BUILDS  •  ALT+K/V/R/H",HORIZONTAL_ALIGNMENT_CENTER,398,13,C_GOLD)
 
 func draw_party_portraits_hud()->void:
 	var selectable_heroes:Array=player_controlled_hero_indices()
@@ -351,6 +358,7 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Mage":action_name=str(MageData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Warlock":action_name=str(WarlockData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Slayer":action_name=str(SlayerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Priest":action_name=str(PriestData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			var cleric_trait_active:bool=false
 			if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)

@@ -10,7 +10,7 @@ func role_glyph(hero_class: String) -> String:
 	match hero_class:
 		"Guardian":
 			return "◈"
-		"Cleric":
+		"Cleric", "Priest":
 			return "✚"
 		"Mage":
 			return "✦━"

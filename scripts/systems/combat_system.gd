@@ -186,6 +186,12 @@ static func is_unstoppable(unit:Dictionary)->bool:
 static func is_silenced(unit:Dictionary)->bool:
 	return StatusEffectSystem.is_silenced(unit)
 
+static func is_protected(unit:Dictionary)->bool:
+	return StatusEffectSystem.is_protected(unit)
+
+static func is_invulnerable(unit:Dictionary)->bool:
+	return StatusEffectSystem.is_invulnerable(unit)
+
 static func is_feared(unit:Dictionary)->bool:
 	return StatusEffectSystem.is_feared(unit)
 

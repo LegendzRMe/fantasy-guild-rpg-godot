@@ -28,6 +28,12 @@ static func is_blinded(unit:Dictionary)->bool:
 static func is_unstoppable(unit:Dictionary)->bool:
 	return has_effect(unit, "unstoppable")
 
+static func is_protected(unit:Dictionary)->bool:
+	return has_effect(unit, "protected") or has_effect(unit, "invulnerable")
+
+static func is_invulnerable(unit:Dictionary)->bool:
+	return has_effect(unit, "invulnerable") or bool(unit.get("spirit_form",false))
+
 static func has_control(unit:Dictionary,control_type:String)->bool:
 	return unit.get("active_effects", []).any(func(effect):
 		return str(effect.get("control_type", "")) == control_type and float(effect.get("remaining_duration", 0.0)) > 0.0)

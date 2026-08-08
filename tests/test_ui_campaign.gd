@@ -7,7 +7,7 @@ static func run(main:Node)->Array:
 	var errors:Array=[];main.current_save_slot=3;main.state=SaveManager.testing_state();main.show_campaign_region("greyhaven_reach");await main.get_tree().process_frame
 	TestSupport.check(errors,main.screen=="campaign_region" and main.ui.find_children("CampaignLocation_*","Button",true,false).size()==9,"A campaign regional map should render all nine permanent locations.")
 	main.show_combat_hall();await main.get_tree().process_frame
-	TestSupport.check(errors,main.screen=="combat_hall" and main.ui.find_child("CombatHall4v4Start",true,false)!=null and main.ui.find_child("CombatHall8v8Start",true,false)!=null and main.ui.find_child("TestingDummyRangeStart",true,false)!=null and main.ui.find_child("TestingEndlessStart",true,false)!=null,"The Combat Hall should collect raid, 4v4, 8v8, dummy-range, and Endless Arena practice modes.")
+	TestSupport.check(errors,main.screen=="combat_hall" and main.ui.find_child("CombatHall4v4Start",true,false)!=null and main.ui.find_child("CombatHall8v8Start",true,false)!=null and main.ui.find_child("TestingDummyRangeStart",true,false)!=null and main.ui.find_child("TestingPriestRangeStart",true,false)!=null and main.ui.find_child("TestingEndlessStart",true,false)!=null,"The Combat Hall should collect raid, 4v4, 8v8, Priest Range, dummy-range, and Endless Arena practice modes.")
 	var gold_before:=int(main.state.gold);var renown_before:=int(main.state.guild_renown);var items_before:int=main.state.item_instances.size()
 	main.start_campaign_encounter("grand_corruption_front","gateway_site","raid_test");await main.get_tree().process_frame
 	var raid_positions:Dictionary={};for hero in main.heroes:raid_positions[str(hero.pos)]=true

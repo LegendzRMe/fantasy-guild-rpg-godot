@@ -90,6 +90,7 @@ static func testing_heroes() -> Array:
 		hero_state("Kestrel","Rogue",4,16),
 		hero_state("Morrow","Warlock",4,16),
 		hero_state("Kaelith","Slayer",30,16),
+		hero_state("Elowen","Priest",30,16),
 		hero_state("Aldren Vale","Guardian",4,18,"special_hero",true,1,{"signature_ability":"Oath of Cinders","story_lead":"The traitor's broken oath-seal"}),
 		hero_state("Mira Thorn","Ranger",4,18,"special_hero",true,1,{"signature_ability":"Ghostmark Volley","story_lead":"Unnatural tracks leaving Ashwood"}),
 		hero_state("Ilyra Voss","Mage",4,18,"special_hero",true,1,{"signature_ability":"Runebreak","story_lead":"The force inside the servant's runes"})
