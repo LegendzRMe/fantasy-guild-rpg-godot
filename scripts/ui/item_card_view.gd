@@ -69,7 +69,7 @@ func _item_type_text(data:Dictionary)->String:
 	return str(data.get("slot_text",slot.capitalize()))
 
 func _owner_glyph(hero_class:String)->String:
-	return {"Guardian":"SHD","Cleric":"+","Ranger":"BOW","Mage":"WND","Rogue":"DW","Warlock":"WND"}.get(hero_class,hero_class.left(3).to_upper())
+	return {"Guardian":"SHD","Cleric":"+","Ranger":"BOW","Mage":"WND","Rogue":"DW","Warlock":"WND","Slayer":"DW"}.get(hero_class,hero_class.left(3).to_upper())
 
 func _make_icon(data:Dictionary,rarity_color:Color)->Control:
 	var frame:=PanelContainer.new()

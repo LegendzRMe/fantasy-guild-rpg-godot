@@ -93,7 +93,8 @@ static func apply_control(unit:Dictionary,control_type:String,duration:float,mag
 	if control_type == "displacement" and not bool(profile.get("displacement", true)):
 		return {"applied":false, "resisted":true, "duration":0.0, "magnitude":0.0, "reason":"immune"}
 	var multiplier := float(profile.get("%s_multiplier" % control_type, profile.get("slow_multiplier", 1.0)))
-	var resolved_duration := maxf(0.0, duration * multiplier)
+	var personal_multiplier:=float(unit.get("control_duration_multipliers",{}).get(control_type,1.0))
+	var resolved_duration := maxf(0.0, duration * multiplier * personal_multiplier)
 	var resolved_magnitude := magnitude * multiplier
 	if resolved_duration <= 0.0:
 		return {"applied":false, "resisted":true, "duration":0.0, "magnitude":0.0, "reason":"duration"}

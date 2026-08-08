@@ -18,7 +18,7 @@ static func run(tree:SceneTree)->Array:
 	await tree.process_frame
 	await tree.process_frame
 	var result_tree:Tree=lab.find_child("BalanceResultsTree",true,false)
-	TestSupport.check(errors,result_tree.get_root()!=null and result_tree.get_root().get_child_count()==17,"The default Balance Lab run should display all compatible prototype scenario comparisons.")
+	TestSupport.check(errors,result_tree.get_root()!=null and result_tree.get_root().get_child_count()==20,"The default Balance Lab run should display all compatible prototype scenario comparisons, including Slayer.")
 	tree.root.remove_child(lab)
 	lab.free()
 	await tree.process_frame

@@ -140,6 +140,9 @@ func start_warlock_testing_zone() -> void:
 func start_rogue_testing_zone() -> void:
 	pass
 
+func start_slayer_testing_zone() -> void:
+	pass
+
 
 func show_testing_zone_menu() -> void:
 	pass

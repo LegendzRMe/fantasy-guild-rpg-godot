@@ -80,7 +80,8 @@ func build_damage_request(target:Dictionary,resolved_amount:float,source_action:
 	if not target.get("armor_reduction_sources",[]).is_empty():request["base_armor_override"]=ArmorReductionSystem.effective_armor(target)
 	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
 		var armor_sources:Array=target.guardian_runtime.temporary_armor_sources.duplicate(true)
-		if damage_type=="physical" and source_action=="basic_attack" and int(target.guardian_runtime.block_charges)>0:armor_sources.append({"id":"dwarf_block","armor":GuardianData.VALUES.block_armor,"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
+		var guardian_block:=BlockChargeSystem.armor_source_legacy(target.guardian_runtime,int(GuardianData.VALUES.block_charges),float(GuardianData.VALUES.block_armor),"dwarf_block","block_charges","block_state",true)
+		if damage_type=="physical" and source_action=="basic_attack" and not guardian_block.is_empty():armor_sources.append(guardian_block)
 		request["armor_sources"]=armor_sources
 	elif str(target.get("class",""))=="Cleric" and not target.get("cleric_runtime",{}).is_empty():
 		var cleric_armor:=ClericSystem.active_armor(target)
@@ -93,7 +94,12 @@ func build_damage_request(target:Dictionary,resolved_amount:float,source_action:
 		if warlock_armor>0.0:request["armor_sources"]=[{"id":"fel_armor","armor":warlock_armor,"remaining":float(target.warlock_runtime.fel_armor_remaining)}]
 	elif str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty():
 		var armor_sources:Array=target.rogue_runtime.temporary_armor_sources.duplicate(true)
-		if damage_type=="physical" and source_action=="basic_attack" and int(target.rogue_runtime.block_charges)>0:armor_sources.append({"id":"combat_readiness","armor":float(RogueData.VALUES.combat_readiness_armor),"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
+		var rogue_block:=BlockChargeSystem.armor_source_legacy(target.rogue_runtime,3,float(RogueData.VALUES.combat_readiness_armor),"combat_readiness","block_charges","block_state",true)
+		if damage_type=="physical" and source_action=="basic_attack" and not rogue_block.is_empty():armor_sources.append(rogue_block)
+		if not armor_sources.is_empty():request["armor_sources"]=armor_sources
+	elif str(target.get("class",""))=="Slayer" and not target.get("slayer_runtime",{}).is_empty():
+		var armor_sources:Array=target.slayer_runtime.temporary_armor_sources.duplicate(true);var block_source:=BlockChargeSystem.armor_source(target,SlayerSystem.scaled(target,float(SlayerData.VALUES.block_armor)),"reflexive_block","slayer_block")
+		if not block_source.is_empty():armor_sources.append(block_source)
 		if not armor_sources.is_empty():request["armor_sources"]=armor_sources
 	if source_action=="percentage_health":request["outgoing_multiplier"]=1.0;request["can_crit"]=false
 	if can_crit_override!=null:request["can_crit"]=bool(can_crit_override)
@@ -121,9 +127,18 @@ func finalize_damage_events(source:Dictionary,target:Dictionary,result:Dictionar
 		for hero in heroes:
 			if hero.hp>0:apply_passive_trigger(hero,defeat_event,target)
 			if str(hero.get("class",""))=="Guardian" and not hero.get("guardian_runtime",{}).is_empty():GuardianSystem.process_marked_death(hero,str(target.get("combat_id","")),battle_time);GuardianSystem.process_haymaker_death(hero,str(target.get("combat_id","")),battle_time)
+			if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty():SlayerSystem.process_defeat(hero,target)
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
+	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
+	if EvasionSystem.should_evade(target,source_action,hostile,bool(source.get("bypass_evasion",false))):
+		var miss:=EvasionSystem.miss_result(source_action,damage_type);combat_events.append(CombatSystem.create_event("basic_attack_evaded",source,target,miss,{"source_action":source_action,"action_tags":[source_action],"origin":origin}));if str(target.get("class",""))=="Slayer":SlayerSystem.telemetry_add(target,"evaded_attacks");return miss
 	var resolved_amount:=amount;var retribution_bonus:float=0.0
+	var slayer_primary:bool=str(source.get("class",""))=="Slayer" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("slayer_runtime",{}).is_empty()
+	if slayer_primary:
+		resolved_amount=(amount+SlayerSystem.unending_hatred_bonus(source))*(1.0+SlayerSystem.basic_attack_bonus(source))
+		if SlayerSystem.prepare_basic_attack(source,target):
+			var percent_request:=PercentageHealthDamageSystem.request(source,target,float(SlayerData.VALUES.fiery_brand_fraction),float(SlayerData.VALUES.fiery_brand_boss_fraction),"Fiery Brand");deal_damage(source,target,float(percent_request.amount),"percentage_health","physical","Fiery Brand",false,"slayer_fiery_brand",[],false)
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and RogueSystem.has_talent(source,"rogue_l12_2") and source.get("rogue_runtime",{}).get("garrotes",[]).any(func(instance):return str(instance.get("target_id",""))==str(target.get("combat_id","")) and float(instance.get("remaining_duration",0.0))>0.0):resolved_amount*=1.40
 	if MageSystem.gravity_crush_applies(source,target,source_action,originating_effect_id,origin):resolved_amount*=1.0+float(MageData.VALUES.gravity_crush)
 	var ranger_basic_result:={}
@@ -150,7 +165,8 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and not source.get("rogue_runtime",{}).is_empty() and bool(source.rogue_runtime.vanish_active):RogueSystem.break_vanish(source)
 	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and float(result.get("resolved_damage",0.0))>0.0 and bool(target.rogue_runtime.vanish_active) and not StealthDetectionSystem.is_unrevealable(target):RogueSystem.break_vanish(target)
-	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and damage_type=="physical" and source_action=="basic_attack" and float(result.get("resolved_damage",0.0))>0.0 and int(target.rogue_runtime.block_charges)>0:target.rogue_runtime.block_charges=int(target.rogue_runtime.block_charges)-1
+	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and damage_type=="physical":BlockChargeSystem.consume_legacy(target.rogue_runtime,3,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)))
+	if str(target.get("class",""))=="Slayer" and not target.get("slayer_runtime",{}).is_empty() and BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"slayer_block"):SlayerSystem.telemetry_add(target,"block_consumed")
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("rogue_runtime",{}).is_empty():
 		if ComboPointSystem.successful_hit(result):
 			RogueSystem.double_strike_roll(source)
@@ -190,6 +206,14 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		if not percent_request.is_empty() and target.hp>0.0:
 			var percent_result:=deal_damage(source,target,float(percent_request.amount),"percentage_health","physical","Manticore",false,"ranger_manticore",[],false);RangerSystem.telemetry_add(source,"percentage_damage",float(percent_result.resolved_damage))
 	if not guardian_basic_result.is_empty() and float(guardian_basic_result.stun)>0.0:CombatSystem.apply_control(target,"stun",float(guardian_basic_result.stun))
+	if slayer_primary:
+		var trait_result:=SlayerSystem.note_basic_attack(source,target,result)
+		if float(trait_result.raw_healing)>0.0:
+			var heal:=deal_healing(source,source,float(trait_result.raw_healing),"basic_heal","Betrayer's Thirst","slayer_trait")
+			if float(heal.overhealing)>0.0:
+				var shield_gain:=SlayerSystem.add_unending_thirst(source,float(heal.overhealing));if shield_gain>0.0:apply_unit_shield(source,source,shield_gain,"Unending Thirst","slayer_unending_thirst",INF)
+		if SlayerSystem.has_talent(source,"slayer_l30_1") and SlayerSystem.successful(result):CombatSystem.apply_control(target,"slow",float(SlayerData.VALUES.nexus_duration),float(SlayerData.VALUES.nexus_slow))
+	if str(source.get("class",""))=="Slayer" and not source.get("slayer_runtime",{}).is_empty():SlayerSystem.note_damage_participation(source,target,float(result.get("resolved_damage",0.0)))
 	if testing_zone_active and "training" in target.get("combat_tags",[]) and float(result.get("resolved_damage",0.0))>0.0:target["seconds_since_damage"]=0.0
 	finalize_damage_events(source,target,result,source_action,damage_type,origin,source_is_summon,originating_effect_id,trigger_chain,before_ratio,retribution_bonus)
 	return result

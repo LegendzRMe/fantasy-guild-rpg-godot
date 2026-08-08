@@ -65,6 +65,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Mage":MageSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Warlock":WarlockSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Rogue":RogueSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Slayer":SlayerSystem.initialize_runtime(heroes[-1],is_testing_save())
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -110,6 +111,25 @@ func start_rogue_testing_zone() -> void:
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:rogue_wall",Rect2(700,280,70,135)))
 	for enemy in enemies:
 		enemy.rewarded=true;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0;enemy.hp=6000.0;enemy.max_hp=6000.0
+	queue_redraw()
+
+func start_slayer_testing_zone() -> void:
+	var test_party:Array=selected_party_indices()
+	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Slayer"):
+		flash("Add a Slayer to the selected team first.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="slayer_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	for hero in heroes:
+		if str(hero.get("class",""))=="Slayer":hero.slayer_runtime.telemetry_enabled=true
+	# Clusters cover Sweeping Strike, Immolation, Unbound, Blades, and Evasion.
+	for position in [Vector2(500,145),Vector2(590,145),Vector2(545,225),Vector2(650,225)]:spawn_enemy(position,"Dummy");enemies[-1].passive_test_enemy=true
+	spawn_enemy(Vector2(800,145),"Defense Dummy");enemies[-1].passive_test_enemy=true;enemies[-1].armor=35.0;enemies[-1].combat_tags.append("armored")
+	spawn_enemy(Vector2(965,145),"Boss");enemies[-1].passive_test_enemy=true;enemies[-1].control_profile={"stun_multiplier":0.25,"slow_multiplier":0.5}
+	spawn_enemy(Vector2(1010,430),"Boss");enemies[-1].passive_test_enemy=true;enemies[-1].hp*=0.20;enemies[-1].combat_tags.append("execute_fixture")
+	spawn_enemy(Vector2(790,500),"Swift");enemies[-1].passive_test_enemy=true;enemies[-1].summoned_unit=true
+	spawn_enemy(Vector2(620,500),"Dummy");enemies[-1].passive_test_enemy=true;enemies[-1].object=true;enemies[-1].combat_tags.append("temporary")
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:slayer_wall",Rect2(700,275,72,145)))
+	for enemy in enemies:
+		enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,6500.0);enemy.max_hp=enemy.hp
 	queue_redraw()
 
 func start_testing_zone() -> void:

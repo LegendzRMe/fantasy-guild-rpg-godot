@@ -59,7 +59,7 @@ func cast_rogue_eviscerate(hero:Dictionary,item_repeat:bool=false)->bool:
 		if float(cloud.remaining)>0.0 and hero.pos.distance_to(Vector2(cloud.center))<=float(cloud.radius) and not bool(hero.rogue_runtime.smoke_free_used.get(str(cloud.cast_id),false)) and RogueSystem.has_talent(hero,"rogue_l27_r1"):free=true;hero.rogue_runtime.smoke_free_used[str(cloud.cast_id)]=true;break
 	var spent:=ComboPointSystem.spend(hero,used,free);hero.ability_cds[2]=float(RogueData.VALUES.e_cooldown)
 	var finisher_event_result:=result.duplicate(true);finisher_event_result.merge(spent,true);combat_events.append(CombatSystem.create_event("rogue_eviscerate_resolved",hero,target,finisher_event_result,{"source_action":"basic_ability","origin":"Eviscerate"}))
-	if RogueSystem.has_talent(hero,"rogue_l9_1"):hero.rogue_runtime.block_charges=mini(3,int(hero.rogue_runtime.block_charges)+int(spent.combo_points_consumed))
+	if RogueSystem.has_talent(hero,"rogue_l9_1"):BlockChargeSystem.grant_legacy(hero.rogue_runtime,int(spent.combo_points_consumed),3)
 	if RogueSystem.has_talent(hero,"rogue_l18_3") and used==3:hero.rogue_runtime.slice_attacks=3;hero.rogue_runtime.slice_remaining=float(RogueData.VALUES.slice_duration)
 	RogueSystem.telemetry_add(hero,"eviscerate_casts");RogueSystem.telemetry_add(hero,"eviscerate_points_used",used);RogueSystem.telemetry_add(hero,"eviscerate_points_consumed",int(spent.combo_points_consumed));rogue_visual("rogue_eviscerate",hero.pos,target.pos,0.20,"-%d"%int(result.resolved_damage));return true
 

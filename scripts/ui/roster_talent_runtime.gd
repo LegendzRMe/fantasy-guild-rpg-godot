@@ -14,6 +14,8 @@ func guardian_talent_name(talent_id: String) -> String:
 		return str(WarlockData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 	if talent_id.begins_with("rogue_"):
 		return str(RogueData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
+	if talent_id.begins_with("slayer_"):
+		return str(SlayerData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 	return str(GuardianData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 
 
@@ -24,6 +26,8 @@ func roster_talent_description(hero_class: String, option_id: String) -> String:
 		return str(ClericData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	if hero_class == "Rogue":
 		return str(RogueData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
+	if hero_class == "Slayer":
+		return str(SlayerData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	if hero_class == "Ranger":
 		return str(RangerData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	if hero_class == "Mage":

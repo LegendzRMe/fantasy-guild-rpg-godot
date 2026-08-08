@@ -1,6 +1,7 @@
 extends RefCounted
 
 const GuardianData = preload("res://scripts/data/guardian_data.gd")
+const BlockChargeSystem = preload("res://scripts/systems/block_charge_system.gd")
 
 static func has_talent(unit:Dictionary,talent_id:String)->bool:
 	return talent_id in unit.get("selected_talents",{}).values()
@@ -15,6 +16,7 @@ static func initialize_runtime(unit:Dictionary,telemetry_enabled:bool=false)->vo
 		"temporary_armor_sources":[],"delayed_effects":[],"ability_charges":default_charges(unit),"ability_recharge":{},
 		"telemetry_enabled":telemetry_enabled,"telemetry":default_telemetry()
 	}
+	BlockChargeSystem.initialize_legacy(unit.guardian_runtime,int(GuardianData.VALUES.block_charges))
 
 static func default_charges(unit:Dictionary)->Dictionary:
 	return {"q":1,"w":2 if has_talent(unit,"guardian_l30_1") else 1,"e":2 if has_talent(unit,"guardian_l30_1") else 1,"r":2 if has_talent(unit,"guardian_l27_r2") else 1}
@@ -128,15 +130,17 @@ static func active_armor(unit:Dictionary,damage_type:String="physical",source_ac
 	var strongest:=float(unit.get("armor",0.0))
 	for source in unit.get("guardian_runtime",{}).get("temporary_armor_sources",[]):
 		if float(source.get("remaining",0.0))>0.0:strongest=maxf(strongest,float(source.get("armor",0.0)))
-	if damage_type=="physical" and source_action=="basic_attack" and int(unit.get("guardian_runtime",{}).get("block_charges",0))>0:strongest=maxf(strongest,float(GuardianData.VALUES.block_armor))
+	if damage_type=="physical" and source_action=="basic_attack" and BlockChargeSystem.charges_legacy(unit.guardian_runtime,int(GuardianData.VALUES.block_charges))>0:strongest=maxf(strongest,float(GuardianData.VALUES.block_armor))
 	return strongest
 
 static func consume_block(unit:Dictionary,damage_type:String,source_action:String,raw_damage:float)->bool:
-	if raw_damage<=0.0 or damage_type!="physical" or source_action!="basic_attack" or int(unit.guardian_runtime.block_charges)<=0:return false
-	unit.guardian_runtime.block_charges=int(unit.guardian_runtime.block_charges)-1;telemetry_add(unit,"block_consumed");return true
+	if raw_damage<=0.0 or damage_type!="physical" or source_action!="basic_attack":return false
+	var consumed:=BlockChargeSystem.consume_legacy(unit.guardian_runtime,int(GuardianData.VALUES.block_charges),source_action,raw_damage)
+	if consumed:telemetry_add(unit,"block_consumed")
+	return consumed
 
 static func grant_block(unit:Dictionary)->void:
-	unit.guardian_runtime.block_charges=int(GuardianData.VALUES.block_charges);telemetry_add(unit,"block_gained",int(GuardianData.VALUES.block_charges))
+	var gained:=BlockChargeSystem.grant_legacy(unit.guardian_runtime,int(GuardianData.VALUES.block_charges),int(GuardianData.VALUES.block_charges));telemetry_add(unit,"block_gained",gained)
 
 static func add_armor_source(unit:Dictionary,id:String,armor:float,duration:float)->void:
 	unit.guardian_runtime.temporary_armor_sources=unit.guardian_runtime.temporary_armor_sources.filter(func(source):return str(source.get("id",""))!=id)

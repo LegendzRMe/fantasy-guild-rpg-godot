@@ -260,6 +260,11 @@ func draw_combat_heroes() -> void:
 		if not victory_sequence and str(h.get("class",""))=="Rogue" and not h.get("rogue_runtime",{}).is_empty():
 			var point_count:int=ComboPointSystem.current(h);var point_max:int=ComboPointSystem.maximum(h);var pip_start:float=float(h.pos.x)-(point_max-1)*7.0
 			for point_index in point_max:draw_circle(Vector2(pip_start+point_index*14.0,h.pos.y-83),4.5,C_GOLD if point_index<point_count else Color("45546a"))
+		if not victory_sequence and str(h.get("class",""))=="Slayer" and not h.get("slayer_runtime",{}).is_empty():
+			if EvasionSystem.is_active(h):draw_arc(h.pos,57,battle_time*3.0,battle_time*3.0+PI*1.55,36,Color("e7fff2"),4)
+			if float(h.slayer_runtime.get("metamorphosis_remaining",0.0))>0.0:draw_arc(h.pos,61,0,TAU,40,Color(CLASSES.Slayer.color,.78),5)
+			var block_count:=BlockChargeSystem.charges(h,"slayer_block");var block_start:float=float(h.pos.x)-(int(SlayerData.VALUES.reflexive_block_max)-1)*7.0
+			for block_index in int(SlayerData.VALUES.reflexive_block_max):draw_circle(Vector2(block_start+block_index*14.0,h.pos.y-83),4.5,Color("7dc3ff") if block_index<block_count else Color("45546a"))
 		if not victory_sequence:
 			var serpent_count:=ClericSystem.active_serpent_count(heroes,str(h.get("combat_id","")))
 			for serpent_marker_index in mini(serpent_count,2):
@@ -301,6 +306,8 @@ func draw_testing_status_hud()->void:
 		draw_rect(Rect2(525,18,230,48),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(537,40),"ENDLESS ARENA  •  LEVEL %d"%testing_endless_level,HORIZONTAL_ALIGNMENT_LEFT,205,13,C_GOLD);draw_string(ThemeDB.fallback_font,Vector2(537,58),"DEFEATED  %d"%testing_endless_defeated,HORIZONTAL_ALIGNMENT_LEFT,205,12,C_MUTED)
 	if testing_zone_active and testing_zone_mode=="rogue_range" and not victory_sequence:
 		draw_rect(Rect2(470,18,340,42),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(486,44),"ROGUE RANGE  -  SHIFT+1-6 BUILDS",HORIZONTAL_ALIGNMENT_CENTER,308,13,C_GOLD)
+	if testing_zone_active and testing_zone_mode=="slayer_range" and not victory_sequence:
+		draw_rect(Rect2(460,18,360,42),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(476,44),"SLAYER RANGE  -  SHIFT+1-9 / 0 BUILDS",HORIZONTAL_ALIGNMENT_CENTER,328,13,C_GOLD)
 
 func draw_party_portraits_hud()->void:
 	var selectable_heroes:Array=player_controlled_hero_indices()
@@ -343,6 +350,8 @@ func draw_ability_bar_hud()->void:
 			elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
 			elif slot==3 and active["class"]=="Mage":action_name=str(MageData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Warlock":action_name=str(WarlockData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Slayer":action_name=str(SlayerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			var cleric_trait_active:bool=false
 			if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
 			var hatred_ratio:float=0.0
@@ -351,7 +360,8 @@ func draw_ability_bar_hud()->void:
 			var mage_trait_armed:bool=slot==4 and str(active.get("class",""))=="Mage" and not active.get("mage_runtime",{}).is_empty() and MageSystem.trait_is_armed(active)
 			var warlock_trait_state:Dictionary=WarlockSystem.slot_state(active) if slot==4 and str(active.get("class",""))=="Warlock" else {}
 			var warlock_darkness_armed:bool=bool(warlock_trait_state.get("darkness_armed",false))
-			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:
+			var slayer_evasion_active:bool=slot==2 and str(active.get("class",""))=="Slayer" and EvasionSystem.is_active(active)
+			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active:
 				var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 				draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
 			draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
@@ -362,7 +372,7 @@ func draw_ability_bar_hud()->void:
 			draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 			if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
 			if active["class"]=="Rogue" and slot==2 and ComboPointSystem.current(active)<=0:draw_octagon(center,37,Color(0,0,0,.58),C_MUTED,2)
-			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
 			if not warlock_trait_state.is_empty() and slot==4:draw_string(ThemeDB.fallback_font,center+Vector2(14,-20),"%d%%"%int(warlock_trait_state.cost_percent),HORIZONTAL_ALIGNMENT_CENTER,42,9,C_TEXT)
 			if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
 				var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
@@ -371,6 +381,8 @@ func draw_ability_bar_hud()->void:
 				if slot==4:
 					var trait_state:=MageSystem.slot_state(active);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[trait_state.charges,trait_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 				elif slot==3 and MageSystem.has_talent(active,"mage_l27_r1") and not active.mage_runtime.phoenix.is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d"%int(active.mage_runtime.phoenix.reposition_charges),HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+			if active["class"]=="Slayer" and slot==1 and not active.get("slayer_runtime",{}).is_empty():
+				var slayer_slot:=AbilitySlotSystem.ui_state(active.slayer_runtime.w_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[slayer_slot.charges,slayer_slot.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 
 func draw_tutorial_completion_hud()->void:
 	if tutorial_active and tutorial_step==4:

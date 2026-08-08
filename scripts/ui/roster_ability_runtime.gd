@@ -7,6 +7,7 @@ const RangerAbilityPresenter = preload("res://scripts/data/ranger_ability_presen
 const MageAbilityPresenter = preload("res://scripts/data/mage_ability_presenter.gd")
 const WarlockAbilityPresenter = preload("res://scripts/data/warlock_ability_presenter.gd")
 const RogueAbilityPresenter = preload("res://scripts/data/rogue_ability_presenter.gd")
+const SlayerAbilityPresenter = preload("res://scripts/data/slayer_ability_presenter.gd")
 
 
 func recruitment_preview_value(candidate: Dictionary, field_id: String, value: String, unavailable: bool = false) -> String:
@@ -446,6 +447,11 @@ func open_roster_ability_details(hero: Dictionary, action_key: String, heroic_id
 		presenter_hero["ability_cds"] = [0.0, 0.0, 0.0, 0.0, 0.0]
 		WarlockSystem.initialize_runtime(presenter_hero, false)
 		details = WarlockAbilityPresenter.details(presenter_hero, action_key, heroic_id)
+	elif str(hero.get("class", "")) == "Slayer":
+		var presenter_hero := hero.duplicate(true)
+		if presenter_hero.get("slayer_runtime", {}).is_empty():
+			SlayerSystem.initialize_runtime(presenter_hero, false)
+		details = SlayerAbilityPresenter.details(presenter_hero, action_key, heroic_id)
 	elif str(hero.get("class", "")) == "Rogue":
 		var presenter_hero := hero.duplicate(true)
 		var presenter_stats := hero_final_stats(hero)
