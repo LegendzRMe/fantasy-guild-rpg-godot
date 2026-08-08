@@ -116,7 +116,7 @@ func update_combat_projectiles(delta:float)->void:
 			if source!=null and target_is_valid_for(source,target,"enemy") and target.pos.distance_to(projectile.destination)<=58.0:
 				if bool(projectile.payload.get("will_miss",false)):record_blind_miss(source,target)
 				else:
-					var result:Dictionary=call("deal_damage",source,target,float(projectile.payload.amount),"basic_attack",str(projectile.payload.damage_type),str(projectile.payload.origin));apply_hit_nudge(source,target);call("add_effect","hit",source.pos,target.pos,"-%d"%int(result.health_damage+result.shield_damage),C_RED)
+					var result:Dictionary=call("deal_damage",source,target,float(projectile.payload.amount),"basic_attack",str(projectile.payload.damage_type),str(projectile.payload.origin));apply_hit_nudge(source,target);call("add_effect","hit",source.pos,target.pos,"-%d"%int(result.resolved_damage),C_RED)
 			combat_projectiles.remove_at(index)
 
 func release_basic_action(unit:Dictionary)->void:
@@ -132,7 +132,7 @@ func release_basic_action(unit:Dictionary)->void:
 	elif CombatSystem.is_blinded(unit):
 		record_blind_miss(unit,target)
 	else:
-		var damage_result:Dictionary=call("deal_damage",unit,target,float(unit.get("damage",0.0)),"basic_attack",str(unit.get("basic_attack_damage_type","physical")),"basic_attack");apply_hit_nudge(unit,target);call("add_effect","slash",unit.pos,target.pos,"-%d"%int(damage_result.health_damage+damage_result.shield_damage),CLASSES.get(str(unit.get("class","Guardian")),{"color":C_TEXT}).color)
+		var damage_result:Dictionary=call("deal_damage",unit,target,float(unit.get("damage",0.0)),"basic_attack",str(unit.get("basic_attack_damage_type","physical")),"basic_attack");apply_hit_nudge(unit,target);call("add_effect","slash",unit.pos,target.pos,"-%d"%int(damage_result.resolved_damage),CLASSES.get(str(unit.get("class","Guardian")),{"color":C_TEXT}).color)
 
 func idle_defense_target(hero:Dictionary):
 	var preferred=null;var closest=null;var closest_distance:=CombatRulesV1.IDLE_MELEE_DEFENSE_RADIUS
@@ -151,6 +151,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 	if has_true_control and (not hero.get("active_cast",{}).is_empty() or not hero.get("active_channel",{}).is_empty() or bool(hero.get("cleric_runtime",{}).get("jug_active",false))):interrupt_unit_action(hero,"crowd control")
 	if hero.hp<=0.0:
 		if not bool(hero.get("incapacitated",false)):
+			hero["was_defeated"]=true
 			if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty():ComboPointSystem.reset(hero);RogueSystem.telemetry_add(hero,"combo_defeat_resets");RogueSystem.break_vanish(hero)
 			interrupt_unit_action(hero,"incapacitated");CombatRulesV1.incapacitate(hero)
 			if str(hero.combat_id) not in incapacitated_hero_ids:incapacitated_hero_ids.append(str(hero.combat_id))

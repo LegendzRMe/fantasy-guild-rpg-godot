@@ -8,10 +8,11 @@ const GUILD_PAGE_INTROS := {
 	"command":{"title":"COMMAND TABLE","body":"The Command Table is where the guild will organize missions beyond the active party. It is intended for assigning available heroes to longer tasks, following opportunities, and collecting useful rewards."},
 	"heroes":{"title":"HERO ROSTER","body":"Hero Roster is the guild's complete member directory. Review each hero's role and growth, inspect their abilities and equipment, and use the star on a card to update the Active Party."},
 	"party":{"title":"PARTY MANAGEMENT","body":"Party Management is for building the group that enters battle. Arrange the Active Party, keep other heroes in reserve, and prepare saved formations for different kinds of encounters."},
-	"vault":{"title":"ITEM STORAGE","body":"Item Storage keeps equipment, materials, and other valuables collected by the guild. As these systems expand, this is where items can be organized and prepared for the heroes who need them."},
-	"tavern":{"title":"TAVERN","body":"The Tavern is intended as the guild's meeting place for new contacts, recruitment opportunities, rumors, and temporary arrangements that may help future expeditions."},
+	"vault":{"title":"GUILD STORAGE","body":"Guild Storage separates protected equipment and valuables in the Guild Vault from production supplies in the Materials Depot. Workshop orders can consume Depot materials, but they can never touch anything protected in the Vault."},
+	"tavern":{"title":"THE TAVERN","body":"Set a Tavern Budget, welcome new patrons, inspect what an applicant discloses, then recruit, reject, or lock them before they leave."},
 	"merchant":{"title":"MERCHANT CONTACTS","body":"Merchant Contacts gathers the traders the guild has discovered. This page will support buying, selling, specialized wares, and trade opportunities tied to different parts of the world."},
-	"workshop":{"title":"WORKSHOP","body":"The Workshop is where guild professions turn gathered resources into useful supplies and equipment. It will grow into the main place for crafting, improving, and preparing expedition tools."}
+	"workshop":{"title":"WORKSHOP","body":"The Workshop is where guild professions turn gathered resources into useful supplies and equipment. It will grow into the main place for crafting, improving, and preparing expedition tools."},
+	"infirmary":{"title":"INFIRMARY","body":"The Infirmary tracks member wellbeing and will grow into the guild's home for expedition recovery, remedies, injury treatment, status removal, and restorative assignments."}
 }
 
 const TALENT_TIER_DEFINITIONS := TalentData.TIER_DEFINITIONS
@@ -38,19 +39,26 @@ const ENEMIES := {
 	"Rune Servant":{"base_health":420.0,"health_growth":0.03,"base_power":26.0,"power_growth":0.03,"base_armor":15.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":4.0,"basic_action_range":44.0,"movement_speed":75.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"magical","behavior_flags":["boss"],"combat_tags":["boss"],"color":Color("ba565f"),"boss":true},
 	"Ashwood Servant":{"base_health":720.0,"health_growth":0.03,"base_power":26.0,"power_growth":0.03,"base_armor":18.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":4.0,"basic_action_range":44.0,"movement_speed":75.0,"base_critical_chance":0.0,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["boss"],"combat_tags":["boss"],"color":Color("e06b42"),"boss":true},
 	"Controlled Rogue":{"base_health":220.0,"health_growth":0.03,"base_power":16.0,"power_growth":0.03,"base_armor":10.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.2,"basic_action_range":55.0,"movement_speed":145.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":[],"combat_tags":["hero"],"color":Color("e6b35f")},
+	"Controlled Guardian":{"base_health":300.0,"health_growth":0.03,"base_power":13.0,"power_growth":0.03,"base_armor":16.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.4,"basic_action_range":55.0,"movement_speed":120.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":[],"combat_tags":["hero","tank"],"color":Color("6eafff")},
+	"Controlled Cleric":{"base_health":230.0,"health_growth":0.03,"base_power":13.0,"power_growth":0.03,"base_armor":8.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.5,"basic_action_range":185.0,"movement_speed":130.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"magical","behavior_flags":["ranged","healer"],"combat_tags":["hero","ranged","healer"],"color":Color("f4dd82"),"ranged":true},
 	"Controlled Ranger":{"base_health":210.0,"health_growth":0.03,"base_power":14.0,"power_growth":0.03,"base_armor":9.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.2,"basic_action_range":185.0,"movement_speed":145.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"physical","behavior_flags":["ranged"],"combat_tags":["hero","ranged"],"color":Color("65dc89"),"ranged":true},
 	"Controlled Mage":{"base_health":190.0,"health_growth":0.03,"base_power":14.0,"power_growth":0.03,"base_armor":3.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.2,"basic_action_range":185.0,"movement_speed":145.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"magical","behavior_flags":["ranged"],"combat_tags":["hero","ranged"],"color":Color("b381ff"),"ranged":true},
 	"Controlled Warlock":{"base_health":200.0,"health_growth":0.03,"base_power":15.0,"power_growth":0.03,"base_armor":4.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.2,"basic_action_range":185.0,"movement_speed":145.0,"base_critical_chance":0.05,"critical_damage":2.0,"basic_action_damage_type":"magical","behavior_flags":["ranged"],"combat_tags":["hero","ranged"],"color":Color("d16ca8"),"ranged":true}
 }
 
 const WORLD_MAP_SIZE := Vector2(1536,864)
-const WORLD_ACTIVE_REGION := {"name":"ASHWOOD MARCHES","zone":0,"position":Vector2(345,405),"size":Vector2(250,94)}
-const LOCKED_WORLD_REGIONS := [
-	["EMBER WASTES",Vector2(155,175)],
-	["FROSTPEAK",Vector2(760,105)],
-	["MIREFANG WILDS",Vector2(1010,410)],
-	["SUN COAST",Vector2(760,655)],
-	["DREAD ISLE",Vector2(135,655)]
+const WORLD_REGIONS := [
+	{"id":"ashwood_marches","display_name":"ASHWOOD MARCHES","subtitle":"Tutorial","map_position":Vector2(345,405),"marker_size":Vector2(250,94),"category":"tutorial","implemented":true,"internal_zone_index":0},
+	{"id":"greyhaven_reach","display_name":"GREYHAVEN REACH","subtitle":"Expected Level 2–5","map_position":Vector2(430,610),"marker_size":Vector2(220,78),"category":"campaign","implemented":true,"internal_zone_index":-1},
+	{"id":"kwaad_scar","display_name":"THE KWAAD SCAR","subtitle":"Expected Level 6–10","map_position":Vector2(155,235),"marker_size":Vector2(220,78),"category":"campaign","implemented":true,"internal_zone_index":-1},
+	{"id":"consortium_crossroads","display_name":"CONSORTIUM CROSSROADS","subtitle":"Expected Level 11–15","map_position":Vector2(660,510),"marker_size":Vector2(250,78),"category":"campaign","implemented":true,"internal_zone_index":-1},
+	{"id":"gallah_highlands","display_name":"GALLAH HIGHLANDS","subtitle":"Expected Level 16–20","map_position":Vector2(725,225),"marker_size":Vector2(225,78),"category":"campaign","implemented":true,"internal_zone_index":-1},
+	{"id":"godfall_marches","display_name":"THE GODFALL MARCHES","subtitle":"Expected Level 21–25","map_position":Vector2(995,390),"marker_size":Vector2(245,78),"category":"campaign","implemented":true,"internal_zone_index":-1},
+	{"id":"grand_corruption_front","display_name":"GRAND CORRUPTION FRONT","subtitle":"Expected Level 26–30","map_position":Vector2(1090,545),"marker_size":Vector2(265,78),"category":"campaign","implemented":true,"internal_zone_index":-1},
+	{"id":"ehrejora","display_name":"EHREJORA","subtitle":"Endgame • Level 30+","map_position":Vector2(1290,185),"marker_size":Vector2(220,78),"category":"endgame","implemented":false,"internal_zone_index":-1},
+	{"id":"norath","display_name":"NORATH","subtitle":"Endgame • Level 30+","map_position":Vector2(455,55),"marker_size":Vector2(220,78),"category":"endgame","implemented":false,"internal_zone_index":-1},
+	{"id":"living_island","display_name":"THE LIVING ISLAND","subtitle":"Third Continent • Endgame","map_position":Vector2(1285,700),"marker_size":Vector2(225,78),"category":"endgame","implemented":false,"internal_zone_index":-1},
+	{"id":"elemental_plains","display_name":"ELEMENTAL PLAINS","subtitle":"Raid • Level 30+","map_position":Vector2(30,665),"marker_size":Vector2(225,78),"category":"raid","implemented":false,"internal_zone_index":-1}
 ]
 
 const ZONE_NAMES := ["Ashwood Marches","Mirefang Wilds"]
@@ -96,8 +104,8 @@ const STORAGE_ITEMS := [
 	["Tonics","tonics",Color("6ed9ef")]
 ]
 const STORAGE_COLUMNS := 10
-const STORAGE_BAG_SLOTS := 6
-const STORAGE_MAX_CAPACITY := 180
+const STORAGE_BAG_SLOTS := 10
+const STORAGE_MAX_CAPACITY := 300
 const STORAGE_BAG_CAPACITY := 30
 const STORAGE_BAG_UNLOCK_BASE_COST := 120
 

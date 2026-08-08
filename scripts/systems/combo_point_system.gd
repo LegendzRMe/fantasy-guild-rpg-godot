@@ -11,7 +11,7 @@ static func current(owner:Dictionary) -> int:
 	return clampi(int(owner.get("combo_points",0)),0,maximum(owner))
 
 static func successful_hit(result:Dictionary) -> bool:
-	return not bool(result.get("immune",false)) and (float(result.get("health_damage",0.0))>0.0 or float(result.get("shield_damage",0.0))>0.0)
+	return not bool(result.get("immune",false)) and float(result.get("resolved_damage",float(result.get("health_damage",0.0))+float(result.get("temporary_hp_damage",0.0))+float(result.get("shield_damage",0.0))))>0.0
 
 static func gain(owner:Dictionary, amount:int) -> Dictionary:
 	var before:=current(owner);var after:=mini(maximum(owner),before+maxi(0,amount));owner.combo_points=after

@@ -1,4 +1,4 @@
-extends "res://scripts/runtime/victory_runtime.gd"
+extends "res://scripts/runtime/combat_effect_presentation.gd"
 
 func octagon_points(center:Vector2,radius:float) -> PackedVector2Array:
 	var points:=PackedVector2Array()
@@ -13,6 +13,46 @@ func draw_octagon_health(center:Vector2,radius:float,ratio:float) -> void:
 	for edge in 8:
 		var fraction=clamp(edge_progress-edge,0.0,1.0)
 		if fraction>0:draw_line(points[edge],points[edge].lerp(points[(edge+1)%8],fraction),C_GREEN,4)
+
+func hero_channel_remaining_ratio(hero:Dictionary)->float:
+	var channel:Dictionary=hero.get("active_channel",{})
+	if not channel.is_empty():
+		var duration:float=maxf(0.001,float(channel.get("duration",0.0)))
+		return clampf(float(channel.get("remaining",0.0))/duration,0.0,1.0)
+	var cleric_runtime:Dictionary=hero.get("cleric_runtime",{})
+	if bool(cleric_runtime.get("jug_active",false)):
+		return clampf(float(cleric_runtime.get("jug_remaining",0.0))/maxf(0.001,float(ClericData.VALUES.r1_duration)),0.0,1.0)
+	return -1.0
+
+func draw_hero_channel_bar(hero:Dictionary)->void:
+	var ratio:=hero_channel_remaining_ratio(hero)
+	if ratio<0.0:return
+	var bar_position:=Vector2(hero.pos)+Vector2(-54,-58)
+	draw_rect(Rect2(bar_position,Vector2(108,9)),Color("0d111a"))
+	draw_rect(Rect2(bar_position+Vector2(2,2),Vector2(104*ratio,5)),Color("b77cff"))
+	draw_rect(Rect2(bar_position,Vector2(108,9)),Color("e0c3ff"),false,1.5)
+
+func rogue_concealment_visual_state(hero:Dictionary)->String:
+	if str(hero.get("class",""))!="Rogue" or not hero.has("concealment"):return ""
+	if StealthDetectionSystem.is_invisible(hero):return "invisible"
+	if bool(hero.get("rogue_runtime",{}).get("vanish_active",false)) or StealthDetectionSystem.is_stealthed(hero):return "vanished"
+	return ""
+
+func draw_rogue_concealment(hero:Dictionary,visual_state:String)->void:
+	if visual_state=="":return
+	var center:=Vector2(hero.pos)
+	var rotation:float=fmod(battle_time*.9,TAU)
+	if visual_state=="invisible":
+		draw_circle(center,50,Color("d9f3ff",.06))
+		for segment in 4:
+			var start:float=rotation+segment*PI/2.0
+			draw_arc(center,55,start,start+.52,10,Color("d9f3ff",.72),3)
+		draw_arc(center,49,0,TAU,40,Color("b8ddff",.20),2)
+	else:
+		for segment in 6:
+			var start:float=-rotation+segment*TAU/6.0
+			draw_arc(center,56,start,start+.48,8,Color("c99cff",.78),3)
+		draw_circle(center-Vector2(hero.get("facing_direction",Vector2.RIGHT))*12.0,43,Color("9f78df",.08))
 
 func draw_octagon_vertical_fill(center:Vector2,radius:float,ratio:float,color:Color)->void:
 	var points:=octagon_points(center,radius);var min_y:=points[0].y;var max_y:=points[0].y
@@ -119,10 +159,7 @@ func draw_combat_debug_overlay()->void:
 	elif str(hero.get("class",""))=="Warlock" and not hero.get("warlock_runtime",{}).is_empty():
 		draw_arc(hero.pos,float(WarlockData.SPACE.q_range),0,TAU,72,Color(CLASSES.Warlock.color,.26),2);draw_arc(hero.pos,float(WarlockData.SPACE.w_cast_range),0,TAU,72,Color("d7a2ff",.24),2)
 
-func _draw() -> void:
-	if screen not in ["combat","ashwood_victory"]:return
-	draw_combat_background()
-	draw_shared_combat_objects()
+func draw_world_combat_context() -> void:
 	if tutorial_should_show_instruction_box():
 		if tutorial_step==0 and not heroes.is_empty() and not tutorial_targets.is_empty():
 			draw_tutorial_dotted_path(heroes[0].pos,tutorial_targets[0]);draw_tutorial_glow(heroes[0].pos,52,CLASSES["Guardian"].color)
@@ -171,6 +208,8 @@ func _draw() -> void:
 		if str(rogue.get("class",""))!="Rogue" or rogue.get("rogue_runtime",{}).is_empty():continue
 		for cloud in rogue.rogue_runtime.smoke_clouds:
 			if float(cloud.remaining)>0.0:draw_circle(Vector2(cloud.center),float(cloud.radius),Color("778292",.18));draw_arc(Vector2(cloud.center),float(cloud.radius),0,TAU,48,Color("a7b0bf",.55),3)
+
+func draw_combat_enemies() -> void:
 	for i in enemies.size():
 		var e=enemies[i]; if e.hp<=0:continue
 		if e.telegraph>0:
@@ -179,7 +218,7 @@ func _draw() -> void:
 			if e.special=="charge": draw_dashed_line(e.pos,e.danger_pos,C_RED,5,10)
 		var enemy_color=GameData.enemy_color(e.type)
 		var target_outline:=Color.WHITE if focused_enemy_index==i else C_GOLD if heroes.size()>selected and heroes[selected].target==i else Color("5f2931")
-		var enemy_radius:=62.0 if e.type=="Defense Dummy" else 46.0;draw_circle(e.pos,enemy_radius,enemy_color); draw_circle(e.pos,enemy_radius+6,target_outline,4); if not victory_sequence and (e.revealed or e.hp<e.max_hp):health_bar(e.pos+Vector2(-54,-enemy_radius-24),108,e.hp/e.max_hp,C_RED); draw_string(ThemeDB.fallback_font,e.pos+Vector2(-55,6),"DEFENSE" if e.type=="Defense Dummy" else e.type.substr(0,7),HORIZONTAL_ALIGNMENT_CENTER,110,15,C_TEXT)
+		var enemy_radius:=62.0 if e.type=="Defense Dummy" else 46.0;draw_circle(e.pos,enemy_radius,enemy_color); draw_circle(e.pos,enemy_radius+6,target_outline,4); if not victory_sequence and (e.revealed or e.hp<e.max_hp):health_bar(e.pos+Vector2(-54,-enemy_radius-24),108,e.hp/e.max_hp,C_RED); draw_string(ThemeDB.fallback_font,e.pos+Vector2(-55,6),"DEFENSE" if e.type=="Defense Dummy" else str(e.get("display_name",e.type)).substr(0,12),HORIZONTAL_ALIGNMENT_CENTER,110,15,C_TEXT)
 		if not victory_sequence:
 			for mage in heroes:
 				if str(mage.get("class",""))=="Mage" and not mage.get("mage_runtime",{}).is_empty() and mage.mage_runtime.bomb_state.bombs_by_target.has(str(e.combat_id)):
@@ -191,6 +230,8 @@ func _draw() -> void:
 			for stack_index in corruption_stacks:draw_circle(e.pos+Vector2(-12+stack_index*12,-enemy_radius-10),4,Color("b15cff"))
 			if CombatSystem.is_feared(e):draw_string(ThemeDB.fallback_font,e.pos+Vector2(-22,enemy_radius+19),"FEAR",HORIZONTAL_ALIGNMENT_CENTER,44,10,Color("d6a5ff"))
 			elif CombatSystem.is_silenced(e):draw_string(ThemeDB.fallback_font,e.pos+Vector2(-26,enemy_radius+19),"SILENCE",HORIZONTAL_ALIGNMENT_CENTER,52,10,Color("d6a5ff"))
+
+func draw_combat_summons() -> void:
 	for mage in heroes:
 		if str(mage.get("class",""))!="Mage" or mage.get("mage_runtime",{}).is_empty():continue
 		var phoenix:Dictionary=mage.mage_runtime.phoenix
@@ -198,9 +239,12 @@ func _draw() -> void:
 			var phoenix_pos:=Vector2(phoenix.pos);draw_circle(phoenix_pos,18,Color("ff7a3d",.30));draw_circle(phoenix_pos,11,Color("ffb34f"));draw_colored_polygon(PackedVector2Array([phoenix_pos+Vector2(0,-19),phoenix_pos+Vector2(-17,10),phoenix_pos,phoenix_pos+Vector2(17,10)]),Color("ffd15c"))
 		for projectile in mage.mage_runtime.pyro_projectiles:
 			var pyro_pos:=Vector2(projectile.pos);draw_circle(pyro_pos,18,Color("ff7a3d",.28));draw_circle(pyro_pos,11,Color("ff7a3d"));draw_circle(pyro_pos,5,Color("fff2a8"))
+
+func draw_combat_heroes() -> void:
 	for i in heroes.size():
 		var h=heroes[i]; var col=CLASSES[h["class"]].color; if h.hp<=0:col=Color("455067")
-		if str(h.get("class",""))=="Rogue" and h.has("concealment") and (StealthDetectionSystem.is_stealthed(h) or StealthDetectionSystem.is_invisible(h)):col=Color(col,.42 if StealthDetectionSystem.is_invisible(h) else .62)
+		var concealment_visual:=rogue_concealment_visual_state(h)
+		if concealment_visual!="":col=Color(col,.24 if concealment_visual=="invisible" else .58)
 		if bool(h.get("incapacitated",false)):
 			draw_circle(h.pos,50,Color("202735"));draw_line(h.pos+Vector2(-24,-24),h.pos+Vector2(24,24),C_RED,7);draw_line(h.pos+Vector2(-24,24),h.pos+Vector2(24,-24),C_RED,7);continue
 		if int(h.get("basic_action_phase",CombatRulesV1.BasicActionPhase.READY))==CombatRulesV1.BasicActionPhase.WINDUP:
@@ -210,7 +254,9 @@ func _draw() -> void:
 		if i==selected and not victory_sequence and not bool(h.get("independent",false)):
 			draw_circle(h.pos,66,Color(C_GOLD,.18));draw_circle(h.pos,59,C_GOLD,4)
 		if h.shield>0 and not victory_sequence:draw_circle(h.pos,63,Color("5fa8ff"),4)
-		draw_circle(h.pos,48,col);draw_role_icon(h.pos,h["class"]);if not victory_sequence and (h.hp<h.max_hp or h.last_hit>0 or h.shield>0):health_bar_with_shield(h.pos+Vector2(-54,-70),108,h)
+		var role_ink:=Color("d9f3ff",.38) if concealment_visual=="invisible" else Color("eadcff",.72) if concealment_visual=="vanished" else Color("101827")
+		draw_circle(h.pos,48,col);draw_role_icon(h.pos,h["class"],role_ink);if not victory_sequence:draw_rogue_concealment(h,concealment_visual);if not victory_sequence and (h.hp<h.max_hp or h.last_hit>0 or h.shield>0):health_bar_with_shield(h.pos+Vector2(-54,-70),108,h)
+		if not victory_sequence:draw_hero_channel_bar(h)
 		if not victory_sequence and str(h.get("class",""))=="Rogue" and not h.get("rogue_runtime",{}).is_empty():
 			var point_count:int=ComboPointSystem.current(h);var point_max:int=ComboPointSystem.maximum(h);var pip_start:float=float(h.pos.x)-(point_max-1)*7.0
 			for point_index in point_max:draw_circle(Vector2(pip_start+point_index*14.0,h.pos.y-83),4.5,C_GOLD if point_index<point_count else Color("45546a"))
@@ -220,6 +266,8 @@ func _draw() -> void:
 				var marker_offset:=Vector2(-34,-49) if serpent_marker_index==0 else Vector2(34,-49)
 				draw_circle(h.pos+marker_offset,7,Color("263142"));draw_circle(h.pos+marker_offset,4.5,Color.WHITE)
 		if bool(h.get("independent",false)) and not victory_sequence:draw_string(ThemeDB.fallback_font,h.pos+Vector2(-42,-62),"ALLIED NPC",HORIZONTAL_ALIGNMENT_CENTER,84,12,C_GREEN)
+
+func draw_combat_input_preview() -> void:
 	if dragging_hero:
 		draw_dashed_line(heroes[selected].pos,drag_cursor,Color(C_GOLD,.75),6,8)
 		var preview_color=C_GREEN if drag_target_type=="ally" else (C_RED if drag_target_type=="enemy" else C_GOLD)
@@ -235,8 +283,8 @@ func _draw() -> void:
 			draw_circle(aim_point,ground_radius,Color(C_GOLD,.10));draw_arc(aim_point,ground_radius,0,TAU,48,C_GOLD,3);draw_dashed_line(aiming_hero.pos,aim_point,Color(C_GOLD,.7),8,6)
 		elif aimed_ability_category=="directional":draw_dashed_line(aiming_hero.pos,aim_point,C_GOLD,10,6);draw_circle(aim_point,14,Color(C_GOLD,.3))
 		elif aimed_ability_category=="area":draw_circle(aiming_hero.pos,max(90.0,range_limit),Color(C_GOLD,.10));draw_arc(aiming_hero.pos,max(90.0,range_limit),0,TAU,48,C_GOLD,3)
-	for fx in effects: draw_combat_effect(fx)
-	if screen!="combat":return
+
+func draw_tutorial_instruction_hud()->void:
 	if tutorial_should_show_instruction_box():
 		var instruction_pulse=.5+.5*sin(tutorial_timer*5.0) if tutorial_idle_hint_shown else 0.0
 		var instruction_rect=Rect2(230,18,820,82)
@@ -244,6 +292,8 @@ func _draw() -> void:
 		draw_rect(instruction_rect,Color(0.03,.055,.09,.92));draw_rect(instruction_rect,Color(C_GOLD,.55+.4*instruction_pulse),false,2+instruction_pulse*2);draw_string(ThemeDB.fallback_font,Vector2(275,43),"TRAINING",HORIZONTAL_ALIGNMENT_CENTER,730,14,C_GOLD);draw_string(ThemeDB.fallback_font,Vector2(275,74),tutorial_prompt(),HORIZONTAL_ALIGNMENT_CENTER,730,19,C_TEXT)
 		if tutorial_reject_time>0:
 			draw_rect(Rect2(320,106,640,38),Color(0.03,.055,.09,.94));draw_rect(Rect2(320,106,640,38),Color(C_GOLD,.65),false,2);draw_string(ThemeDB.fallback_font,Vector2(345,131),tutorial_feedback_message,HORIZONTAL_ALIGNMENT_CENTER,590,15,C_GOLD)
+
+func draw_testing_status_hud()->void:
 	if testing_zone_active and not item_feedback_feed.is_empty():
 		draw_rect(Rect2(18,18,250,24+item_feedback_feed.size()*19),Color(0.03,.05,.08,.76));draw_string(ThemeDB.fallback_font,Vector2(30,39),"ITEM EFFECTS",HORIZONTAL_ALIGNMENT_LEFT,-1,12,C_GOLD)
 		for feed_index in item_feedback_feed.size():draw_string(ThemeDB.fallback_font,Vector2(30,59+feed_index*19),item_feedback_feed[feed_index],HORIZONTAL_ALIGNMENT_LEFT,225,12,C_TEXT)
@@ -251,72 +301,78 @@ func _draw() -> void:
 		draw_rect(Rect2(525,18,230,48),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(537,40),"ENDLESS ARENA  •  LEVEL %d"%testing_endless_level,HORIZONTAL_ALIGNMENT_LEFT,205,13,C_GOLD);draw_string(ThemeDB.fallback_font,Vector2(537,58),"DEFEATED  %d"%testing_endless_defeated,HORIZONTAL_ALIGNMENT_LEFT,205,12,C_MUTED)
 	if testing_zone_active and testing_zone_mode=="rogue_range" and not victory_sequence:
 		draw_rect(Rect2(470,18,340,42),Color(0.03,.05,.08,.78));draw_string(ThemeDB.fallback_font,Vector2(486,44),"ROGUE RANGE  -  SHIFT+1-6 BUILDS",HORIZONTAL_ALIGNMENT_CENTER,308,13,C_GOLD)
-	if not victory_sequence and (not tutorial_active or tutorial_step>=4):
-		var selectable_heroes:Array=player_controlled_hero_indices()
-		for i in 8:
-			var center=Vector2(451+i*54,604)
-			var occupied=i<selectable_heroes.size()
-			var hero_index:int=selectable_heroes[i] if occupied else -1
-			var is_selected=occupied and hero_index==selected
-			var portrait_radius=29.0 if is_selected else 26.0
-			var portrait_fill=Color("26364a") if is_selected else Color("172130")
-			if is_selected:
-				var glow_color=Color(CLASSES[heroes[hero_index]["class"]].color,.16)
-				draw_circle(center,35,glow_color)
-				draw_octagon(center,33,Color.TRANSPARENT,C_GOLD,3)
-			draw_octagon(center,portrait_radius,portrait_fill,Color("65758d") if occupied else Color("46546a"),3)
-			if occupied:
-				draw_octagon_health(center,portrait_radius+1,max(0,heroes[hero_index].hp/heroes[hero_index].max_hp))
-				if heroes[hero_index].shield>0:draw_arc(center,portrait_radius+4,-PI*.75,-PI*.25,10,Color("55aaff"),4)
-				var class_color:Color=CLASSES[heroes[hero_index]["class"]].color
-				var icon_color=class_color if is_selected else class_color.lerp(Color("929aa6"),.68)
-				draw_role_icon(center-Vector2(0,4),heroes[hero_index]["class"],icon_color)
-				draw_string(ThemeDB.fallback_font,center+Vector2(-8,20),str(i+1),HORIZONTAL_ALIGNMENT_CENTER,16,11,C_GOLD if is_selected else C_MUTED)
-		if tutorial_should_show_ability_bar():
-			var active=heroes[selected];var keys=["Q","W","E","R","D"];var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
-			var visible_slots:Array=[0,4]
-			for ability_slot in [1,2,3]:
-				if TalentSystem.ability_is_unlocked(hero_level,ability_slot) and (ability_slot!=3 or str(active.get("selected_heroic_id",""))!=""):visible_slots.insert(visible_slots.size()-1,ability_slot)
-			for slot in visible_slots:
-				var center=Vector2(484+slot*78,674);var action_name:String=str(ABILITIES[active["class"]][slot]) if slot<4 else "Stoneform" if active["class"]=="Guardian" and GuardianSystem.has_talent(active,"guardian_l24_2") else str(TRAITS[active["class"]])
-				if active["class"]=="Rogue" and slot<3 and not active.get("rogue_runtime",{}).is_empty() and bool(active.rogue_runtime.vanish_active):action_name=["Ambush","Cheap Shot","Garrote"][slot]
-				elif active["class"]=="Rogue" and slot==3:action_name=str(RogueData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
-				if slot==3 and active["class"]=="Cleric":action_name=str(ClericData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
-				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_2"):action_name="Safety Sprint"
-				elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_3"):action_name="Let's Go!"
-				elif slot==3 and active["class"]=="Ranger":action_name=str(RangerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
-				elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
-				elif slot==3 and active["class"]=="Mage":action_name=str(MageData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
-				elif slot==3 and active["class"]=="Warlock":action_name=str(WarlockData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
-				var cleric_trait_active:bool=false
-				if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
-				var hatred_ratio:float=0.0
-				if slot==4 and str(active.get("class",""))=="Ranger" and not active.get("ranger_runtime",{}).is_empty():hatred_ratio=clampf(float(active.ranger_runtime.hatred)/float(RangerData.VALUES.hatred_max),0.0,1.0)
-				var ranger_hatred_full:bool=hatred_ratio>=1.0
-				var mage_trait_armed:bool=slot==4 and str(active.get("class",""))=="Mage" and not active.get("mage_runtime",{}).is_empty() and MageSystem.trait_is_armed(active)
-				var warlock_trait_state:Dictionary=WarlockSystem.slot_state(active) if slot==4 and str(active.get("class",""))=="Warlock" else {}
-				var warlock_darkness_armed:bool=bool(warlock_trait_state.get("darkness_armed",false))
-				if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:
-					var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
-					draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
-				draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
-				if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
-				if not warlock_trait_state.is_empty() and not warlock_darkness_armed:
-					var darkness_ratio:=clampf(float(warlock_trait_state.darkness_progress)/maxf(1.0,float(warlock_trait_state.darkness_required)),0.0,1.0)
-					if darkness_ratio>0.0:draw_octagon_vertical_fill(center,34,darkness_ratio,Color(CLASSES["Warlock"].color,.55))
-				draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
-				if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
-				if active["class"]=="Rogue" and slot==2 and ComboPointSystem.current(active)<=0:draw_octagon(center,37,Color(0,0,0,.58),C_MUTED,2)
-				if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
-				if not warlock_trait_state.is_empty() and slot==4:draw_string(ThemeDB.fallback_font,center+Vector2(14,-20),"%d%%"%int(warlock_trait_state.cost_percent),HORIZONTAL_ALIGNMENT_CENTER,42,9,C_TEXT)
-				if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
-					var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
-					draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[charge_state.charges,charge_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
-				if active["class"]=="Mage" and not active.get("mage_runtime",{}).is_empty():
-					if slot==4:
-						var trait_state:=MageSystem.slot_state(active);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[trait_state.charges,trait_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
-					elif slot==3 and MageSystem.has_talent(active,"mage_l27_r1") and not active.mage_runtime.phoenix.is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d"%int(active.mage_runtime.phoenix.reposition_charges),HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
-		draw_string(ThemeDB.fallback_font,Vector2(1080,50),"●  %d"%state.gold,HORIZONTAL_ALIGNMENT_RIGHT,115,20,C_GOLD);draw_circle(Vector2(1235,42),25,Color(0.08,.11,.16,.9)); draw_string(ThemeDB.fallback_font,Vector2(1222,50),"Ⅱ",HORIZONTAL_ALIGNMENT_LEFT,-1,22,C_TEXT)
+
+func draw_party_portraits_hud()->void:
+	var selectable_heroes:Array=player_controlled_hero_indices()
+	for i in 8:
+		var center=Vector2(451+i*54,604)
+		var occupied=i<selectable_heroes.size()
+		var hero_index:int=selectable_heroes[i] if occupied else -1
+		var is_selected=occupied and hero_index==selected
+		var portrait_radius=29.0 if is_selected else 26.0
+		var portrait_fill=Color("26364a") if is_selected else Color("172130")
+		if is_selected:
+			var glow_color=Color(CLASSES[heroes[hero_index]["class"]].color,.16)
+			draw_circle(center,35,glow_color)
+			draw_octagon(center,33,Color.TRANSPARENT,C_GOLD,3)
+		draw_octagon(center,portrait_radius,portrait_fill,Color("65758d") if occupied else Color("46546a"),3)
+		if occupied:
+			draw_octagon_health(center,portrait_radius+1,max(0,heroes[hero_index].hp/heroes[hero_index].max_hp))
+			if heroes[hero_index].shield>0:draw_arc(center,portrait_radius+4,-PI*.75,-PI*.25,10,Color("55aaff"),4)
+			var class_color:Color=CLASSES[heroes[hero_index]["class"]].color
+			var icon_color=class_color if is_selected else class_color.lerp(Color("929aa6"),.68)
+			draw_role_icon(center-Vector2(0,4),heroes[hero_index]["class"],icon_color)
+			draw_string(ThemeDB.fallback_font,center+Vector2(-8,20),str(i+1),HORIZONTAL_ALIGNMENT_CENTER,16,11,C_GOLD if is_selected else C_MUTED)
+
+func draw_ability_bar_hud()->void:
+	if tutorial_should_show_ability_bar():
+		var active=heroes[selected];var keys=["Q","W","E","R","D"];var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
+		var visible_slots:Array=[0,4]
+		for ability_slot in [1,2,3]:
+			if TalentSystem.ability_is_unlocked(hero_level,ability_slot) and (ability_slot!=3 or str(active.get("selected_heroic_id",""))!=""):visible_slots.insert(visible_slots.size()-1,ability_slot)
+		for slot in visible_slots:
+			var center=Vector2(484+slot*78,674);var action_name:String=str(ABILITIES[active["class"]][slot]) if slot<4 else "Stoneform" if active["class"]=="Guardian" and GuardianSystem.has_talent(active,"guardian_l24_2") else str(TRAITS[active["class"]])
+			if slot<3 and selected<battle_hero_indices.size():
+				var saved_hero:Dictionary=state.heroes[battle_hero_indices[selected]];var ability_id:="%s:%s"%[str(saved_hero.class_id),["q","w","e"][slot]];var rune_presentation:Dictionary=ProfessionSystem.ability_presentation(state,str(saved_hero.hero_id),ability_id,action_name);action_name=str(rune_presentation.display_name)
+			if active["class"]=="Rogue" and slot<3 and not active.get("rogue_runtime",{}).is_empty() and bool(active.rogue_runtime.vanish_active):action_name=["Ambush","Cheap Shot","Garrote"][slot]
+			elif active["class"]=="Rogue" and slot==3:action_name=str(RogueData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			if slot==3 and active["class"]=="Cleric":action_name=str(ClericData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_2"):action_name="Safety Sprint"
+			elif slot==4 and active["class"]=="Cleric" and ClericSystem.has_talent(active,"cleric_l12_3"):action_name="Let's Go!"
+			elif slot==3 and active["class"]=="Ranger":action_name=str(RangerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==4 and active["class"]=="Ranger" and RangerSystem.has_talent(active,"ranger_l21_3"):action_name="Gloom"
+			elif slot==3 and active["class"]=="Mage":action_name=str(MageData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Warlock":action_name=str(WarlockData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			var cleric_trait_active:bool=false
+			if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
+			var hatred_ratio:float=0.0
+			if slot==4 and str(active.get("class",""))=="Ranger" and not active.get("ranger_runtime",{}).is_empty():hatred_ratio=clampf(float(active.ranger_runtime.hatred)/float(RangerData.VALUES.hatred_max),0.0,1.0)
+			var ranger_hatred_full:bool=hatred_ratio>=1.0
+			var mage_trait_armed:bool=slot==4 and str(active.get("class",""))=="Mage" and not active.get("mage_runtime",{}).is_empty() and MageSystem.trait_is_armed(active)
+			var warlock_trait_state:Dictionary=WarlockSystem.slot_state(active) if slot==4 and str(active.get("class",""))=="Warlock" else {}
+			var warlock_darkness_armed:bool=bool(warlock_trait_state.get("darkness_armed",false))
+			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:
+				var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
+				draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
+			draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
+			if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
+			if not warlock_trait_state.is_empty() and not warlock_darkness_armed:
+				var darkness_ratio:=clampf(float(warlock_trait_state.darkness_progress)/maxf(1.0,float(warlock_trait_state.darkness_required)),0.0,1.0)
+				if darkness_ratio>0.0:draw_octagon_vertical_fill(center,34,darkness_ratio,Color(CLASSES["Warlock"].color,.55))
+			draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
+			if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
+			if active["class"]=="Rogue" and slot==2 and ComboPointSystem.current(active)<=0:draw_octagon(center,37,Color(0,0,0,.58),C_MUTED,2)
+			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+			if not warlock_trait_state.is_empty() and slot==4:draw_string(ThemeDB.fallback_font,center+Vector2(14,-20),"%d%%"%int(warlock_trait_state.cost_percent),HORIZONTAL_ALIGNMENT_CENTER,42,9,C_TEXT)
+			if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
+				var slot_key:="e" if slot==2 else "r";var charge_state:=AbilitySlotSystem.ui_state(active.ranger_runtime.slots[slot_key])
+				draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[charge_state.charges,charge_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+			if active["class"]=="Mage" and not active.get("mage_runtime",{}).is_empty():
+				if slot==4:
+					var trait_state:=MageSystem.slot_state(active);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[trait_state.charges,trait_state.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+				elif slot==3 and MageSystem.has_talent(active,"mage_l27_r1") and not active.mage_runtime.phoenix.is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d"%int(active.mage_runtime.phoenix.reposition_charges),HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+
+func draw_tutorial_completion_hud()->void:
 	if tutorial_active and tutorial_step==4:
 		draw_tutorial_box(Rect2(420,570,455,68))
 	if tutorial_active and tutorial_step==7:
@@ -330,11 +386,26 @@ func _draw() -> void:
 		draw_string(ThemeDB.fallback_font,Vector2(375,322),"•  Sera keeps a persistent healing target",HORIZONTAL_ALIGNMENT_LEFT,530,20,C_TEXT)
 		draw_string(ThemeDB.fallback_font,Vector2(375,362),"•  Use the action bar for abilities",HORIZONTAL_ALIGNMENT_LEFT,530,20,C_TEXT)
 		draw_string(ThemeDB.fallback_font,Vector2(365,427),"Tap to continue" if tutorial_input_device=="mobile" else "Click or press any key to continue",HORIZONTAL_ALIGNMENT_CENTER,550,18,C_GOLD)
+
+func draw_pause_hud()->void:
 	if paused:
 		draw_rect(Rect2(390,160,500,370 if testing_zone_active else 300),Color(0.03,.05,.08,.94)); draw_string(ThemeDB.fallback_font,Vector2(565,250),"PAUSED",HORIZONTAL_ALIGNMENT_LEFT,-1,34,C_GOLD); draw_rect(Rect2(490,285,300,58),C_PANEL_2); draw_string(ThemeDB.fallback_font,Vector2(600,322),"RESUME",HORIZONTAL_ALIGNMENT_LEFT,-1,20,C_TEXT)
 		if testing_zone_active and testing_zone_mode=="range":draw_rect(Rect2(490,360,300,58),C_PANEL_2);draw_string(ThemeDB.fallback_font,Vector2(535,397),"DUMMY ATTACKS: %s"%("YES" if testing_dummy_attacks_enabled else "NO"),HORIZONTAL_ALIGNMENT_CENTER,210,18,C_GREEN if testing_dummy_attacks_enabled else C_MUTED)
 		elif testing_zone_active:draw_rect(Rect2(490,360,300,58),C_PANEL_2);draw_string(ThemeDB.fallback_font,Vector2(535,397),"ENEMY LEVEL: %d"%testing_endless_level,HORIZONTAL_ALIGNMENT_CENTER,210,18,C_GOLD)
 		var retreat_y:=435 if testing_zone_active else 360;draw_rect(Rect2(490,retreat_y,300,58),C_PANEL_2); draw_string(ThemeDB.fallback_font,Vector2(600,retreat_y+37),"RETREAT",HORIZONTAL_ALIGNMENT_LEFT,-1,20,C_RED)
+
+func draw_combat_hud() -> void:
+	draw_tutorial_instruction_hud()
+	draw_testing_status_hud()
+	if not victory_sequence and (not tutorial_active or tutorial_step>=4):
+		draw_party_portraits_hud()
+		draw_ability_bar_hud()
+		draw_string(ThemeDB.fallback_font,Vector2(1080,50),"●  %d"%state.gold,HORIZONTAL_ALIGNMENT_RIGHT,115,20,C_GOLD);draw_circle(Vector2(1235,42),25,Color(0.08,.11,.16,.9)); draw_string(ThemeDB.fallback_font,Vector2(1222,50),"Ⅱ",HORIZONTAL_ALIGNMENT_LEFT,-1,22,C_TEXT)
+	draw_tutorial_completion_hud()
+	draw_pause_hud()
+	draw_victory_overlay()
+
+func draw_victory_overlay() -> void:
 	if victory_sequence and victory_phase>=1:
 		draw_string(ThemeDB.fallback_font,Vector2(400,117),"VICTORY",HORIZONTAL_ALIGNMENT_CENTER,480,66,C_GOLD)
 		if current_ashwood_encounter!="" and not pending_victory.is_empty():
@@ -378,110 +449,19 @@ func _draw() -> void:
 					var marker_text:="NEW TALENT TIER!" if not level_up.get("talent_tiers",[]).is_empty() else "LEVEL UP!"
 					draw_string(ThemeDB.fallback_font,marker_center+Vector2(-72,92),marker_text,HORIZONTAL_ALIGNMENT_CENTER,144,15,C_GOLD if marker_text.begins_with("NEW") else C_GREEN)
 				draw_string(ThemeDB.fallback_font,Vector2(440,585),victory_continue_prompt(),HORIZONTAL_ALIGNMENT_CENTER,400,24,C_MUTED)
+
+func _draw() -> void:
+	if screen not in ["combat","ashwood_victory"]:return
+	draw_combat_background()
+	draw_shared_combat_objects()
+	draw_world_combat_context()
+	draw_combat_enemies()
+	draw_combat_summons()
+	draw_combat_heroes()
+	draw_combat_input_preview()
+	for fx in effects:draw_combat_effect(fx)
+	if screen=="combat":draw_combat_hud()
 	draw_combat_debug_overlay()
 	if toast_time>0 and screen!="combat":draw_string(ThemeDB.fallback_font,Vector2(480,680),toast,HORIZONTAL_ALIGNMENT_LEFT,-1,17,C_GOLD)
 
-func health_bar(pos:Vector2,width:float,ratio:float,color:Color)->void:
-	draw_rect(Rect2(pos,Vector2(width,7)),Color("11151e"));draw_rect(Rect2(pos,Vector2(width*clamp(ratio,0,1),7)),color)
-
-func health_bar_with_shield(pos:Vector2,width:float,unit:Dictionary)->void:
-	var health_ratio:float=clampf(float(unit.hp)/maxf(1.0,float(unit.max_hp)),0.0,1.0);health_bar(pos,width,health_ratio,C_GREEN)
-	var shield_width:float=minf(width,float(unit.get("shield",0.0))/maxf(1.0,float(unit.max_hp))*width)
-	if shield_width>0:draw_rect(Rect2(pos+Vector2(min(width-shield_width,width*health_ratio),0),Vector2(shield_width,7)),Color("55aaff"))
-func add_effect(kind:String,from:Vector2,to:Vector2,text_value:String,color:Color)->void:
-	effects.append({"kind":kind,"from":from,"to":to,"text":text_value,"color":color,"life":.75 if kind!="heroic" else 1.25,"max_life":.75 if kind!="heroic" else 1.25})
-func draw_combat_effect(fx:Dictionary)->void:
-	var progress=1.0-fx.life/fx.max_life
-	var alpha=clamp(fx.life*2.0,0.0,1.0)
-	var col=Color(fx.color,alpha)
-	match fx.kind:
-		"projectile":
-			var p=fx.from.lerp(fx.to,clamp(progress*1.8,0.0,1.0));draw_line(p-Vector2(12,0),p+Vector2(8,0),col,5);draw_circle(p,5,Color.WHITE)
-		"ranger_arrow":
-			var arrow_direction:Vector2=fx.from.direction_to(fx.to)
-			if arrow_direction==Vector2.ZERO:
-				draw_arc(fx.to,12+progress*16,0,TAU,24,col,3)
-			else:
-				var arrow_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var arrow_tip:=arrow_position+arrow_direction*8.0
-				draw_line(arrow_position-arrow_direction*18.0,arrow_tip,col,4);draw_line(arrow_tip,arrow_tip-arrow_direction.rotated(.55)*10.0,col,3);draw_line(arrow_tip,arrow_tip-arrow_direction.rotated(-.55)*10.0,col,3)
-		"multishot":
-			var fan_direction:Vector2=fx.from.direction_to(fx.to);var fan_distance:float=fx.from.distance_to(fx.to)*clampf(progress,0.0,1.0)
-			for arrow_index in range(-3,4):
-				var shot_direction:=fan_direction.rotated(deg_to_rad(float(arrow_index)*8.0));var shot_tip:Vector2=fx.from+shot_direction*fan_distance
-				draw_line(shot_tip-shot_direction*15.0,shot_tip,Color(col,.88),3)
-		"cloud_serpent_projectile":
-			var serpent_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var serpent_direction:Vector2=fx.from.direction_to(fx.to)
-			draw_line(serpent_position-serpent_direction*20.0,serpent_position,Color("79dfe8",alpha*.58),4);draw_circle(serpent_position,8,Color("8feaf2",alpha*.26));draw_circle(serpent_position,4.5,col);draw_circle(serpent_position,2,Color.WHITE)
-		"guardian_thunder_clap":
-			var thunder_center:=Vector2(fx.to);var thunder_radius:=float(fx.get("radius",145.0));var thunder_spread:=clampf(progress*1.7,0.0,1.0);var thunder_color:=Color("b68cff") if bool(fx.get("secondary",false)) else Color("62b8ff")
-			draw_circle(thunder_center,thunder_radius*thunder_spread,Color(thunder_color,alpha*.10));draw_arc(thunder_center,thunder_radius*thunder_spread,0,TAU,64,Color(thunder_color,alpha),6)
-			draw_arc(thunder_center,thunder_radius*maxf(0.12,thunder_spread*.68),0,TAU,48,Color.WHITE,alpha*3.5)
-			for bolt_index in 8:
-				var bolt_angle:float=TAU*float(bolt_index)/8.0+float(progress)*.22;var bolt_start:Vector2=thunder_center+Vector2.RIGHT.rotated(bolt_angle)*thunder_radius*thunder_spread*.28;var bolt_mid:Vector2=thunder_center+Vector2.RIGHT.rotated(bolt_angle+.07)*thunder_radius*thunder_spread*.62;var bolt_end:Vector2=thunder_center+Vector2.RIGHT.rotated(bolt_angle-.04)*thunder_radius*thunder_spread*.92
-				draw_polyline(PackedVector2Array([bolt_start,bolt_mid,bolt_end]),Color(thunder_color,alpha*.88),3)
-		"guardian_thunder_warning":
-			var warning_center:=Vector2(fx.to);var warning_radius:=float(fx.get("radius",145.0));var warning_color:=Color("a879e8")
-			draw_circle(warning_center,warning_radius,Color(warning_color,.035));draw_arc(warning_center,warning_radius,0,TAU,64,Color(warning_color,.38),2);draw_arc(warning_center,warning_radius+4,-PI/2,-PI/2+TAU*(1.0-progress),64,Color(warning_color,.72),4)
-		"mage_gravity":
-			var gravity_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(gravity_position,9,Color(col,.24));draw_circle(gravity_position,4,Color.WHITE);draw_line(fx.from,gravity_position,Color(col,.45),3)
-		"mage_flamestrike_warning":
-			var flame_center:=Vector2(fx.to);var flame_radius:=float(fx.get("radius",72.0));var warning_pulse:=0.5+0.5*sin(progress*TAU*4.0);var warning_color:=Color("d978ff") if bool(fx.get("repeat",false)) else Color("ff9b45")
-			draw_circle(flame_center,flame_radius,Color(warning_color,.07+.035*warning_pulse));draw_arc(flame_center,flame_radius,0,TAU,64,Color(warning_color,.70),3)
-			draw_arc(flame_center,flame_radius+5,-PI/2,-PI/2+TAU*(1.0-progress),64,Color.WHITE,.0 if progress>=1.0 else 5.0)
-			draw_circle(flame_center,8+warning_pulse*3.0,Color(warning_color,.35));draw_line(flame_center+Vector2(-flame_radius*.42,0),flame_center+Vector2(flame_radius*.42,0),Color(warning_color,.38),2);draw_line(flame_center+Vector2(0,-flame_radius*.42),flame_center+Vector2(0,flame_radius*.42),Color(warning_color,.38),2)
-		"mage_flamestrike_impact":
-			var impact_center:=Vector2(fx.to);var impact_radius:=float(fx.get("radius",72.0));var expanding_radius:=lerpf(impact_radius*.35,impact_radius,clampf(progress*2.0,0.0,1.0))
-			draw_circle(impact_center,expanding_radius,Color("ff742f",alpha*.24));draw_arc(impact_center,expanding_radius,0,TAU,64,Color("ffc45e",alpha),6);draw_arc(impact_center,impact_radius*(.25+.45*progress),0,TAU,48,Color.WHITE,alpha*4.0);draw_circle(impact_center,12+progress*20,Color("fff2b0",alpha*.72))
-		"mage_phoenix":
-			var phoenix_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(phoenix_position,12,Color("ffb34f",alpha));draw_line(fx.from,phoenix_position,Color("ff7a3d",alpha*.55),6)
-		"mage_pyro":
-			var pyro_position:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(pyro_position,13,Color("ff7a3d",alpha*.45));draw_circle(pyro_position,7,Color("ffd15c",alpha));draw_circle(pyro_position,3,Color.WHITE)
-		"warlock_fel_flame":
-			var flame_direction:Vector2=fx.from.direction_to(fx.to);var flame_length:float=fx.from.distance_to(fx.to)*clampf(progress,0.0,1.0);var flame_tip:Vector2=fx.from+flame_direction*flame_length;var side:Vector2=flame_direction.orthogonal();var start_radius:=float(fx.get("start_radius",18.0));var end_radius:=float(fx.get("end_radius",80.0))*clampf(progress,0.15,1.0)
-			var wave:=PackedVector2Array([fx.from+side*start_radius,flame_tip+side*end_radius,flame_tip-side*end_radius,fx.from-side*start_radius]);draw_colored_polygon(wave,Color("7b2aa8",alpha*.18));draw_polyline(PackedVector2Array([wave[0],wave[1],wave[2],wave[3],wave[0]]),Color("c45cff",alpha),4)
-		"warlock_drain_tether":
-			var wobble:float=sin(progress*TAU*3.0)*5.0;var midpoint:Vector2=fx.from.lerp(fx.to,.5)+fx.from.direction_to(fx.to).orthogonal()*wobble;draw_polyline(PackedVector2Array([fx.from,midpoint,fx.to]),Color("b45cff",alpha*.85),5);draw_circle(fx.to,8,Color("d89aff",alpha*.35))
-		"warlock_corruption_warning":
-			var corruption_radius:=float(fx.get("radius",54.0));draw_circle(fx.to,corruption_radius,Color("7b2aa8",.07));draw_arc(fx.to,corruption_radius,0,TAU,40,Color("b15cff",alpha*.65),3)
-		"warlock_corruption_impact":
-			var corruption_radius:=float(fx.get("radius",54.0));draw_circle(fx.to,corruption_radius*clampf(progress*1.8,0.0,1.0),Color("8c35b8",alpha*.22));draw_arc(fx.to,corruption_radius,0,TAU,40,Color("df9cff",alpha),5)
-		"warlock_horrify_warning":
-			var fear_radius:=float(fx.get("radius",105.0));draw_circle(fx.to,fear_radius,Color("6b248f",.08));draw_arc(fx.to,fear_radius,-PI/2,-PI/2+TAU*(1.0-progress),52,Color("d091ff",.82),5)
-		"warlock_horrify_impact":
-			var fear_radius:=float(fx.get("radius",105.0));draw_circle(fx.to,fear_radius,Color("792da3",alpha*.18));draw_arc(fx.to,fear_radius*(.35+.65*progress),0,TAU,52,Color("e0a8ff",alpha),7)
-		"warlock_rain_warning":
-			var rain_radius:=float(fx.get("radius",42.0));draw_circle(fx.to,rain_radius,Color("7b2aa8",.10));draw_arc(fx.to,rain_radius,-PI/2,-PI/2+TAU*(1.0-progress),36,Color("dd7cff",.86),4)
-		"warlock_rain_impact":
-			var rain_radius:=float(fx.get("radius",42.0));draw_circle(fx.to,rain_radius,Color("7f2aa6",alpha*.27));draw_line(fx.to-Vector2(18,75),fx.to,Color("db8cff",alpha),9);draw_arc(fx.to,rain_radius,0,TAU,40,Color("ffd6ff",alpha),5)
-		"warlock_life_tap":
-			var tap_color:=Color("e2a5ff") if bool(fx.get("free",false)) else Color("b15cff");draw_circle(fx.from,30+progress*32,Color(tap_color,alpha*.12));draw_arc(fx.from,30+progress*32,0,TAU,36,Color(tap_color,alpha),5)
-		"slash":
-			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
-		"hit":
-			draw_circle(fx.to,28+progress*22,Color(col,.16));draw_line(fx.from,fx.to,col,4)
-		"heal":
-			draw_line(fx.from,fx.to,col,4);draw_circle(fx.to,25+progress*30,Color(col,.18));draw_arc(fx.to,25+progress*30,0,TAU,30,col,3)
-		"cast":
-			draw_arc(fx.from,30+progress*18,0,TAU,32,col,4)
-		"heroic":
-			draw_circle(fx.from,38+progress*80,Color(col,.14));draw_arc(fx.from,38+progress*80,0,TAU,40,col,6)
-
-	if fx.text!="":
-		var text_pos=fx.to+Vector2(-28,-48-progress*30)
-		draw_string(ThemeDB.fallback_font,text_pos,fx.text,HORIZONTAL_ALIGNMENT_CENTER,90,17,col)
-func draw_role_icon(pos:Vector2,hero_class:String,ink:Color=Color("101827"))->void:
-	if hero_class=="Guardian":
-		var shield=PackedVector2Array([pos+Vector2(-11,-13),pos+Vector2(11,-13),pos+Vector2(9,5),pos+Vector2(0,15),pos+Vector2(-9,5)])
-		draw_colored_polygon(shield,ink);draw_polyline(shield+PackedVector2Array([shield[0]]),Color.WHITE,2)
-	elif hero_class=="Cleric":
-		draw_rect(Rect2(pos+Vector2(-5,-15),Vector2(10,30)),ink);draw_rect(Rect2(pos+Vector2(-15,-5),Vector2(30,10)),ink)
-	elif hero_class=="Mage":
-		draw_line(pos+Vector2(-11,13),pos+Vector2(8,-8),ink,5);draw_circle(pos+Vector2(11,-11),6,ink);draw_circle(pos+Vector2(11,-11),2,Color.WHITE)
-	elif hero_class=="Rogue":
-		draw_line(pos+Vector2(-13,12),pos+Vector2(11,-12),ink,5);draw_line(pos+Vector2(-11,-12),pos+Vector2(13,12),ink,5)
-	elif hero_class=="Warlock":
-		draw_circle(pos,13,Color.TRANSPARENT,2);draw_arc(pos,14,0,TAU,28,ink,4);draw_colored_polygon(PackedVector2Array([pos+Vector2(0,-15),pos+Vector2(10,6),pos+Vector2(0,2),pos+Vector2(-10,6)]),ink)
-	else:
-		# Ranged DPS use a bow marker. Future melee classes can use crossed swords.
-		draw_arc(pos+Vector2(-3,0),15,-PI/2,PI/2,18,ink,4);draw_line(pos+Vector2(-3,-15),pos+Vector2(-3,15),ink,2);draw_line(pos+Vector2(-3,0),pos+Vector2(15,0),ink,3);draw_colored_polygon(PackedVector2Array([pos+Vector2(15,0),pos+Vector2(8,-5),pos+Vector2(8,5)]),ink)
 func flash(msg:String)->void:toast=msg;toast_time=2.5;queue_redraw()

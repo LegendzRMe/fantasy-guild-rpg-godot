@@ -5,8 +5,9 @@ An original Godot 4 prototype combining manual party control, guild management, 
 ## Run
 
 1. Install Godot 4.7 or newer.
-2. Import `project.godot`.
-3. Press **F6/F5** or select **Run Project**.
+2. Double-click `Launch Game.cmd`, or run `./tools/run.ps1` from PowerShell.
+
+You can also import `project.godot` in the Godot editor and press **F6/F5**.
 
 ## Current prototype
 
@@ -42,7 +43,7 @@ The project uses original placeholder systems and artwork. Names, UI, game rules
 
 ## Development
 
-Architecture, ownership boundaries, save invariants, and refactoring rules are documented in [`docs/architecture.md`](docs/architecture.md).
+Architecture, ownership boundaries, save invariants, and refactoring rules are documented in [`docs/architecture.md`](docs/architecture.md). The complete documentation catalog is in [`docs/README.md`](docs/README.md).
 
 Run the complete local validation suite from PowerShell:
 
@@ -51,5 +52,32 @@ Run the complete local validation suite from PowerShell:
 ```
 
 The validator uses isolated Godot user data and does not modify normal guild saves.
+
+Generate a maintainability and asset-size snapshot with:
+
+```powershell
+.\tools\audit.ps1
+```
+
+Capture repeatable Guild Hall, testing-range, and busy Endless Arena update-time baselines with:
+
+```powershell
+.\tools\profile.ps1
+```
+
+Capture visible, uncapped renderer throughput, draw calls, primitives, memory, and graphics-adapter details with:
+
+```powershell
+.\tools\profile-graphics.ps1
+```
+
+To produce a validated Windows release, install the matching official export templates once and then build:
+
+```powershell
+.\tools\install_export_templates.ps1
+.\tools\build.ps1
+```
+
+The release is written to `build/windows` with a `build-info.json` containing the project version, Git build ID, engine version, and UTC build time. `Launch Build.cmd` provides the same build path by double-click. GitHub Actions runs the complete validator and preserves the audit report for every push and pull request.
 
 Shared Combat Rules v1, its test-range layout, tuning values, and acceptance matrix are documented in [`docs/shared_combat_rules_v1.md`](docs/shared_combat_rules_v1.md).

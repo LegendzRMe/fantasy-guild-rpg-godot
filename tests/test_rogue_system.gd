@@ -35,6 +35,7 @@ static func run()->Array:
 	ComboPointSystem.gain(rogue,2);ComboPointSystem.reset(rogue);TestSupport.check(errors,ComboPointSystem.current(rogue)==0,"Encounter and defeat callers must be able to reset owner-held points.")
 
 	rogue=make_rogue();TestSupport.check(errors,RogueSystem.activate_vanish(rogue),"Ready Vanish should activate.")
+	TestSupport.check(errors,is_equal_approx(float(RogueData.VALUES.vanish_threat_reduction),.25),"Vanish should define a twenty-five-percent current-threat reduction.")
 	TestSupport.check(errors,str(rogue.active_action_set)=="stealth" and AlternateActionSetSystem.ability_id(rogue,0)=="rogue_stealth_q","Vanish should swap Q/W/E through the reusable action-set system.")
 	RogueSystem.update(rogue,1.6);TestSupport.check(errors,bool(rogue.concealment.invisible),"A stationary Rogue should become Invisible after 1.5 seconds.")
 	RogueSystem.update(rogue,1.5);TestSupport.check(errors,bool(rogue.rogue_runtime.opener_ready),"Baseline teleport openers should prepare after three seconds.")

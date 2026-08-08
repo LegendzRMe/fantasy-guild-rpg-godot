@@ -7,7 +7,7 @@ const IDS := {"basic_attack":"rogue_basic_attack","trait":"rogue_trait","q":"rog
 const SPACE := {"source_to_world":SOURCE_TO_WORLD,"basic_range":1.2*SOURCE_TO_WORLD,"movement_speed":150.0,"sinister_range":4.0*SOURCE_TO_WORLD,"sinister_width":0.8*SOURCE_TO_WORLD,"sinister_speed":900.0,"mutilate_range_penalty":1.0*SOURCE_TO_WORLD,"blade_radius":2.25*SOURCE_TO_WORLD,"opener_range":1.5*SOURCE_TO_WORLD,"smoke_radius":2.75*SOURCE_TO_WORLD,"isolation_radius":180.0}
 const VALUES := {
 	"health":2129.0,"health_regeneration":4.4354,"basic_attack_damage":82.0,"basic_attacks_per_second":2.0,
-	"combo_max":3,"vigor_combo_max":5,"vanish_cooldown":8.0,"vanish_speed":0.20,"vanish_unrevealable":1.0,"vanish_invisible_stationary":1.5,"vanish_teleport_ready":3.0,
+	"combo_max":3,"vigor_combo_max":5,"vanish_cooldown":8.0,"vanish_speed":0.20,"vanish_threat_reduction":0.25,"vanish_unrevealable":1.0,"vanish_invisible_stationary":1.5,"vanish_teleport_ready":3.0,
 	"q_damage":110.0,"q_cooldown":5.0,"q_hit_reduction":1.0,"w_damage":130.0,"w_cooldown":4.0,"e_per_point":85.0,"e_cooldown":1.0,
 	"ambush_damage":130.0,"ambush_armor_reduction":10.0,"ambush_duration":5.0,"opener_cooldown":1.0,
 	"cheap_damage":30.0,"cheap_stun":0.75,"cheap_blind":2.0,"garrote_initial":20.0,"garrote_periodic":140.0,"garrote_duration":7.0,"garrote_tick":1.0,"garrote_silence":2.5,

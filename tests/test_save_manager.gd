@@ -3,17 +3,29 @@ extends RefCounted
 const SaveManager = preload("res://scripts/systems/save_manager.gd")
 const ItemData = preload("res://scripts/data/item_data.gd")
 const GameData = preload("res://scripts/data/game_data.gd")
+const RecruitmentSystem = preload("res://scripts/systems/recruitment_system.gd")
+const TavernFacilitySystem = preload("res://scripts/systems/tavern_facility_system.gd")
+const CookingSystem = preload("res://scripts/systems/cooking_system.gd")
+const TavernManagementSystem = preload("res://scripts/systems/tavern_management_system.gd")
+const SaveSchema = preload("res://scripts/systems/save_schema.gd")
 const TestSupport = preload("res://tests/test_support.gd")
 
 static func run() -> Array:
 	var errors:=[]
 	var live:=SaveManager.fresh_state()
+	TestSupport.check(errors,live.save_version==SaveManager.SAVE_SCHEMA_VERSION and live.component_versions.recruitment==RecruitmentSystem.SAVE_VERSION,"Save files should expose one root schema version plus explicit component versions.")
+	TestSupport.check(errors,SaveSchema.validation_errors(live).is_empty(),"Fresh saves should satisfy the shared root schema contract.")
 	TestSupport.check(errors,live.guild_name=="","Live saves should start without a guild name.")
 	TestSupport.check(errors,live.gold==0,"Live saves should start with zero gold.")
 	TestSupport.check(errors,live.prestige_tokens==0 and not live.has("tokens"),"Guild saves should expose only Gold and Prestige Tokens as currencies.")
 	TestSupport.check(errors,live.tutorial_complete==false,"Live saves should enter the tutorial.")
 	TestSupport.check(errors,live.major_systems_unlocked==false,"Live saves should begin with major guild systems locked.")
 	TestSupport.check(errors,live.seen_page_intros.is_empty(),"New guilds should begin with no Guild Hall page introductions dismissed.")
+	TestSupport.check(errors,live.codex_seen_entries.is_empty(),"New guilds should begin with no Guild Codex entries dismissed.")
+	TestSupport.check(errors,live.game_clock is Dictionary and live.game_clock.speed==1 and not live.game_clock.paused,"New saves should receive the shared Guild Hall clock defaults.")
+	TestSupport.check(errors,live.recruitment is Dictionary and live.recruitment.tavern_name=="The Tavern" and live.recruitment.hourly_budget==0 and live.recruitment.candidates.is_empty(),"New saves should receive a named, dormant Level 1 Tavern recruitment state.")
+	TestSupport.check(errors,["great_hall","command_table","infirmary","front_gate","guild_storage","combat_hall"].all(func(room_id):return bool(live.guild_hall_room_unlocks.get(room_id,false))),"New and migrated guilds should receive the six playable starting Guild Hall rooms, including the Combat Hall.")
+	TestSupport.check(errors,live.guild_hall_new_rooms.is_empty() and live.guild_hall_scroll_position>0 and not live.guild_hall_scroll_hint_dismissed,"New guilds should receive independent Guild Hall navigation defaults.")
 	TestSupport.check(errors,live.heroes.size()==2,"Live saves should start with two heroes.")
 	TestSupport.check(errors,live.heroes[0].name=="Brann" and live.heroes[1].name=="Sera","Live saves should start with Brann and Sera.")
 	TestSupport.check(errors,live.heroes.all(func(hero):return hero.identity_type=="standard" and hero.can_edit_name and hero.can_edit_appearance),"Founding Standard Heroes should have editable identities.")
@@ -33,7 +45,7 @@ static func run() -> Array:
 	TestSupport.check(errors,testing.selected_team==[0,1,2,3] and testing.active_team==[0,1,2,3],"The testing slot should select all four heroes.")
 	TestSupport.check(errors,testing.zone0.zone0_boss_defeated and testing.zone0.party_management_unlocked,"The testing slot should include completed Ashwood progression.")
 	TestSupport.check(errors,testing.zone_progress==[10,10] and testing.zone_branches==[[true,true],[true,true]],"The testing slot should unlock current zone progression.")
-	TestSupport.check(errors,testing.unlocked_dungeon==1 and testing.vault_level==6 and testing.vault_limit==180,"The testing slot should unlock current dungeon and storage gates.")
+	TestSupport.check(errors,testing.unlocked_dungeon==1 and testing.vault_level==10 and testing.vault_limit==300 and testing.depot_level==10 and testing.depot_limit==300,"The testing slot should unlock all ten bags in both storage halves.")
 	TestSupport.check(errors,testing.item_instances.size()==10 and testing.item_instances.all(func(item):return item.testing_only and item.owner_state=="vault" and item.equipped_hero_index==-1) and testing.heroes.all(func(hero):return hero.equipment_slots.values().all(func(value):return value==null)),"The testing guild should seed the ten Legendary test items without auto-equipping them.")
 	TestSupport.check(errors,SaveManager.save_slot_path(3)=="user://guild_save_4.json","The testing slot should use the independent fourth save path.")
 
@@ -52,6 +64,16 @@ static func run() -> Array:
 	legacy.erase("faction")
 	legacy.erase("major_systems_unlocked")
 	legacy.erase("seen_page_intros")
+	legacy.erase("codex_seen_entries")
+	legacy.erase("guild_hall_room_unlocks")
+	legacy.erase("guild_hall_new_rooms")
+	legacy.erase("guild_hall_scroll_position")
+	legacy.erase("guild_hall_tutorial_step")
+	legacy.erase("guild_hall_tutorial_complete")
+	legacy.erase("guild_hall_scroll_hint_dismissed")
+	legacy.erase("game_clock")
+	legacy.erase("recruitment")
+	legacy.erase("component_versions")
 	legacy["tokens"]=37
 	legacy.erase("prestige_tokens")
 	legacy.erase("class_talent_discovery")
@@ -69,10 +91,19 @@ static func run() -> Array:
 	TestSupport.check(errors,migrated.prestige_tokens==0 and not migrated.has("tokens"),"Legacy generic tokens should be discarded rather than converted into a real currency.")
 	TestSupport.check(errors,migrated.major_systems_unlocked==false,"Legacy two-hero live saves should use the current locked progression state.")
 	TestSupport.check(errors,migrated.seen_page_intros.is_empty(),"Legacy saves should receive compatible first-visit page-introduction tracking.")
+	TestSupport.check(errors,migrated.codex_seen_entries.is_empty(),"Legacy saves should receive compatible Guild Codex discovery tracking.")
+	TestSupport.check(errors,migrated.guild_hall_room_unlocks is Dictionary and bool(migrated.guild_hall_room_unlocks.front_gate) and migrated.guild_hall_new_rooms is Array,"Legacy saves should migrate into the Guild Hall without losing access to its core rooms.")
+	TestSupport.check(errors,migrated.game_clock is Dictionary and migrated.recruitment is Dictionary and migrated.recruitment.tavern_name=="The Tavern" and migrated.recruitment.candidates.is_empty(),"Legacy saves should receive compatible clock and named Tavern defaults without changing existing progress.")
+	TestSupport.check(errors,migrated.save_version==SaveManager.SAVE_SCHEMA_VERSION and migrated.component_versions.professions==3 and migrated.component_versions.recruitment==RecruitmentSystem.SAVE_VERSION and migrated.component_versions.tavern_facility==TavernFacilitySystem.SAVE_VERSION and migrated.component_versions.cooking==CookingSystem.SAVE_VERSION and migrated.component_versions.tavern_management==TavernManagementSystem.SAVE_VERSION,"Legacy saves should migrate to unambiguous root and component schema versions.")
 	TestSupport.check(errors,migrated.heroes[0].has("hero_id") and migrated.heroes[0].has("class_id") and migrated.heroes[0].has("selected_talents") and migrated.heroes[0].has("planned_talents") and migrated.heroes[0].has("prestige_reward_history") and migrated.heroes[0].has("profession_progress") and migrated.heroes[0].has("pvp_progress"),"Legacy Heroes should receive identity, talent, Prestige, profession, and PvP foundation fields.")
 	var malformed:=SaveManager.fresh_state();malformed.heroes="invalid";malformed.selected_team={};malformed.casting_settings=[];malformed.zone0="invalid"
 	var repaired:=SaveManager.migrate_state(malformed,true)
 	TestSupport.check(errors,repaired.heroes is Array and repaired.heroes.size()==2 and repaired.selected_team is Array and repaired.casting_settings is Dictionary and repaired.zone0 is Dictionary,"Migration should repair valid JSON containing invalid core field types.")
+	var malformed_nested:=SaveManager.fresh_state();malformed_nested.heroes.append(null);malformed_nested.heroes.append("broken hero");malformed_nested.item_instances=[null,"broken item"];malformed_nested.material_stacks=[false];malformed_nested.casting_settings.pc="broken device"
+	var repaired_nested:=SaveManager.migrate_state(malformed_nested,true)
+	TestSupport.check(errors,repaired_nested.heroes.size()==2 and repaired_nested.heroes.all(func(entry):return entry is Dictionary),"Migration should discard invalid nested Hero records without losing valid Heroes.")
+	TestSupport.check(errors,repaired_nested.item_instances.all(func(entry):return entry is Dictionary) and repaired_nested.material_stacks.all(func(entry):return entry is Dictionary) and repaired_nested.casting_settings.pc is Dictionary,"Migration should repair malformed nested inventory, material, and casting records.")
+	TestSupport.check(errors,SaveSchema.validation_errors(repaired_nested).is_empty(),"Repaired saves should satisfy the root schema before persistence.")
 	var legacy_testing:=SaveManager.testing_state()
 	legacy_testing.erase("major_systems_unlocked")
 	legacy_testing.heroes=legacy_testing.heroes.filter(func(hero):return str(hero.get("class",""))!="Warlock" and str(hero.get("name",""))!="Ilyra Voss")
@@ -89,14 +120,23 @@ static func run() -> Array:
 		var testing_test_slot:=99
 		live.guild_name="Persistence Test"
 		testing.casting_settings.pc.ground="release"
+		testing.recruitment.hourly_budget=4
+		testing.recruitment.tavern_name="The Golden Griffin"
+		RecruitmentSystem.debug_spawn(testing)
+		testing.recruitment.candidates[0].remaining_wait_minutes=73.5
 		SaveManager.save_state(live_test_slot,live)
 		live.guild_name="Persistence Test Updated"
 		SaveManager.save_state(live_test_slot,live)
 		var live_file:=FileAccess.open(SaveManager.save_slot_path(live_test_slot),FileAccess.WRITE);live_file.store_string("{broken json");live_file.close()
 		TestSupport.check(errors,SaveManager.load_state(live_test_slot).guild_name=="Persistence Test","A malformed live save should recover from the last verified backup.")
 		SaveManager.save_state(testing_test_slot,testing)
+		var persisted_testing=JSON.parse_string(FileAccess.get_file_as_string(SaveManager.save_slot_path(testing_test_slot)))
+		TestSupport.check(errors,persisted_testing is Dictionary and persisted_testing.selected_team==["brann","sera","wren","nyx"] and persisted_testing.saved_teams[0]==["brann","sera","wren","nyx"],"Team membership should be stored by stable Hero ID instead of fragile roster index.")
 		TestSupport.check(errors,SaveManager.load_state(testing_test_slot).casting_settings.pc.ground=="release","Casting preferences should persist per save.")
+		TestSupport.check(errors,SaveManager.load_state(testing_test_slot).selected_team==[0,1,2,3],"ID-based persisted teams should resolve back to runtime indices without changing current UI contracts.")
 		TestSupport.check(errors,SaveManager.load_state(testing_test_slot).item_instances.size()==10 and SaveManager.load_state(testing_test_slot).heroes[0].equipment_slots.values().all(func(value):return value==null),"Testing item instances and unequipped ownership should round-trip through JSON saves.")
+		var loaded_recruitment:Dictionary=SaveManager.load_state(testing_test_slot).recruitment
+		TestSupport.check(errors,loaded_recruitment.tavern_name=="The Golden Griffin" and loaded_recruitment.hourly_budget==4 and loaded_recruitment.candidates.size()==1 and is_equal_approx(float(loaded_recruitment.candidates[0].remaining_wait_minutes),73.5),"Tavern name, budget, candidate, and departure timer should round-trip through the existing JSON save.")
 		SaveManager.delete_slot(live_test_slot)
 		SaveManager.delete_slot(testing_test_slot)
 		TestSupport.check(errors,not FileAccess.file_exists(SaveManager.save_slot_path(live_test_slot)) and not FileAccess.file_exists(SaveManager.save_slot_path(testing_test_slot)),"Test saves should delete cleanly.")

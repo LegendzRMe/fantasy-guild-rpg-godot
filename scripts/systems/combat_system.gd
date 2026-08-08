@@ -144,21 +144,26 @@ static func _consume_shield_sources(target:Dictionary,amount:float)->Array:
 static func resolve_damage(source:Dictionary,target:Dictionary,request:Dictionary,rng_roll:float=-1.0)->Dictionary:
 	var source_action:String=str(request.get("source_action","basic_attack"));var damage_type:String=str(request.get("damage_type","physical"))
 	var amount:float=maxf(0.0,float(request.get("amount",calculate_power_scaled_amount(source,float(request.get("power_coefficient",0.0))))))
+	if source_action in ["basic_ability","heroic"] and str(source.get("chefs_touch_id",""))=="final_bite" and not bool(source.get("chefs_touch_used",false)):amount*=1.10;source["chefs_touch_used"]=true
+	if source_action in ["basic_ability","heroic"] and str(source.get("chefs_touch_id",""))=="quick_start" and not bool(source.get("chefs_touch_used",false)):source["chefs_touch_used"]=true;source["basic_attack_interval"]=float(source.get("basic_attack_interval",1.0))*0.90;source["basic_heal_interval"]=float(source.get("basic_heal_interval",1.0))*0.90
 	amount+=float(request.get("flat_bonus",0.0));amount*=float(request.get("outgoing_multiplier",source.get("damage_multiplier",1.0)))
 	amount=maxf(0.0,amount)
 	var can_crit:bool=bool(request.get("can_crit",default_can_crit(source_action,"damage",damage_type)));var roll:float=randf() if rng_roll<0 else rng_roll;var critical:bool=can_crit and roll<float(source.get("critical_chance",0.0))
 	var critical_multiplier:float=float(request.get("critical_multiplier",source.get("critical_damage",2.0)))
 	if critical:amount*=critical_multiplier
 	amount*=float(request.get("damage_taken_multiplier",target.get("damage_taken_multiplier",1.0)))
+	if damage_type=="physical" and str(target.get("chefs_touch_id",""))=="heavy_stomach" and float(target.get("temporary_hp",0.0))<=0.0 and not bool(target.get("chefs_touch_used",false)):amount*=0.85;target["chefs_touch_used"]=true
 	amount=maxf(0.0,amount)
 	var resolved_armor:=strongest_armor(float(request.get("base_armor_override",target.get("armor",0.0))),request.get("armor_sources",target.get("temporary_armor_sources",[])),damage_type,source_action)
 	var reduction:float=0.0 if damage_type=="true" else calculate_armor_reduction(resolved_armor,int(source.get("level",1)))
 	var mitigated_amount:float=amount*(1.0-reduction)
 	var available_shield:float=maxf(0.0,float(target.get("shield",0.0)));var shield_damage:float=minf(available_shield,mitigated_amount)
 	var shield_absorptions:Array=_consume_shield_sources(target,shield_damage);target["shield"]=available_shield-shield_damage
-	var health_damage:float=minf(maxf(0.0,float(target.get("hp",0.0))),mitigated_amount-shield_damage);target["hp"]=maxf(0.0,float(target.get("hp",0.0))-health_damage)
-	var resolved_damage:float=shield_damage+health_damage
-	return {"amount":mitigated_amount,"raw_amount":amount,"resolved_damage":resolved_damage,"health_damage":health_damage,"shield_damage":shield_damage,"shield_absorptions":shield_absorptions,"overkill":maxf(0.0,mitigated_amount-resolved_damage),"critical":critical,"critical_multiplier":critical_multiplier,"damage_type":damage_type,"source_action":source_action,"result_category":"damage","armor":resolved_armor,"armor_reduction":reduction,"armor_prevented":maxf(0.0,amount-mitigated_amount),"defeated":health_damage>0.0 and float(target.get("hp",0.0))<=0.0}
+	var after_shield:=maxf(0.0,mitigated_amount-shield_damage);var available_temporary_hp:=maxf(0.0,float(target.get("temporary_hp",0.0)));var temporary_hp_damage:=minf(available_temporary_hp,after_shield);target["temporary_hp"]=available_temporary_hp-temporary_hp_damage
+	if available_temporary_hp>0.0 and float(target.temporary_hp)<=0.0 and str(target.get("chefs_touch_id",""))=="second_wind" and not bool(target.get("chefs_touch_used",false)):target["chefs_touch_used"]=true;apply_shield(target,float(target.get("max_hp",0.0))*0.05,{"source_id":"chefs_touch_second_wind"})
+	var health_damage:float=minf(maxf(0.0,float(target.get("hp",0.0))),after_shield-temporary_hp_damage);target["hp"]=maxf(0.0,float(target.get("hp",0.0))-health_damage)
+	var resolved_damage:float=shield_damage+temporary_hp_damage+health_damage
+	return {"amount":mitigated_amount,"raw_amount":amount,"resolved_damage":resolved_damage,"health_damage":health_damage,"temporary_hp_damage":temporary_hp_damage,"shield_damage":shield_damage,"shield_absorptions":shield_absorptions,"overkill":maxf(0.0,mitigated_amount-resolved_damage),"critical":critical,"critical_multiplier":critical_multiplier,"damage_type":damage_type,"source_action":source_action,"result_category":"damage","armor":resolved_armor,"armor_reduction":reduction,"armor_prevented":maxf(0.0,amount-mitigated_amount),"defeated":health_damage>0.0 and float(target.get("hp",0.0))<=0.0}
 
 static func default_control_profile(unit:Dictionary)->Dictionary:
 	return StatusEffectSystem.control_profile(unit)

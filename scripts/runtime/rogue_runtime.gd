@@ -109,7 +109,9 @@ func cast_rogue_ability(slot:int,point:Vector2,item_repeat:bool=false)->bool:
 
 func use_rogue_trait(hero:Dictionary)->bool:
 	var result:=RogueSystem.activate_vanish(hero)
-	if result and RogueSystem.has_talent(hero,"rogue_l27_r2") and str(hero.get("selected_heroic_id",""))=="rogue_l15_r2":rogue_apply_cloak(hero,"rogue_cloak")
+	if result:
+		reduce_hero_threat(int(hero.get("battle_index",heroes.find(hero))),float(RogueData.VALUES.vanish_threat_reduction))
+		if RogueSystem.has_talent(hero,"rogue_l27_r2") and str(hero.get("selected_heroic_id",""))=="rogue_l15_r2":rogue_apply_cloak(hero,"rogue_cloak")
 	return result
 
 func update_rogue_runtime(delta:float)->void:

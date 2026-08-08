@@ -61,7 +61,10 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 			h.q_charges=int(h.q_charges)-1;h.q_charge_timers.append(base_cooldown);h.ability_cds[0]=0.0 if h.q_charges>0 else base_cooldown
 		else:h.ability_cds[slot]=base_cooldown
 	var ability_action:="heroic" if slot==3 else "basic_ability";var ability_damage_type:="magical" if h["class"] in ["Cleric","Mage","Warlock"] else "physical";combat_events.append(CombatSystem.create_event("heroic_cast" if slot==3 else "basic_ability_cast",h,h,{"amount":0.0,"critical":false,"source_action":ability_action},{"action_tags":[ability_action],"origin":ABILITIES[h["class"]][slot]}))
-	add_effect("heroic" if slot==3 else "cast",h.pos,h.pos,("ECHO: " if item_repeat else "")+ABILITIES[h["class"]][slot],CLASSES[h["class"]].color)
+	var display_name:=str(ABILITIES[h["class"]][slot]);var effect_color:Color=CLASSES[h["class"]].color
+	if slot<3 and selected<battle_hero_indices.size():
+		var saved_hero:Dictionary=state.heroes[battle_hero_indices[selected]];var ability_id:="%s:%s"%[str(saved_hero.class_id),["q","w","e"][slot]];var rune_presentation:Dictionary=ProfessionSystem.ability_presentation(state,str(saved_hero.hero_id),ability_id,display_name);display_name=str(rune_presentation.display_name);if str(rune_presentation.get("effect_tint",""))!="":effect_color=Color(str(rune_presentation.effect_tint))
+	add_effect("heroic" if slot==3 else "cast",h.pos,h.pos,("ECHO: " if item_repeat else "")+display_name,effect_color)
 	match h["class"]:
 		"Guardian":
 			if slot==0:

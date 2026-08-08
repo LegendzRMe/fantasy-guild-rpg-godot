@@ -1,5 +1,12 @@
 extends "res://scripts/ui/team_builder_screen.gd"
 
+# Implemented by the focused profession layer that follows this screen in the
+# application inheritance stack. These contracts keep this parent independently
+# parseable during Godot's cold filesystem scan.
+func show_profession_trainer()->void:pass
+func craft(_resource:String,_cost:int,_kind:String)->void:pass
+func show_campaign_trading_post(_region_id:String,_location_id:String)->void:pass
+
 func clamp_world_map_pan() -> void:
 	if world_map_view==null or world_map_content==null:return
 	var content_size=world_map_content.size*world_map_zoom; var view_size=world_map_view.size
@@ -28,22 +35,55 @@ func handle_world_map_input(event:InputEvent) -> void:
 			var ids=world_map_touches.keys();var old_a=old_positions.get(ids[0],world_map_touches[ids[0]]);var old_b=old_positions.get(ids[1],world_map_touches[ids[1]]);var new_a=world_map_touches[ids[0]];var new_b=world_map_touches[ids[1]];var old_distance=old_a.distance_to(old_b);var new_distance=new_a.distance_to(new_b)
 			if old_distance>1:zoom_world_map(new_distance/old_distance,(new_a+new_b)*.5)
 
+func world_region_accent(category:String,implemented:bool) -> Color:
+	if implemented:return C_GOLD
+	match category:
+		"endgame":return Color("8f6dcc")
+		"raid":return Color("c56a55")
+	return Color("657b98")
+
+func open_world_region(region:Dictionary) -> void:
+	if bool(region.get("implemented",false)):
+		var zone_index:=int(region.get("internal_zone_index",-1))
+		if zone_index>=0:show_zone_map(zone_index)
+		elif str(region.get("id","")) in CampaignData.REGION_ORDER:
+			CampaignSystem.ensure_state(state)
+			if bool(state.campaign.regions[str(region.id)].unlocked):show_campaign_region(str(region.id))
+			else:flash("Complete the previous campaign region to unlock %s."%str(region.display_name).capitalize())
+		return
+	flash("%s is planned but not implemented yet."%str(region.get("display_name","This region")).capitalize())
+
+func make_world_region_marker(region:Dictionary) -> Button:
+	var implemented:=bool(region.get("implemented",false))
+	var campaign_unlocked:=true
+	if str(region.get("id","")) in CampaignData.REGION_ORDER:
+		CampaignSystem.ensure_state(state);campaign_unlocked=bool(state.campaign.regions[str(region.id)].unlocked)
+	var category:=str(region.get("category","campaign"))
+	var accent:=world_region_accent(category,implemented)
+	var marker:=Button.new()
+	marker.name="WorldRegion_%s"%str(region.id)
+	marker.position=region.map_position
+	marker.size=region.marker_size
+	marker.tooltip_text=str(region.display_name) if implemented and campaign_unlocked else "Locked by campaign progression." if implemented else "%s is planned but not implemented yet."%str(region.display_name).capitalize()
+	marker.focus_mode=Control.FOCUS_ALL
+	marker.add_theme_stylebox_override("normal",ui_box(Color(0.04,.08,.10,.94),10,accent,3 if implemented else 2))
+	marker.add_theme_stylebox_override("hover",ui_box(Color(0.07,.12,.17,.97),10,accent.lightened(.16),3))
+	marker.add_theme_stylebox_override("pressed",ui_box(Color(0.03,.06,.09,.98),10,accent.darkened(.12),3))
+	marker.pressed.connect(func():open_world_region(region))
+	var copy:=VBoxContainer.new();copy.mouse_filter=Control.MOUSE_FILTER_IGNORE;copy.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);copy.add_theme_constant_override("separation",2);copy.alignment=BoxContainer.ALIGNMENT_CENTER;marker.add_child(copy)
+	var title:=label(str(region.display_name),18 if implemented else 15,C_GOLD if implemented else C_TEXT);title.mouse_filter=Control.MOUSE_FILTER_IGNORE;title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.autowrap_mode=TextServer.AUTOWRAP_OFF;copy.add_child(title)
+	var subtitle_text:=str(region.subtitle) if implemented and campaign_unlocked else "%s  •  LOCKED"%str(region.subtitle)
+	var subtitle:=label(subtitle_text,12,accent.lightened(.22));subtitle.mouse_filter=Control.MOUSE_FILTER_IGNORE;subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;subtitle.autowrap_mode=TextServer.AUTOWRAP_OFF;copy.add_child(subtitle)
+	return marker
+
 func show_dungeons() -> void:
 	screen="dungeons"; clear_all()
 	world_map_view=Control.new(); world_map_view.position=Vector2.ZERO; world_map_view.size=Vector2(W,H); world_map_view.clip_contents=true; world_map_view.mouse_filter=Control.MOUSE_FILTER_STOP; world_map_view.gui_input.connect(handle_world_map_input); ui.add_child(world_map_view)
 	world_map_content=Control.new(); world_map_content.size=GameData.WORLD_MAP_SIZE; world_map_content.mouse_filter=Control.MOUSE_FILTER_PASS; world_map_view.add_child(world_map_content)
 	var map_image:=TextureRect.new(); map_image.texture=load("res://assets/world_map.png"); map_image.position=Vector2.ZERO; map_image.size=world_map_content.size; map_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE; map_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED; map_image.modulate=Color(.86,.89,.95,1); map_image.mouse_filter=Control.MOUSE_FILTER_IGNORE; world_map_content.add_child(map_image)
-	var active_region=GameData.WORLD_ACTIVE_REGION
-	var completed_count:=0
-	for encounter_key in AshwoodData.MANDATORY_ORDER:
-		if AshwoodManager.encounter_is_completed(state.zone0,encounter_key):completed_count+=1
-	var ashwood:=Button.new(); ashwood.position=active_region.position; ashwood.size=active_region.size; ashwood.text="%s\n%d / 7" % [active_region.name,completed_count]; ashwood.add_theme_font_size_override("font_size",19); ashwood.add_theme_color_override("font_color",C_GOLD); ashwood.add_theme_stylebox_override("normal",ui_box(Color(0.04,.08,.10,.92),12,C_GOLD,3)); ashwood.pressed.connect(func():show_zone_map(active_region.zone)); world_map_content.add_child(ashwood)
-	if is_testing_save():
-		var testing_region:=Button.new();testing_region.name="TestingWorldRegion";testing_region.position=Vector2(1110,165);testing_region.size=Vector2(220,82);testing_region.text="TESTING";testing_region.tooltip_text="Open testing battles and training tools.";testing_region.add_theme_font_size_override("font_size",22);testing_region.add_theme_color_override("font_color",Color("d9c2ff"));testing_region.add_theme_stylebox_override("normal",ui_box(Color("261d3d"),12,Color("b381ff"),3));testing_region.pressed.connect(show_testing_zone_menu);world_map_content.add_child(testing_region)
-	for region in GameData.LOCKED_WORLD_REGIONS:
-		var marker:=Button.new(); marker.position=region[1]; marker.size=Vector2(210,72); marker.text="🔒  %s" % region[0]; marker.disabled=true; marker.mouse_filter=Control.MOUSE_FILTER_IGNORE; marker.tooltip_text="Locked region"; marker.add_theme_font_size_override("font_size",15); marker.add_theme_stylebox_override("disabled",ui_box(Color(0.05,.07,.11,.88),10,Color("68778e"),2)); world_map_content.add_child(marker)
-	var return_button:=button("Return",show_hall,130); return_button.position=Vector2(1116,22); world_map_view.add_child(return_button)
-	var zoom_controls:=HBoxContainer.new(); zoom_controls.position=Vector2(995,24); zoom_controls.add_theme_constant_override("separation",6); world_map_view.add_child(zoom_controls); zoom_controls.add_child(compact_button("−",func():zoom_world_map(.85,world_map_view.size*.5),46));zoom_controls.add_child(compact_button("+",func():zoom_world_map(1.18,world_map_view.size*.5),46))
+	for region in GameData.WORLD_REGIONS:world_map_content.add_child(make_world_region_marker(region))
+	var return_button:=button("Return to Guild Hall",show_hall,210);return_button.name="WorldMapReturnButton";return_button.position=Vector2(1036,22);world_map_view.add_child(return_button)
+	var zoom_controls:=HBoxContainer.new();zoom_controls.name="WorldMapZoomControls";zoom_controls.position=Vector2(918,24);zoom_controls.add_theme_constant_override("separation",6);world_map_view.add_child(zoom_controls);zoom_controls.add_child(compact_button("−",func():zoom_world_map(.85,world_map_view.size*.5),46));zoom_controls.add_child(compact_button("+",func():zoom_world_map(1.18,world_map_view.size*.5),46))
 
 	if is_testing_save():
 		var reset_story:=button("TEST: RESET ASHWOOD STORY",request_reset_testing_story,265);reset_story.name="TestingResetStoryButton";reset_story.position=Vector2(24,648);reset_story.tooltip_text="Reset Ashwood story progress while keeping testing heroes, levels, equipment, inventory, and guild resources.";reset_story.add_theme_color_override("font_color",Color("d9c2ff"));reset_story.add_theme_stylebox_override("normal",ui_box(Color("261d3d"),8,Color("b381ff"),2));world_map_view.add_child(reset_story)
@@ -51,30 +91,20 @@ func show_dungeons() -> void:
 
 func testing_mode_card(title:String,description:String) -> PanelContainer:
 	var card:=PanelContainer.new()
-	card.custom_minimum_size=Vector2(520,390)
+	card.custom_minimum_size=Vector2(480,0)
+	card.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	card.add_theme_stylebox_override("panel",ui_box(Color("182536"),12,Color("465b78"),2))
-	var content:=VBoxContainer.new();content.add_theme_constant_override("separation",18);card.add_child(content)
-	content.add_child(label(title,28,C_GOLD));content.add_child(label(description,17,C_TEXT))
+	var content:=VBoxContainer.new();content.add_theme_constant_override("separation",12);card.add_child(content)
+	content.add_child(label(title,26,C_GOLD))
+	var description_label:=label(description,16,C_TEXT)
+	description_label.custom_minimum_size.y=76
+	description_label.vertical_alignment=VERTICAL_ALIGNMENT_TOP
+	content.add_child(description_label)
 	return card
 
 func show_testing_zone_menu() -> void:
-	if not is_testing_save():show_dungeons();return
-	screen="testing_zone_menu"
-	var root:=base_screen("Testing Zone")
-	root.add_child(label("Choose a controlled space for combat testing.",17,C_MUTED))
-	var modes:=HBoxContainer.new();modes.add_theme_constant_override("separation",22);modes.size_flags_vertical=Control.SIZE_EXPAND_FILL;root.add_child(modes)
-	var range_card:=testing_mode_card("Dummy Range","Use the existing stationary targets, defensive dummy, bosses, and combat telemetry to inspect individual abilities and interactions.")
-	modes.add_child(range_card);var range_content:=range_card.get_child(0) as VBoxContainer;range_content.add_spacer(false)
-	var enter_range:=button("Enter Dummy Range",start_testing_zone,240);enter_range.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;range_content.add_child(enter_range)
-	var enter_warlock_range:=button("Enter Warlock Range",start_warlock_testing_zone,240);enter_warlock_range.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;range_content.add_child(enter_warlock_range)
-	var enter_rogue_range:=button("Enter Rogue Range",start_rogue_testing_zone,240);enter_rogue_range.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;range_content.add_child(enter_rogue_range)
-	var endless_card:=testing_mode_card("Endless Arena","Fight a continuous stream of enemies at one fixed level. Defeated enemies are replaced, and the selected level never increases automatically.")
-	modes.add_child(endless_card);var endless_content:=endless_card.get_child(0) as VBoxContainer
-	var level_row:=HBoxContainer.new();level_row.alignment=BoxContainer.ALIGNMENT_CENTER;level_row.add_theme_constant_override("separation",14);endless_content.add_child(level_row)
-	level_row.add_child(label("Enemy Level",18,C_MUTED))
-	var level_picker:=SpinBox.new();level_picker.name="TestingEndlessLevel";level_picker.min_value=1;level_picker.max_value=CombatSystem.LEVEL_CAP;level_picker.step=1;level_picker.allow_greater=false;level_picker.allow_lesser=false;level_picker.value=testing_endless_level;level_picker.custom_minimum_size=Vector2(120,46);level_picker.value_changed.connect(func(value:float):testing_endless_level=int(value));level_row.add_child(level_picker)
-	endless_content.add_spacer(false)
-	var enter_endless:=button("Begin Endless Arena",func():start_testing_endless(testing_endless_level),250);enter_endless.name="TestingEndlessStart";enter_endless.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;endless_content.add_child(enter_endless)
+	show_combat_hall()
 
 func show_zone_map(zone:int) -> void:
 	if zone==0:
@@ -210,6 +240,7 @@ func show_command_table() -> void:
 
 func show_market() -> void:
 	screen="market"; var root=base_screen("Merchant Contacts")
+	var trainer_button:=button("Profession Trainer",show_profession_trainer,210);trainer_button.size_flags_horizontal=Control.SIZE_SHRINK_END;root.add_child(trainer_button)
 	var gold_row:=HBoxContainer.new(); root.add_child(gold_row)
 	var gold_label:=label("●  %d" % state.gold,20,C_GOLD); gold_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL; gold_row.add_child(gold_label)
 	root.add_child(label("Discover merchants while exploring the world. Once you have made contact, they can provide goods, recipes, selling services, and trade contracts.",16,C_MUTED))
@@ -218,10 +249,10 @@ func show_market() -> void:
 	for merchant in merchant_data:
 		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(390,300);card.add_theme_stylebox_override("panel",ui_box(Color("182536"),12,Color("35445a"),1));merchant_row.add_child(card)
 		var content:=VBoxContainer.new();content.add_theme_constant_override("separation",9);card.add_child(content);content.add_child(label(merchant[0],24,C_GOLD));content.add_child(label(merchant[1],16,C_TEXT));content.add_child(label("Location  •  "+merchant[2],14,C_MUTED));content.add_child(rule());content.add_child(label("Offers",13,C_MUTED));content.add_child(label(merchant[3],16,C_TEXT));content.add_spacer(false)
-		var actions:=HBoxContainer.new();actions.add_theme_constant_override("separation",6);content.add_child(actions);actions.add_child(compact_button("View Wares",func(merchant_name=merchant[0]):show_merchant_wares(str(merchant_name)),105));actions.add_child(compact_button("View Contracts",func(merchant_name=merchant[0]):flash("%s's contracts will be added later."%merchant_name),120));actions.add_child(compact_button("Sell Items",func(merchant_name=merchant[0]):flash("Selling through %s will be added later."%merchant_name),100))
+		var actions:=HBoxContainer.new();actions.add_theme_constant_override("separation",6);content.add_child(actions);actions.add_child(compact_button("View Wares",func(merchant_name=merchant[0]):show_merchant_wares(str(merchant_name)),105));actions.add_child(compact_button("View Contracts",func(merchant_name=merchant[0]):flash("%s's contracts will be added later."%merchant_name),120));actions.add_child(compact_button("Sell Items",func():show_campaign_trading_post("",""),100))
 
 func merchant_wares()->Array:
-	return [{"definition_id":"pinewatch_bow","price":90},{"definition_id":"pilgrims_vestment","price":110},{"definition_id":"marchwarden_plate","price":160}]
+	return [{"definition_id":"pinewatch_bow","price":90},{"definition_id":"pilgrims_vestment","price":110},{"definition_id":"ashwood_bulwark","price":95},{"definition_id":"marchwarden_plate","price":160}]
 
 func merchant_item_fits(definition_id:String)->bool:
 	var preview:=ItemData.create_instance(definition_id,"merchant_preview_%s"%definition_id)
@@ -255,7 +286,7 @@ func show_merchant_wares(merchant_name:String)->void:
 	for ware in merchant_wares():
 		var item:=ItemData.create_instance(str(ware.definition_id),"merchant_preview");var fits:=merchant_item_fits(str(ware.definition_id));var card:=Button.new();card.custom_minimum_size=Vector2(330,250);card.text="%s\n\n%s\nTier %s • %s\n\n● %d\n%s"%[InventorySystem.fallback_glyph(str(item.fallback_icon_type)),item.display_name,ItemData.roman_tier(int(item.tier)),item.rarity,int(ware.price),"Inspect" if fits else "VAULT FULL"];card.add_theme_color_override("font_color",Color(ItemData.RARITY_COLORS.get(str(item.rarity),"e9f1ff")));card.tooltip_text=ItemData.item_tooltip(item);card.pressed.connect(func(definition_id=str(ware.definition_id),price=int(ware.price)):open_merchant_item_card(definition_id,price,merchant_name));row.add_child(card)
 
-func show_crafting() -> void:
+func show_legacy_crafting() -> void:
 	screen="crafting"; var root=base_screen("Professions")
 	var profession_data=GameData.PROFESSIONS
 	var columns:=HBoxContainer.new(); columns.add_theme_constant_override("separation",18); columns.size_flags_vertical=Control.SIZE_EXPAND_FILL; root.add_child(columns)
@@ -265,7 +296,7 @@ func show_crafting() -> void:
 	var details:=VBoxContainer.new(); details.size_flags_horizontal=Control.SIZE_EXPAND_FILL; details.add_theme_constant_override("separation",14); columns.add_child(details)
 	var chosen=profession_data[selected_profession]; details.add_child(label(chosen[0],30,C_GOLD)); details.add_child(label("AVAILABLE RECIPE",13,C_MUTED)); details.add_child(label(chosen[1],24,C_TEXT)); details.add_child(label("Cost  •  "+chosen[2],17,C_MUTED)); details.add_child(button("Craft",func():craft(chosen[3],chosen[4],chosen[5]),190))
 
-func craft(resource:String,cost:int,kind:String) -> void:
+func legacy_craft(resource:String,cost:int,kind:String) -> void:
 	var result:Dictionary
 	if kind=="tonic":result=InventorySystem.apply_inventory_transaction(state,[{"kind":"material","material_id":resource,"quantity":cost}],[{"kind":"material","material_id":"tonics","quantity":1}])
 	else:result=InventorySystem.consume_material(state,resource,cost)

@@ -1,19 +1,51 @@
 extends "res://scripts/runtime/combat_input_runtime.gd"
 
 func _process(delta:float) -> void:
+	update_meta_systems(delta)
+	if not prepare_combat_frame(delta):return
+	advance_encounter_frame(delta)
+	update_combat_runtime_layers(delta)
+	if update_combat_heroes(delta):return
+	if update_combat_enemies(delta):return
+	if not testing_zone_active and ashwood_combat_complete():finish_battle(true)
+	queue_redraw()
+
+func update_meta_systems(delta:float) -> void:
+	var advanced_game_minutes:=GameClockSystem.advance(state,delta,paused if screen=="combat" else false)
+	var recruitment_events:Array=RecruitmentSystem.advance(state,advanced_game_minutes)
+	var tavern_events:Array=TavernFacilitySystem.advance(state,advanced_game_minutes)
+	var tavern_management_events:Array=TavernManagementSystem.advance(state,advanced_game_minutes,screen!="combat")
+	if advanced_game_minutes>0.0:mark_save_dirty()
+	persistence.advance(delta)
+	if screen=="tavern" and advanced_game_minutes>0.0:
+		tavern_ui_refresh_elapsed+=delta
+		if tavern_ui_refresh_elapsed>=0.5 and tavern_refresh_is_safe():tavern_ui_refresh_elapsed=0.0;call_deferred("show_tavern")
+	else:tavern_ui_refresh_elapsed=0.0
+	if not recruitment_events.is_empty() or not tavern_events.is_empty() or not tavern_management_events.is_empty() or persistence.should_flush(SAVE_DEBOUNCE_SECONDS):
+		flush_pending_save()
+		if screen=="tavern" and tavern_refresh_is_safe() and (not recruitment_events.is_empty() or not tavern_events.is_empty() or not tavern_management_events.is_empty()):call_deferred("show_tavern")
+	var completed_profession_orders:Array=ProfessionSystem.process_orders(state,delta)
+	if not completed_profession_orders.is_empty():save_game();if screen in ["crafting","roster"] or (screen=="tavern" and tavern_refresh_is_safe()):call_deferred("show_crafting" if screen=="crafting" else "show_roster" if screen=="roster" else "show_tavern")
 	if screen=="roster":update_roster_party_press(delta)
 	if screen=="vault" and vault_press_active:
 		vault_press_time+=delta
 		if not vault_dragging and vault_press_time>=InventorySystem.LONG_PRESS_DURATION:begin_vault_drag()
 		if vault_dragging:update_vault_drag_visual()
 	if toast_time>0: toast_time-=delta; queue_redraw()
+
+func prepare_combat_frame(delta:float) -> bool:
 	update_objective_notice(delta)
-	if victory_sequence: update_victory(delta); return
-	if screen!="combat" or battle_over or paused: return
+	if victory_sequence:
+		update_victory(delta)
+		return false
+	if screen!="combat" or battle_over or paused:return false
 	if tutorial_active:
 		update_tutorial(delta)
-		if tutorial_step==8:return
+		if tutorial_step==8:return false
 		recover_tutorial_state()
+	return true
+
+func advance_encounter_frame(delta:float) -> void:
 	battle_time+=delta
 	spawn_timer=max(0,spawn_timer-delta); wave_break=max(0,wave_break-delta)
 	if testing_zone_active and testing_zone_mode=="endless":update_testing_endless(delta)
@@ -26,6 +58,8 @@ func _process(delta:float) -> void:
 	if current_ashwood_encounter!="":update_objective_banner(delta)
 	for fx in effects: fx.life-=delta
 	effects=effects.filter(func(fx):return fx.life>0)
+
+func update_combat_runtime_layers(delta:float) -> void:
 	update_combat_projectiles(delta)
 	update_guardian_runtime(delta)
 	update_cleric_runtime(delta)
@@ -35,6 +69,8 @@ func _process(delta:float) -> void:
 	update_rogue_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
+
+func update_combat_heroes(delta:float) -> bool:
 	for i in heroes.size():
 		var h=heroes[i]
 		h.last_hit=max(0,h.last_hit-delta)
@@ -47,7 +83,12 @@ func _process(delta:float) -> void:
 		if str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty():h.ability_cds[4]=float(h.warlock_runtime.life_tap_lockout)
 		if h.hp>0:update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
-	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):finish_battle(false);return
+	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):
+		finish_battle(false)
+		return true
+	return false
+
+func update_combat_enemies(delta:float) -> bool:
 	for enemy_index in enemies.size():
 		var e=enemies[enemy_index]
 		if testing_zone_active and "training" in e.get("combat_tags",[]):
@@ -63,7 +104,7 @@ func _process(delta:float) -> void:
 			if not e.rewarded:
 				e.rewarded=true
 				if current_ashwood_encounter=="":
-					var kill_gold=12 if bool(e.get("boss",false)) else 5 if e.type=="Brute" else 2;state.gold+=kill_gold;battle_gold_earned+=kill_gold;add_effect("cast",e.pos,e.pos,"â— +%d"%kill_gold,C_GOLD);save_game()
+					var kill_gold=12 if bool(e.get("boss",false)) else 5 if e.type=="Brute" else 2;state.gold+=kill_gold;battle_gold_earned+=kill_gold;add_effect("cast",e.pos,e.pos,"● +%d"%kill_gold,C_GOLD);mark_save_dirty()
 				elif str(e.type).begins_with("Controlled "):
 					add_effect("cast",e.pos,e.pos,"SUBDUED",C_GREEN)
 			continue
@@ -88,7 +129,9 @@ func _process(delta:float) -> void:
 			var opening_target=int(e.tutorial_opening_target)
 			if opening_target<heroes.size() and heroes[opening_target].hp>0 and (heroes.is_empty() or heroes[0].target!=enemy_index):ti=opening_target
 			else:e.erase("tutorial_opening_target")
-		if ti<0 and ti!=OBJECTIVE_THREAT_TARGET: finish_battle(false); return
+		if ti<0 and ti!=OBJECTIVE_THREAT_TARGET:
+			finish_battle(false)
+			return true
 		var targets_objective:bool=ti==OBJECTIVE_THREAT_TARGET
 		var target_pos:Vector2=objective_actor_pos if targets_objective else heroes[ti].pos
 		e.target=ti; var dist=e.pos.distance_to(target_pos)
@@ -107,12 +150,12 @@ func _process(delta:float) -> void:
 						if bool(e.get("ranged",false)) and str(e.get("basic_attack_damage_type","physical"))=="physical":spawn_basic_projectile(e,heroes[ti],float(e.damage),str(e.basic_attack_damage_type),"enemy_basic_attack")
 						else:
 							if CombatSystem.is_blinded(e):record_blind_miss(e,heroes[ti])
-							else:var basic_result:=deal_damage(e,heroes[ti],e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");heroes[ti].last_hit=3.0;apply_hit_nudge(e,heroes[ti]);add_effect("hit",e.pos,heroes[ti].pos,"-%d"%int(basic_result.health_damage+basic_result.shield_damage),C_RED)
-				elif e.special=="charge":e.pos=e.pos.move_toward(e.danger_pos,220);for hero_charge in heroes:if hero_charge.hp>0 and hero_charge.pos.distance_to(e.pos)<65:var charge_result:=deal_damage(e,hero_charge,e.damage*1.25,"basic_ability",e.basic_attack_damage_type,"boss_charge");add_effect("hit",e.pos,hero_charge.pos,"-%d"%int(charge_result.health_damage+charge_result.shield_damage),C_RED)
+							else:var basic_result:=deal_damage(e,heroes[ti],e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");heroes[ti].last_hit=3.0;apply_hit_nudge(e,heroes[ti]);add_effect("hit",e.pos,heroes[ti].pos,"-%d"%int(basic_result.resolved_damage),C_RED)
+				elif e.special=="charge":e.pos=e.pos.move_toward(e.danger_pos,220);for hero_charge in heroes:if hero_charge.hp>0 and hero_charge.pos.distance_to(e.pos)<65:var charge_result:=deal_damage(e,hero_charge,e.damage*1.25,"basic_ability",e.basic_attack_damage_type,"boss_charge");add_effect("hit",e.pos,hero_charge.pos,"-%d"%int(charge_result.resolved_damage),C_RED)
 				else:
 					var impact=e.danger_pos if e.special=="danger" else e.pos; var radius=78.0 if e.special=="danger" else 115.0
 					for struck_hero in heroes:
-						if struck_hero.hp>0 and struck_hero.pos.distance_to(impact)<radius:var area_result:=deal_damage(e,struck_hero,e.damage*1.4,"basic_ability",e.basic_attack_damage_type,"boss_area");add_effect("hit",impact,struck_hero.pos,"-%d"%int(area_result.health_damage+area_result.shield_damage),C_RED)
+						if struck_hero.hp>0 and struck_hero.pos.distance_to(impact)<radius:var area_result:=deal_damage(e,struck_hero,e.damage*1.4,"basic_ability",e.basic_attack_damage_type,"boss_area");add_effect("hit",impact,struck_hero.pos,"-%d"%int(area_result.resolved_damage),C_RED)
 				var attack_speed_reduction:=clampf(CombatSystem.control_amount(e,"attack_speed"),0.0,0.9)
 				e.cooldown=e.basic_attack_interval*(.68 if e.enraged else 1.0)/maxf(0.1,1.0-attack_speed_reduction)
 		elif dist>e.range:
@@ -120,8 +163,7 @@ func _process(delta:float) -> void:
 		elif e.cooldown<=0:
 			e.facing_direction=e.pos.direction_to(target_pos)
 			e.special="basic"; e.telegraph=.48; e.danger_pos=target_pos
-	if not testing_zone_active and ashwood_combat_complete():finish_battle(true)
-	queue_redraw()
+	return false
 
 func update_testing_endless(delta:float) -> void:
 	for enemy_index in range(enemies.size()-1,-1,-1):

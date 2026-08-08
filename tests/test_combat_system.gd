@@ -45,6 +45,10 @@ static func run()->Array:
 	var shielded:=unit();CombatSystem.apply_shield(shielded,30.0,{"source_id":"test_ward","creator_index":2})
 	var shield_result:=CombatSystem.resolve_damage(unit(),shielded,{"amount":40.0,"source_action":"basic_attack","damage_type":"physical"},0.9)
 	TestSupport.check(errors,shield_result.shield_damage==30.0 and shield_result.health_damage==10.0 and shield_result.shield_absorptions[0].creator_index==2,"Damage should remove sourced Shields before Health and report the Shield creator.")
+	var layered_health:=unit();layered_health.temporary_hp=30.0;CombatSystem.apply_shield(layered_health,20.0,{"source_id":"layered_ward"})
+	var layered_first:=CombatSystem.resolve_damage(unit(),layered_health,{"amount":40.0,"source_action":"basic_attack","damage_type":"physical"},0.9)
+	var layered_second:=CombatSystem.resolve_damage(unit(),layered_health,{"amount":20.0,"source_action":"basic_attack","damage_type":"physical"},0.9)
+	TestSupport.check(errors,layered_first.shield_damage==20.0 and layered_first.temporary_hp_damage==20.0 and layered_first.health_damage==0.0 and layered_second.temporary_hp_damage==10.0 and layered_second.health_damage==10.0 and layered_health.hp==90.0,"Damage should remove Shields, then temporary HP, then regular Health.")
 	var critical_target:=unit();source.critical_chance=1.0
 	var critical_damage:=CombatSystem.resolve_damage(source,critical_target,{"amount":10.0,"source_action":"basic_attack","damage_type":"physical"},0.0)
 	TestSupport.check(errors,critical_damage.critical and critical_damage.health_damage==20.0,"Direct eligible damage should use the default 200-percent critical multiplier.")

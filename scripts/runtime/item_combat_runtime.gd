@@ -75,6 +75,53 @@ func apply_passive_trigger(owner:Dictionary,event:Dictionary,target:Dictionary)-
 				if str(result.get("category",""))=="buff":
 					var named_effect:=result.duplicate(true);named_effect["remaining_duration"]=float(passive.get("duration",0.0));owner.active_effects=CombatSystem.apply_named_effect(owner.get("active_effects",[]),named_effect)
 
+func build_damage_request(target:Dictionary,resolved_amount:float,source_action:String,damage_type:String,can_crit_override)->Dictionary:
+	var request:={"amount":resolved_amount,"source_action":source_action,"damage_type":damage_type,"damage_taken_multiplier":current_damage_taken_multiplier(target)}
+	if not target.get("armor_reduction_sources",[]).is_empty():request["base_armor_override"]=ArmorReductionSystem.effective_armor(target)
+	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
+		var armor_sources:Array=target.guardian_runtime.temporary_armor_sources.duplicate(true)
+		if damage_type=="physical" and source_action=="basic_attack" and int(target.guardian_runtime.block_charges)>0:armor_sources.append({"id":"dwarf_block","armor":GuardianData.VALUES.block_armor,"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
+		request["armor_sources"]=armor_sources
+	elif str(target.get("class",""))=="Cleric" and not target.get("cleric_runtime",{}).is_empty():
+		var cleric_armor:=ClericSystem.active_armor(target)
+		if cleric_armor>0.0:request["armor_sources"]=[{"id":"safety_sprint","armor":cleric_armor,"remaining":1.0}]
+	elif str(target.get("class",""))=="Ranger" and not target.get("ranger_runtime",{}).is_empty():
+		var ranger_armor:=RangerSystem.trait_armor(target)
+		if ranger_armor>0.0:request["armor_sources"]=[{"id":"gloom","armor":ranger_armor,"remaining":1.0}]
+	elif str(target.get("class",""))=="Warlock" and not target.get("warlock_runtime",{}).is_empty():
+		var warlock_armor:=WarlockSystem.fel_armor(target)
+		if warlock_armor>0.0:request["armor_sources"]=[{"id":"fel_armor","armor":warlock_armor,"remaining":float(target.warlock_runtime.fel_armor_remaining)}]
+	elif str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty():
+		var armor_sources:Array=target.rogue_runtime.temporary_armor_sources.duplicate(true)
+		if damage_type=="physical" and source_action=="basic_attack" and int(target.rogue_runtime.block_charges)>0:armor_sources.append({"id":"combat_readiness","armor":float(RogueData.VALUES.combat_readiness_armor),"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
+		if not armor_sources.is_empty():request["armor_sources"]=armor_sources
+	if source_action=="percentage_health":request["outgoing_multiplier"]=1.0;request["can_crit"]=false
+	if can_crit_override!=null:request["can_crit"]=bool(can_crit_override)
+	return request
+
+func finalize_damage_events(source:Dictionary,target:Dictionary,result:Dictionary,source_action:String,damage_type:String,origin,source_is_summon:bool,originating_effect_id:String,trigger_chain:Array,before_ratio:float,retribution_bonus:float)->void:
+	var crossed_below_half:bool=before_ratio>0.50 and float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))<0.50
+	var context:={"source_action":source_action,"damage_type":damage_type,"action_tags":[source_action],"origin":origin,"source_is_summon":source_is_summon,"originating_effect_id":originating_effect_id,"trigger_chain":trigger_chain,"crossed_below_half":crossed_below_half}
+	var events:=CombatSystem.event_bundle_for_damage(source,target,result,context);combat_events.append_array(events)
+	for event in events:
+		if event.event_type=="damage_taken":apply_passive_trigger(target,event,target)
+		elif event.event_type in ["basic_attack_hit","direct_damage_dealt","periodic_damage_dealt","critical_result"]:apply_passive_trigger(source,event,target)
+	var enemy_index:int=enemies.find(target);var source_index:int=int(source.get("battle_index",-1))
+	if enemy_index>=0 and source_index>=0:add_damage_threat(target,source_index,float(result.get("resolved_damage",0.0)))
+	var living_enemy_count:int=enemies.filter(func(enemy):return enemy.hp>0 and not bool(enemy.get("ignores_tank_aggro",false))).size()
+	for absorption in result.get("shield_absorptions",[]):
+		var creator_index:int=int(absorption.get("creator_index",-1))
+		if creator_index>=0:
+			var per_enemy:=CombatSystem.distributed_threat(CombatSystem.shield_absorption_threat(float(absorption.amount),float(heroes[creator_index].get("threat_modifier",1.0))),living_enemy_count)
+			for enemy in enemies:if enemy.hp>0:add_enemy_threat(enemy,creator_index,per_enemy)
+	if retribution_bonus>0.0 and target.hp>0:deal_damage(source,target,retribution_bonus,"summon","true","Retribution",false,"retribution",["retribution"]);item_feedback("Retribution %d"%int(retribution_bonus),target.pos,Color("ef9e56"))
+	if bool(result.get("defeated",false)) and not bool(target.get("item_defeat_processed",false)):
+		target["item_defeat_processed"]=true
+		var defeat_event:=CombatSystem.create_event("unit_defeated",source,target,result,context)
+		for hero in heroes:
+			if hero.hp>0:apply_passive_trigger(hero,defeat_event,target)
+			if str(hero.get("class",""))=="Guardian" and not hero.get("guardian_runtime",{}).is_empty():GuardianSystem.process_marked_death(hero,str(target.get("combat_id","")),battle_time);GuardianSystem.process_haymaker_death(hero,str(target.get("combat_id","")),battle_time)
+
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var resolved_amount:=amount;var retribution_bonus:float=0.0
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and RogueSystem.has_talent(source,"rogue_l12_2") and source.get("rogue_runtime",{}).get("garrotes",[]).any(func(instance):return str(instance.get("target_id",""))==str(target.get("combat_id","")) and float(instance.get("remaining_duration",0.0))>0.0):resolved_amount*=1.40
@@ -93,27 +140,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		if originating_effect_id!="retribution" and not source.get("retribution_charges",[]).is_empty():
 			retribution_bonus=float(source.retribution_charges.pop_front().amount)
 	var before_ratio:float=float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))
-	var damage_request:={"amount":resolved_amount,"source_action":source_action,"damage_type":damage_type,"damage_taken_multiplier":current_damage_taken_multiplier(target)}
-	if not target.get("armor_reduction_sources",[]).is_empty():damage_request["base_armor_override"]=ArmorReductionSystem.effective_armor(target)
-	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
-		var armor_sources:Array=target.guardian_runtime.temporary_armor_sources.duplicate(true)
-		if damage_type=="physical" and source_action=="basic_attack" and int(target.guardian_runtime.block_charges)>0:armor_sources.append({"id":"dwarf_block","armor":GuardianData.VALUES.block_armor,"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
-		damage_request["armor_sources"]=armor_sources
-	elif str(target.get("class",""))=="Cleric" and not target.get("cleric_runtime",{}).is_empty():
-		var cleric_armor:=ClericSystem.active_armor(target)
-		if cleric_armor>0.0:damage_request["armor_sources"]=[{"id":"safety_sprint","armor":cleric_armor,"remaining":1.0}]
-	elif str(target.get("class",""))=="Ranger" and not target.get("ranger_runtime",{}).is_empty():
-		var ranger_armor:=RangerSystem.trait_armor(target)
-		if ranger_armor>0.0:damage_request["armor_sources"]=[{"id":"gloom","armor":ranger_armor,"remaining":1.0}]
-	elif str(target.get("class",""))=="Warlock" and not target.get("warlock_runtime",{}).is_empty():
-		var warlock_armor:=WarlockSystem.fel_armor(target)
-		if warlock_armor>0.0:damage_request["armor_sources"]=[{"id":"fel_armor","armor":warlock_armor,"remaining":float(target.warlock_runtime.fel_armor_remaining)}]
-	elif str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty():
-		var rogue_sources:Array=target.rogue_runtime.temporary_armor_sources.duplicate(true)
-		if damage_type=="physical" and source_action=="basic_attack" and int(target.rogue_runtime.block_charges)>0:rogue_sources.append({"id":"combat_readiness","armor":float(RogueData.VALUES.combat_readiness_armor),"damage_type":"physical","source_action":"basic_attack","remaining":1.0})
-		if not rogue_sources.is_empty():damage_request["armor_sources"]=rogue_sources
-	if source_action=="percentage_health":damage_request["outgoing_multiplier"]=1.0;damage_request["can_crit"]=false
-	if can_crit_override!=null:damage_request["can_crit"]=bool(can_crit_override)
+	var damage_request:=build_damage_request(target,resolved_amount,source_action,damage_type,can_crit_override)
 	var previews_mage_barrier:bool=str(target.get("class",""))=="Mage" and not target.get("mage_runtime",{}).is_empty() and str(source.get("combat_team",""))!=str(target.get("combat_team",""))
 	var resolution_roll:=-1.0
 	if previews_mage_barrier:
@@ -137,6 +164,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 			target.hp=float(target.hp)+float(result.health_damage);result.health_damage=0.0;result.resolved_damage=float(result.shield_damage);result.defeated=false;result.overkill=0.0
 			clear_hero_command(target,"demonic circle");target.command_state=CombatRulesV1.CommandState.INCAPACITATED;target.incapacitated=true
 		else:WarlockSystem.convert_health_loss(target,float(result.health_damage),{"exclude_health_loss_cooldown_conversion":false})
+	if bool(result.get("defeated",false)) and str(target.get("combat_affiliation",""))=="player":target["was_defeated"]=true
 	if str(source.get("class",""))=="Mage" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("mage_runtime",{}).is_empty():
 		MageSystem.telemetry_add(source,"basic_attacks_released");MageSystem.telemetry_add(source,"basic_attack_hits")
 		var sunfire:=MageSystem.sunfire_release(source,true)
@@ -163,28 +191,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 			var percent_result:=deal_damage(source,target,float(percent_request.amount),"percentage_health","physical","Manticore",false,"ranger_manticore",[],false);RangerSystem.telemetry_add(source,"percentage_damage",float(percent_result.resolved_damage))
 	if not guardian_basic_result.is_empty() and float(guardian_basic_result.stun)>0.0:CombatSystem.apply_control(target,"stun",float(guardian_basic_result.stun))
 	if testing_zone_active and "training" in target.get("combat_tags",[]) and float(result.get("resolved_damage",0.0))>0.0:target["seconds_since_damage"]=0.0
-	var crossed_below_half:bool=before_ratio>0.50 and float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))<0.50
-	var context:={"source_action":source_action,"damage_type":damage_type,"action_tags":[source_action],"origin":origin,"source_is_summon":source_is_summon,"originating_effect_id":originating_effect_id,"trigger_chain":trigger_chain,"crossed_below_half":crossed_below_half}
-	var events:=CombatSystem.event_bundle_for_damage(source,target,result,context);combat_events.append_array(events)
-	for event in events:
-		if event.event_type=="damage_taken":apply_passive_trigger(target,event,target)
-		elif event.event_type in ["basic_attack_hit","direct_damage_dealt","periodic_damage_dealt","critical_result"]:apply_passive_trigger(source,event,target)
-	var enemy_index:int=enemies.find(target);var source_index:int=int(source.get("battle_index",-1))
-	if enemy_index>=0 and source_index>=0:add_damage_threat(target,source_index,float(result.get("resolved_damage",0.0)))
-	var living_enemy_count:int=enemies.filter(func(enemy):return enemy.hp>0 and not bool(enemy.get("ignores_tank_aggro",false))).size()
-	for absorption in result.get("shield_absorptions",[]):
-		var creator_index:int=int(absorption.get("creator_index",-1))
-		if creator_index>=0:
-			var per_enemy:=CombatSystem.distributed_threat(CombatSystem.shield_absorption_threat(float(absorption.amount),float(heroes[creator_index].get("threat_modifier",1.0))),living_enemy_count)
-			for enemy in enemies:if enemy.hp>0:add_enemy_threat(enemy,creator_index,per_enemy)
-	if retribution_bonus>0.0 and target.hp>0:
-		deal_damage(source,target,retribution_bonus,"summon","true","Retribution",false,"retribution",["retribution"]);item_feedback("Retribution %d"%int(retribution_bonus),target.pos,Color("ef9e56"))
-	if bool(result.get("defeated",false)) and not bool(target.get("item_defeat_processed",false)):
-		target["item_defeat_processed"]=true
-		var defeat_event:=CombatSystem.create_event("unit_defeated",source,target,result,context)
-		for hero in heroes:
-			if hero.hp>0:apply_passive_trigger(hero,defeat_event,target)
-			if str(hero.get("class",""))=="Guardian" and not hero.get("guardian_runtime",{}).is_empty():GuardianSystem.process_marked_death(hero,str(target.get("combat_id","")),battle_time);GuardianSystem.process_haymaker_death(hero,str(target.get("combat_id","")),battle_time)
+	finalize_damage_events(source,target,result,source_action,damage_type,origin,source_is_summon,originating_effect_id,trigger_chain,before_ratio,retribution_bonus)
 	return result
 
 func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="")->Dictionary:
