@@ -1,4 +1,4 @@
-extends "res://scripts/runtime/priest_runtime.gd"
+extends "res://scripts/runtime/shaman_runtime.gd"
 
 func clamped_cast_point(hero:Dictionary,point:Vector2,range_limit:float)->Vector2:
 	if range_limit<=0:return hero.pos
@@ -56,6 +56,9 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 		return
 	if h["class"]=="Priest":
 		cast_priest_ability(slot,cast_position,item_repeat)
+		return
+	if h["class"]=="Shaman":
+		cast_shaman_ability(slot,cast_position,item_repeat)
 		return
 	var ability_range=float(ABILITY_RANGES[h["class"]][slot])
 	var resolved_point=clamped_cast_point(h,cast_position,ability_range) if ability_range>0 else h.pos

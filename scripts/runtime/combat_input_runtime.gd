@@ -17,6 +17,35 @@ func load_slayer_test_build(hero:Dictionary,build_index:int)->void:
 func load_priest_test_build(hero:Dictionary,build_index:int)->void:
 	var build:Dictionary=PriestData.TEST_BUILDS[clampi(build_index,0,PriestData.TEST_BUILDS.size()-1)];var level:int=int(build.level);hero.level=level;hero.power=PriestData.scaled(float(PriestData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=PriestData.scaled(float(PriestData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);PriestSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_shaman_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=ShamanData.TEST_BUILDS[clampi(build_index,0,ShamanData.TEST_BUILDS.size()-1)];var level:int=int(build.level);var mastery:Dictionary=hero.get("shaman_runtime",{}).get("mastery",{}).duplicate(true)
+	hero.level=level;hero.power=ShamanData.scaled(float(ShamanData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=ShamanData.scaled(float(ShamanData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);ShamanSystem.initialize_runtime(hero,true,mastery);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func shaman_range_hero():
+	for hero in heroes:
+		if str(hero.get("class",""))=="Shaman":return hero
+	return null
+
+func handle_shaman_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="shaman_range":return false
+	var hero=shaman_range_hero();if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_0 and event.keycode<=KEY_9:
+		var digit_index:int=9 if event.keycode==KEY_0 else int(event.keycode-KEY_1);var build_index:int=digit_index+(10 if event.ctrl_pressed else 0)
+		if build_index<ShamanData.TEST_BUILDS.size():load_shaman_test_build(hero,build_index);flash("Shaman build: %s"%str(ShamanData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.alt_pressed:return false
+	match event.keycode:
+		KEY_F:ShamanSystem.add_frostwolf_stacks(hero,1,float(hero.hp));flash("Frostwolf stack added")
+		KEY_T:resolve_shaman_frostwolf(hero,int(ShamanData.VALUES.trait_threshold));flash("Frostwolf threshold resolved")
+		KEY_C:hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.shaman_runtime.q_slot=AbilitySlotSystem.create(ShamanSystem.q_max_charges(hero),ShamanSystem.q_cooldown(hero));flash("Shaman cooldowns reset")
+		KEY_G:hero.shaman_runtime.gathering_stacks=int(ShamanData.VALUES.gathering_max);flash("Gathering Storm maxed")
+		KEY_U:hero.shaman_runtime.thunder_stacks=int(ShamanData.VALUES.thunder_max);flash("Rolling Thunder maxed")
+		KEY_A:hero.shaman_runtime.ancestral_stacks=int(ShamanData.VALUES.ancestral_max);hero.shaman_runtime.ancestral_ready=true;flash("Ancestral Wrath armed")
+		KEY_N:ProgressionScopeSystem.begin_encounter(hero.shaman_runtime,ProgressionScopeSystem.new_encounter_id("shaman_test"));flash("New encounter scope")
+		KEY_M:ProgressionScopeSystem.room_transition(hero.shaman_runtime,str(hero.shaman_runtime.encounter_id));flash("Room transition; encounter preserved")
+		KEY_X:ProgressionScopeSystem.end_encounter(hero.shaman_runtime);flash("Encounter progress cleared")
+		_:return false
+	queue_redraw();return true
+
 func priest_range_hero():
 	for hero in heroes:
 		if str(hero.get("class",""))=="Priest":return hero
@@ -170,6 +199,8 @@ func begin_trait()->void:
 		if use_rogue_trait(hero):queue_redraw()
 	elif str(hero.get("class",""))=="Slayer":
 		if use_slayer_trait(hero):queue_redraw()
+	elif str(hero.get("class",""))=="Shaman":
+		if use_shaman_trait(hero):queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -256,6 +287,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_shaman_range_shortcut(event):return true
 	if handle_priest_range_shortcut(event):return true
 	if handle_rogue_range_shortcut(event):return true
 	if testing_zone_active and testing_zone_mode=="slayer_range" and event.shift_pressed and event.keycode>=KEY_0 and event.keycode<=KEY_9:

@@ -146,6 +146,9 @@ func start_slayer_testing_zone() -> void:
 func start_priest_testing_zone() -> void:
 	pass
 
+func start_shaman_testing_zone() -> void:
+	pass
+
 
 func show_testing_zone_menu() -> void:
 	pass

@@ -92,6 +92,16 @@ func draw_combat_effect(fx:Dictionary)->void:
 			draw_line(fx.from,fx.to,Color(col,.8),maxf(3.0,float(fx.get("width",20.0))*.18));draw_line(fx.from,fx.to,Color.WHITE,2)
 		"priest_lightbomb_warning","priest_salvation":
 			var priest_radius:=float(fx.get("radius",80.0));draw_circle(fx.from,priest_radius,Color(col,.08));draw_arc(fx.from,priest_radius,0,TAU,48,col,4)
+		"shaman_chain":
+			var bolt_mid:Vector2=fx.from.lerp(fx.to,.5)+fx.from.direction_to(fx.to).orthogonal()*sin(progress*TAU*4.0)*8.0;draw_polyline(PackedVector2Array([fx.from,bolt_mid,fx.to]),Color("91e7ff",alpha),5);draw_circle(fx.to,7,Color.WHITE)
+		"shaman_feral_spirit":
+			var wolf_dir:Vector2=fx.from.direction_to(fx.to);var wolf_pos:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_circle(wolf_pos,13,Color(col,alpha*.28));draw_line(wolf_pos-wolf_dir*24,wolf_pos,col,6);draw_arc(wolf_pos,18,0,TAU,24,col,3)
+		"shaman_windfury":
+			draw_arc(fx.from,36+progress*12,progress*TAU,progress*TAU+PI*1.6,36,col,5)
+		"shaman_sundering":
+			var rift_width:=maxf(5.0,float(fx.get("width",24.0))*.18);draw_line(fx.from,fx.to,Color("8fe7ff",alpha*.24),rift_width*2.0);draw_line(fx.from,fx.to,col,rift_width)
+		"shaman_earthquake":
+			var quake_radius:=float(fx.get("radius",180.0));draw_circle(fx.from,quake_radius,Color(col,alpha*.08));draw_arc(fx.from,quake_radius*clampf(progress*1.6,0.1,1.0),0,TAU,56,col,6)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":
@@ -118,7 +128,7 @@ func draw_role_icon(pos:Vector2,hero_class:String,ink:Color=Color("101827"))->vo
 		draw_line(pos+Vector2(-13,12),pos+Vector2(11,-12),ink,5);draw_line(pos+Vector2(-11,-12),pos+Vector2(13,12),ink,5)
 	elif hero_class=="Warlock":
 		draw_circle(pos,13,Color.TRANSPARENT,2);draw_arc(pos,14,0,TAU,28,ink,4);draw_colored_polygon(PackedVector2Array([pos+Vector2(0,-15),pos+Vector2(10,6),pos+Vector2(0,2),pos+Vector2(-10,6)]),ink)
-	elif hero_class=="Slayer":
+	elif hero_class in ["Slayer","Shaman"]:
 		draw_arc(pos+Vector2(-4,0),14,-1.1,1.1,18,ink,4);draw_arc(pos+Vector2(4,0),14,PI-1.1,PI+1.1,18,ink,4);draw_line(pos+Vector2(-12,12),pos+Vector2(12,-12),ink,3);draw_line(pos+Vector2(-12,-12),pos+Vector2(12,12),ink,3)
 	else:
 		# Ranged DPS use a bow marker. Future melee classes can use crossed swords.
