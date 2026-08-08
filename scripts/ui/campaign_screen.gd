@@ -156,6 +156,7 @@ func show_combat_hall()->void:
 	var rogue_start:=button("Rogue Range",start_rogue_testing_zone,200);rogue_start.name="TestingRogueRangeStart";range_actions.add_child(rogue_start)
 	var slayer_start:=button("Slayer Range",start_slayer_testing_zone,200);slayer_start.name="TestingSlayerRangeStart";range_actions.add_child(slayer_start)
 	var priest_start:=button("Priest Range",start_priest_testing_zone,200);priest_start.name="TestingPriestRangeStart";range_actions.add_child(priest_start)
+	var shaman_start:=button("Shaman Range",start_shaman_testing_zone,200);shaman_start.name="TestingShamanRangeStart";range_actions.add_child(shaman_start)
 	content.add_child(_campaign_card("ENDLESS ARENA","Fight a continuous stream of enemies at one fixed level. Defeated enemies are replaced until the party retreats.",Color("f5c451")))
 	var endless_row:=HBoxContainer.new();endless_row.name="TestingEndlessLevelRow";endless_row.add_theme_constant_override("separation",12);content.add_child(endless_row)
 	var level_label:=label("Enemy Level",18,C_MUTED);level_label.name="TestingEndlessLevelLabel";level_label.custom_minimum_size=Vector2(125,46);level_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;endless_row.add_child(level_label)

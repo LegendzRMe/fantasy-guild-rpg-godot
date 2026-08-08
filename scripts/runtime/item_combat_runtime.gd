@@ -1,5 +1,13 @@
 extends "res://scripts/runtime/shared_combat_runtime.gd"
 
+func resolve_shaman_frostwolf_from_basic(hero:Dictionary,stacks:int)->void:
+	for activation in ShamanSystem.add_frostwolf_stacks(hero,stacks,float(hero.hp)):
+		var healing:=deal_healing(hero,hero,float(activation.raw_healing),"basic_heal","Frostwolf Resilience","shaman_trait");ShamanSystem.telemetry_add(hero,"frostwolf_healing",float(healing.effective_amount));ShamanSystem.telemetry_add(hero,"frostwolf_overhealing",float(healing.overhealing))
+		var request:=ShamanSystem.overflow_shield_request(hero,activation,healing)
+		if not request.is_empty():
+			var existing:=0.0;for shield_source in hero.get("shield_sources",[]):if str(shield_source.get("source_id",""))==str(request.source_id):existing+=float(shield_source.get("amount",0.0))
+			var room:=maxf(0.0,float(request.cap)-existing);var applied:=apply_unit_shield(hero,hero,minf(room,float(request.amount)),"Overflowing Resilience",str(request.source_id),float(request.cap),float(request.duration));ShamanSystem.telemetry_add(hero,"overflow_shield",float(applied.get("amount",0.0)))
+
 func item_feedback(text_value:String,position:Vector2,color:Color=C_GOLD)->void:
 	if not is_testing_save():return
 	item_feedback_feed.append(text_value)
@@ -101,6 +109,9 @@ func build_damage_request(target:Dictionary,resolved_amount:float,source_action:
 		var armor_sources:Array=target.slayer_runtime.temporary_armor_sources.duplicate(true);var block_source:=BlockChargeSystem.armor_source(target,SlayerSystem.scaled(target,float(SlayerData.VALUES.block_armor)),"reflexive_block","slayer_block")
 		if not block_source.is_empty():armor_sources.append(block_source)
 		if not armor_sources.is_empty():request["armor_sources"]=armor_sources
+	elif str(target.get("class",""))=="Shaman" and not target.get("shaman_runtime",{}).is_empty():
+		var shaman_block:=BlockChargeSystem.armor_source(target,float(ShamanData.VALUES.feral_resilience_block_armor),"feral_resilience","shaman_block")
+		if not shaman_block.is_empty():request["armor_sources"]=[shaman_block]
 	var shared_armor:Array=target.get("temporary_armor_sources",[]).duplicate(true)
 	if not shared_armor.is_empty():
 		var combined:Array=request.get("armor_sources",[]).duplicate(true);combined.append_array(shared_armor);request["armor_sources"]=combined
@@ -131,6 +142,7 @@ func finalize_damage_events(source:Dictionary,target:Dictionary,result:Dictionar
 			if hero.hp>0:apply_passive_trigger(hero,defeat_event,target)
 			if str(hero.get("class",""))=="Guardian" and not hero.get("guardian_runtime",{}).is_empty():GuardianSystem.process_marked_death(hero,str(target.get("combat_id","")),battle_time);GuardianSystem.process_haymaker_death(hero,str(target.get("combat_id","")),battle_time)
 			if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty():SlayerSystem.process_defeat(hero,target)
+			if str(hero.get("class",""))=="Shaman" and not hero.get("shaman_runtime",{}).is_empty() and not bool(target.get("summoned_unit",false)) and not bool(target.get("object",false)):ShamanSystem.note_echo_defeat(hero,str(target.get("combat_id","")))
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	if CombatSystem.is_protected(target):
@@ -142,7 +154,13 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
 	if EvasionSystem.should_evade(target,source_action,hostile,bool(source.get("bypass_evasion",false))):
 		var miss:=EvasionSystem.miss_result(source_action,damage_type);combat_events.append(CombatSystem.create_event("basic_attack_evaded",source,target,miss,{"source_action":source_action,"action_tags":[source_action],"origin":origin}));if str(target.get("class",""))=="Slayer":SlayerSystem.telemetry_add(target,"evaded_attacks");return miss
-	var resolved_amount:=amount;var retribution_bonus:float=0.0
+	var resolved_amount:=amount;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
+	if str(source.get("class",""))=="Shaman" and not source.get("shaman_runtime",{}).is_empty():
+		resolved_amount*=ShamanSystem.alpha_multiplier(source,str(target.get("combat_id","")))
+		if source_action=="basic_attack" and originating_effect_id=="":
+			var remaining:=int(source.shaman_runtime.windfury_attacks);shaman_basic_origin="windfury_attack_%d"%(int(ShamanData.VALUES.e_attacks)-remaining+1) if remaining>0 else "normal_basic_attack"
+			if ShamanSystem.reward_active(source,"maelstrom_1"):resolved_amount+=ShamanSystem.ability_amount(source,float(ShamanData.VALUES.maelstrom_damage_1))
+			if ShamanSystem.reward_active(source,"maelstrom_2"):resolved_amount+=ShamanSystem.ability_amount(source,float(ShamanData.VALUES.maelstrom_damage_2))
 	var slayer_primary:bool=str(source.get("class",""))=="Slayer" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("slayer_runtime",{}).is_empty()
 	if slayer_primary:
 		resolved_amount=(amount+SlayerSystem.unending_hatred_bonus(source))*(1.0+SlayerSystem.basic_attack_bonus(source))
@@ -176,6 +194,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and float(result.get("resolved_damage",0.0))>0.0 and bool(target.rogue_runtime.vanish_active) and not StealthDetectionSystem.is_unrevealable(target):RogueSystem.break_vanish(target)
 	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and damage_type=="physical":BlockChargeSystem.consume_legacy(target.rogue_runtime,3,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)))
 	if str(target.get("class",""))=="Slayer" and not target.get("slayer_runtime",{}).is_empty() and BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"slayer_block"):SlayerSystem.telemetry_add(target,"block_consumed")
+	if str(target.get("class",""))=="Shaman" and not target.get("shaman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"shaman_block")
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("rogue_runtime",{}).is_empty():
 		if ComboPointSystem.successful_hit(result):
 			RogueSystem.double_strike_roll(source)
@@ -235,6 +254,16 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 				for renew in source.priest_runtime.periodic_heals:if str(renew.get("id",""))=="priest_renew":renew.remaining_duration=float(PriestData.VALUES.renew_duration);PriestSystem.telemetry_add(source,"renew_refreshes")
 			if bool(priest_basic.get("trigger_varian",false)):
 				source.priest_runtime.periodic_damage=source.priest_runtime.periodic_damage.filter(func(instance):return str(instance.get("target_id",""))!=str(target.combat_id));source.priest_runtime.periodic_damage.append(PeriodicStatusSystem.create("priest_varian",str(source.combat_id),str(target.combat_id),PriestSystem.ability_amount(source,float(PriestData.VALUES.varian_damage))/float(PriestData.VALUES.varian_duration),float(PriestData.VALUES.varian_duration),float(PriestData.VALUES.varian_tick)))
+	if str(source.get("class",""))=="Shaman" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("shaman_runtime",{}).is_empty():
+		var shaman_basic:=ShamanSystem.note_basic_attack(source,str(target.get("combat_id","")),result,shaman_basic_origin)
+		if bool(shaman_basic.get("successful",false)):
+			if float(shaman_basic.bonus_damage)>0.0:
+				var bonus:=deal_damage(source,target,float(shaman_basic.bonus_damage),"basic_attack","physical","Shaman Basic Attack Bonus",false,"shaman_basic_bonus",[],false)
+				if bool(shaman_basic.rolling):var rolling_heal:=deal_healing(source,source,float(bonus.resolved_damage),"basic_heal","Rolling Thunder","shaman_rolling");ShamanSystem.telemetry_add(source,"rolling_damage",float(bonus.resolved_damage));ShamanSystem.telemetry_add(source,"rolling_healing",float(rolling_heal.effective_amount))
+			resolve_shaman_frostwolf_from_basic(source,int(shaman_basic.frostwolf_stacks))
+			if bool(shaman_basic.windfury_finished) and int(shaman_basic.tempest_subhits)>0:
+				for subhit in int(shaman_basic.tempest_subhits):deal_damage(source,target,float(result.resolved_damage)*float(ShamanData.VALUES.tempest_subhit_damage),"basic_attack","physical","Tempest Fury",false,"tempest_fury_subhit",[],false);ShamanSystem.telemetry_add(source,"tempest_subhits")
+			if bool(shaman_basic.fury_recast):ShamanSystem.begin_windfury(source,true);source.ability_cds[2]=float(ShamanData.VALUES.e_cooldown)
 	if str(target.get("class",""))=="Priest" and not target.get("priest_runtime",{}).is_empty() and float(result.get("health_damage",0.0))>float(target.max_hp)*float(PriestData.VALUES.blessed_recovery_threshold) and PriestSystem.has_talent(target,"priest_l18_2") and float(target.priest_runtime.blessed_recovery_ready_in)<=0.0:
 		target.priest_runtime.periodic_heals.append(PeriodicStatusSystem.create("priest_blessed_recovery",str(target.combat_id),str(target.combat_id),float(target.max_hp)*float(PriestData.VALUES.blessed_recovery_fraction)/float(PriestData.VALUES.blessed_recovery_duration),float(PriestData.VALUES.blessed_recovery_duration),1.0));target.priest_runtime.blessed_recovery_ready_in=float(PriestData.VALUES.blessed_recovery_cooldown)
 	if testing_zone_active and "training" in target.get("combat_tags",[]) and float(result.get("resolved_damage",0.0))>0.0:target["seconds_since_damage"]=0.0

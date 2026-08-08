@@ -3,6 +3,7 @@ extends "res://scripts/runtime/campaign_runtime.gd"
 func finish_battle(win:bool)->void:
 	for hero in heroes:
 		if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty():RogueSystem.telemetry_add(hero,"combo_encounter_resets");RogueSystem.reset_encounter(hero)
+		if str(hero.get("class",""))=="Shaman" and not hero.get("shaman_runtime",{}).is_empty() and int(hero.get("hero_index",-1))>=0 and int(hero.hero_index)<state.heroes.size():state.heroes[int(hero.hero_index)]["talent_mastery"]=hero.shaman_runtime.mastery.duplicate(true)
 	battle_over=true
 	if not tutorial_active and not testing_zone_active:
 		var recovery_members:=TavernFacilitySystem.record_battle_defeats(state,heroes)

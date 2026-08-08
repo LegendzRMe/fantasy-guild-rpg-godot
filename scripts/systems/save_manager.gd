@@ -91,6 +91,8 @@ static func testing_heroes() -> Array:
 		hero_state("Morrow","Warlock",4,16),
 		hero_state("Kaelith","Slayer",30,16),
 		hero_state("Elowen","Priest",30,16),
+		hero_state("Torren","Shaman",30,16,"guild_recruit",false,0,{"talent_mastery":{}}),
+		hero_state("Rehgar Stone","Shaman",30,16,"guild_recruit",false,0,{"talent_mastery":{"shaman_l9_1":200,"shaman_l9_2":100,"shaman_l9_3":100}}),
 		hero_state("Aldren Vale","Guardian",4,18,"special_hero",true,1,{"signature_ability":"Oath of Cinders","story_lead":"The traitor's broken oath-seal"}),
 		hero_state("Mira Thorn","Ranger",4,18,"special_hero",true,1,{"signature_ability":"Ghostmark Volley","story_lead":"Unnatural tracks leaving Ashwood"}),
 		hero_state("Ilyra Voss","Mage",4,18,"special_hero",true,1,{"signature_ability":"Runebreak","story_lead":"The force inside the servant's runes"})
@@ -123,7 +125,7 @@ static func testing_state() -> Dictionary:
 		"dust":999,
 		"provisions":999,
 		"prestige_tokens":999,
-		"class_talent_discovery":{"guardian":30,"cleric":30,"rogue":30,"ranger":30,"mage":30,"warlock":30,"slayer":30},
+		"class_talent_discovery":{"guardian":30,"cleric":30,"rogue":30,"ranger":30,"mage":30,"warlock":30,"slayer":30,"priest":30,"shaman":30},
 		"vault_level":10,
 		"vault_limit":300,
 		"depot_level":10,
@@ -246,6 +248,7 @@ static func migrate_state(state:Dictionary, save_declared_tutorial:bool, testing
 		if not hero.has("playable_race_id"):hero["playable_race_id"]=""
 		if not hero.get("selected_talents") is Dictionary:hero["selected_talents"]={}
 		if not hero.get("planned_talents") is Dictionary:hero["planned_talents"]={}
+		if not hero.get("talent_mastery") is Dictionary:hero["talent_mastery"]={}
 		if not hero.has("selected_heroic_id"):hero["selected_heroic_id"]=""
 		if not hero.has("legacy_rank"):
 			hero["legacy_rank"]=0

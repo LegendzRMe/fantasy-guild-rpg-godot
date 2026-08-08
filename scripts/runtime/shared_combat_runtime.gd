@@ -52,6 +52,7 @@ func issue_hero_move(hero:Dictionary,destination:Vector2)->void:
 
 func active_movement_multiplier(unit:Dictionary)->float:
 	var multiplier:=1.0
+	if str(unit.get("class",""))=="Shaman" and int(unit.get("shaman_runtime",{}).get("windfury_attacks",0))>0:multiplier*=ShamanSystem.windfury_movement_multiplier(unit)
 	for effect in unit.get("active_effects",[]):
 		if float(effect.get("remaining_duration",0.0))>0.0:multiplier*=float(effect.get("movement_speed_multiplier",1.0))
 	return multiplier
