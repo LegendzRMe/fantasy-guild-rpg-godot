@@ -5,6 +5,9 @@ const BATTLE_BOUNDS := Rect2(48,62,1184,505)
 static func create_blocker(combat_id:String,rect:Rect2,flags:Dictionary={}) -> Dictionary:
 	return {"combat_id":combat_id,"rect":rect,"blocks_movement":bool(flags.get("blocks_movement",true)),"blocks_line_of_sight":bool(flags.get("blocks_line_of_sight",true)),"blocks_projectiles":bool(flags.get("blocks_projectiles",true)),"destructible":bool(flags.get("destructible",false)),"current_health":float(flags.get("current_health",100.0)),"maximum_health":float(flags.get("maximum_health",100.0))}
 
+static func create_segment_blocker(combat_id:String,from:Vector2,to:Vector2,thickness:float,flags:Dictionary={}) -> Dictionary:
+	return {"combat_id":combat_id,"shape":"segment","from":from,"to":to,"thickness":maxf(1.0,thickness),"rect":Rect2(from.min(to),from.max(to)-from.min(to)).grow(maxf(1.0,thickness)*0.5),"blocks_movement":bool(flags.get("blocks_movement",true)),"blocks_line_of_sight":bool(flags.get("blocks_line_of_sight",false)),"blocks_projectiles":bool(flags.get("blocks_projectiles",false)),"destructible":bool(flags.get("destructible",false)),"current_health":float(flags.get("current_health",100.0)),"maximum_health":float(flags.get("maximum_health",100.0)),"owner_combat_id":str(flags.get("owner_combat_id","")),"cast_id":str(flags.get("cast_id","")),"temporary":bool(flags.get("temporary",true)),"remaining_duration":float(flags.get("remaining_duration",INF))}
+
 static func blocker_active(blocker:Dictionary)->bool:
 	return not bool(blocker.get("destructible",false)) or float(blocker.get("current_health",0.0))>0.0
 
@@ -16,7 +19,10 @@ static func segment_intersects_rect(from:Vector2,to:Vector2,rect:Rect2)->bool:
 static func first_blocker(from:Vector2,to:Vector2,blockers:Array,flag:String)->int:
 	for index in blockers.size():
 		var blocker:Dictionary=blockers[index]
-		if blocker_active(blocker) and bool(blocker.get(flag,false)) and segment_intersects_rect(from,to,blocker.rect):return index
+		if not blocker_active(blocker) or not bool(blocker.get(flag,false)):continue
+		if str(blocker.get("shape","rect"))=="segment":
+			if segment_segment_distance(from,to,Vector2(blocker.from),Vector2(blocker.to))<=float(blocker.thickness)*0.5:return index
+		elif segment_intersects_rect(from,to,blocker.rect):return index
 	return -1
 
 static func has_line_of_sight(from:Vector2,to:Vector2,blockers:Array)->bool:
@@ -25,7 +31,10 @@ static func has_line_of_sight(from:Vector2,to:Vector2,blockers:Array)->bool:
 static func valid_position(position:Vector2,radius:float,blockers:Array)->bool:
 	if not BATTLE_BOUNDS.grow(-radius).has_point(position):return false
 	for blocker in blockers:
-		if blocker_active(blocker) and bool(blocker.get("blocks_movement",false)) and blocker.rect.grow(radius).has_point(position):return false
+		if not blocker_active(blocker) or not bool(blocker.get("blocks_movement",false)):continue
+		if str(blocker.get("shape","rect"))=="segment":
+			if segment_distance_to_point(Vector2(blocker.from),Vector2(blocker.to),position)<=radius+float(blocker.thickness)*0.5:return false
+		elif blocker.rect.grow(radius).has_point(position):return false
 	return true
 
 static func move_toward_safe(from:Vector2,to:Vector2,distance:float,radius:float,blockers:Array)->Vector2:
@@ -59,3 +68,24 @@ static func segment_distance_to_point(from:Vector2,to:Vector2,point:Vector2)->fl
 
 static func segment_hits_circle(from:Vector2,to:Vector2,center:Vector2,radius:float)->bool:
 	return segment_distance_to_point(from,to,center)<=radius
+
+static func segment_segment_distance(a:Vector2,b:Vector2,c:Vector2,d:Vector2)->float:
+	if Geometry2D.segment_intersects_segment(a,b,c,d)!=null:return 0.0
+	return minf(minf(segment_distance_to_point(a,b,c),segment_distance_to_point(a,b,d)),minf(segment_distance_to_point(c,d,a),segment_distance_to_point(c,d,b)))
+
+static func blocker_intersects_segment(blocker:Dictionary,from:Vector2,to:Vector2,padding:float=0.0)->bool:
+	if str(blocker.get("shape","rect"))=="segment":return segment_segment_distance(from,to,Vector2(blocker.from),Vector2(blocker.to))<=float(blocker.thickness)*0.5+padding
+	return segment_intersects_rect(from,to,Rect2(blocker.rect).grow(padding))
+
+static func segment_blocker_push_out(position:Vector2,radius:float,blocker:Dictionary)->Vector2:
+	var from:=Vector2(blocker.from);var to:=Vector2(blocker.to);var segment:=to-from
+	var factor:=0.0 if segment.length_squared()<=0.0001 else clampf((position-from).dot(segment)/segment.length_squared(),0.0,1.0)
+	var closest:=from+segment*factor;var normal:=closest.direction_to(position)
+	if normal==Vector2.ZERO:normal=segment.normalized().orthogonal() if segment.length_squared()>0.0001 else Vector2.UP
+	return (closest+normal*(radius+float(blocker.thickness)*0.5+1.0)).clamp(BATTLE_BOUNDS.position+Vector2.ONE*radius,BATTLE_BOUNDS.end-Vector2.ONE*radius)
+
+static func reflect_point_across_line(point:Vector2,line_from:Vector2,line_to:Vector2)->Vector2:
+	var line:=line_to-line_from
+	if line.length_squared()<=0.0001:return line_from*2.0-point
+	var projection:=line_from+line*clampf((point-line_from).dot(line)/line.length_squared(),0.0,1.0)
+	return projection*2.0-point

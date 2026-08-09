@@ -71,6 +71,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_priest_runtime(delta)
 	update_shaman_runtime(delta)
 	update_templar_runtime(delta)
+	update_protector_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 
@@ -158,7 +159,7 @@ func update_combat_enemies(delta:float) -> bool:
 						else:
 							if CombatSystem.is_blinded(e):record_blind_miss(e,heroes[ti])
 							else:var basic_result:=deal_damage(e,heroes[ti],e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");heroes[ti].last_hit=3.0;apply_hit_nudge(e,heroes[ti]);add_effect("hit",e.pos,heroes[ti].pos,"-%d"%int(basic_result.resolved_damage),C_RED)
-				elif e.special=="charge":e.pos=e.pos.move_toward(e.danger_pos,220);for hero_charge in heroes:if hero_charge.hp>0 and hero_charge.pos.distance_to(e.pos)<65:var charge_result:=deal_damage(e,hero_charge,e.damage*1.25,"basic_ability",e.basic_attack_damage_type,"boss_charge");add_effect("hit",e.pos,hero_charge.pos,"-%d"%int(charge_result.resolved_damage),C_RED)
+				elif e.special=="charge":e.pos=CombatGeometry.move_toward_safe(e.pos,e.danger_pos,220.0,float(e.get("combat_radius",28.0)),combat_blockers);for hero_charge in heroes:if hero_charge.hp>0 and hero_charge.pos.distance_to(e.pos)<65:var charge_result:=deal_damage(e,hero_charge,e.damage*1.25,"basic_ability",e.basic_attack_damage_type,"boss_charge");add_effect("hit",e.pos,hero_charge.pos,"-%d"%int(charge_result.resolved_damage),C_RED)
 				else:
 					var impact=e.danger_pos if e.special=="danger" else e.pos; var radius=78.0 if e.special=="danger" else 115.0
 					for struck_hero in heroes:
@@ -166,7 +167,7 @@ func update_combat_enemies(delta:float) -> bool:
 				var attack_speed_reduction:=clampf(CombatSystem.control_amount(e,"attack_speed"),0.0,0.9)
 				e.cooldown=e.basic_attack_interval*(.68 if e.enraged else 1.0)/maxf(0.1,1.0-attack_speed_reduction)
 		elif dist>e.range:
-			var enemy_speed=float(e.movement_speed)*(1.0-CombatSystem.control_amount(e,"slow"));e.facing_direction=e.pos.direction_to(target_pos);e.pos=e.pos.move_toward(target_pos,enemy_speed*delta)
+			var enemy_speed=float(e.movement_speed)*(1.0-CombatSystem.control_amount(e,"slow"));e.facing_direction=e.pos.direction_to(target_pos);e.pos=CombatGeometry.move_toward_safe(e.pos,target_pos,enemy_speed*delta,float(e.get("combat_radius",28.0)),combat_blockers)
 		elif e.cooldown<=0:
 			e.facing_direction=e.pos.direction_to(target_pos)
 			e.special="basic"; e.telegraph=.48; e.danger_pos=target_pos

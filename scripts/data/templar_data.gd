@@ -1,5 +1,7 @@
 extends RefCounted
 
+const CombatBalanceData = preload("res://scripts/data/combat_balance_data.gd")
+
 const CLASS_ID := "templar"
 const SCALE_PER_LEVEL := 1.04
 const SOURCE_TO_WORLD := 185.0 / 5.5
@@ -69,7 +71,7 @@ const TEST_BUILDS := [
 	{"name":"Crosscut Titan","level":30,"heroic":"templar_l15_r1","talents":{"tier_1":"templar_l9_2","tier_2":"templar_l12_3","tier_3":"templar_l15_r1","tier_4":"templar_l18_3","tier_5":"templar_l21_2","tier_6":"templar_l24_1","tier_7":"templar_l27_r1","tier_8":"templar_l30_3"}}
 ]
 
-const CLASS_DEFINITION := {"class_id":"templar","display_name":"Templar","primary_role":"Tank","role":"Tank","basic_action_id":"templar_basic_attack","trait_id":"templar_shield_overload","q_ability_id":"templar_q","w_ability_id":"templar_w","e_ability_id":"templar_e","heroic_option_ids":["templar_l15_r1","templar_l15_r2"],"talent_tier_definitions":TALENT_TIERS,"ai_behavior_tags":["melee","tank","shield_support"],"color":Color("e3b33e"),"ability":"Blade Dash","base_health":2490.0,"health_growth":0.04,"base_power":111.0,"power_growth":0.04,"base_armor":0.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.0,"basic_action_range":1.25*SOURCE_TO_WORLD,"movement_speed":140.0,"base_critical_chance":0.05,"critical_damage":2.0,"health_regeneration":5.1875,"health_regeneration_growth":0.04,"threat_modifier":1.5,"basic_action_damage_type":"physical","armor_family":"plate","armor_proficiency":"plate","weapon_proficiencies":["one_handed","two_handed"],"uses_mana":false,"resource_id":""}
+const CLASS_DEFINITION := {"class_id":"templar","display_name":"Templar","primary_role":"Tank","role":"Tank","basic_action_id":"templar_basic_attack","trait_id":"templar_shield_overload","q_ability_id":"templar_q","w_ability_id":"templar_w","e_ability_id":"templar_e","heroic_option_ids":["templar_l15_r1","templar_l15_r2"],"talent_tier_definitions":TALENT_TIERS,"ai_behavior_tags":["melee","tank","shield_support"],"color":Color("e3b33e"),"ability":"Blade Dash","base_health":2490.0,"health_growth":0.04,"base_power":111.0,"power_growth":0.04,"base_armor":0.0,"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.0,"basic_action_range":1.25*SOURCE_TO_WORLD,"movement_speed":140.0,"base_critical_chance":0.05,"critical_damage":2.0,"health_regeneration":5.1875,"health_regeneration_growth":0.04,"threat_modifier":CombatBalanceData.TANK_THREAT_MODIFIER,"basic_action_damage_type":"physical","armor_family":"plate","armor_proficiency":"plate","weapon_proficiencies":["one_handed","two_handed"],"uses_mana":false,"resource_id":""}
 
 static func scale(level:int)->float:return pow(SCALE_PER_LEVEL,maxi(0,level-1))
 static func scaled(value:float,level:int)->float:return value*scale(level)

@@ -198,7 +198,7 @@ static func is_feared(unit:Dictionary)->bool:
 static func control_amount(unit:Dictionary,control_type:String)->float:
 	var strongest:=0.0
 	for effect in unit.get("active_effects",[]):
-		if str(effect.get("control_type",""))==control_type and float(effect.get("remaining_duration",0.0))>0.0:strongest=maxf(strongest,float(effect.get("amount",0.0)))
+		if str(effect.get("control_type",""))==control_type and float(effect.get("remaining_duration",0.0))>0.0 and float(effect.get("delay",0.0))<=0.0:strongest=maxf(strongest,float(effect.get("amount",0.0)))
 	return strongest
 
 static func is_stunned(unit:Dictionary)->bool:
