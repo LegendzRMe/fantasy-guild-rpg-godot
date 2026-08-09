@@ -160,6 +160,9 @@ func draw_combat_debug_overlay()->void:
 		var protector:Dictionary=hero.protector_runtime;var owned_walls:Array=combat_blockers.filter(func(blocker):return ProtectorSystem.own_wall(hero,blocker));lines.append("SWORD  %s"%("ACTIVE" if not protector.q_sequence.is_empty() else "NONE"));lines.append("Q EMPOWERED  %s"%str(bool(protector.q_sequence.get("empowered",false))));lines.append("WALLS  %d  %s"%[owned_walls.size(),str(owned_walls.map(func(blocker):return "%s %.1f"%[str(blocker.cast_id),float(blocker.remaining_duration)]))]);lines.append("SMITE  %d/%d  FIELDS %d"%[int(protector.smite_slot.current_charges),int(protector.smite_slot.max_charges),protector.smite_fields.size()]);lines.append("LAST PURGE  %s"%str(protector.last_purge));lines.append("ASPECT CD  %.1f"%float(protector.aspect_cooldown));lines.append("WRATH  %s"%str(protector.wrath.get("phase","none")));lines.append("ARMOR SOURCES  %s"%str(ProtectorSystem.armor_sources(hero)))
 	if str(hero.get("class",""))=="Sentinel" and not hero.get("sentinel_runtime",{}).is_empty():
 		var sentinel:Dictionary=hero.sentinel_runtime;lines.append("Q CHARGES  %d / %d"%[int(sentinel.q_slot.current_charges),int(sentinel.q_slot.max_charges)]);lines.append("W CHARGES  %d / %d  SHOTS %d"%[int(sentinel.w_slot.current_charges),int(sentinel.w_slot.max_charges),sentinel.w_projectiles.size()]);lines.append("MARK  %s  %.1f"%[str(sentinel.marked_target_id),float(sentinel.mark_remaining)]);lines.append("FLARE QUEST  %d / 84"%int(sentinel.e_quest_stacks));lines.append("FLARES/FIELDS  %d / %d"%[sentinel.pending_flares.size(),sentinel.starfalls.size()]);lines.append("OVERFLOW  %.1f"%float(sentinel.overflow_bank));lines.append("TELEMETRY  %s"%str(sentinel.telemetry))
+	if str(hero.get("class",""))=="Huntsman" and not hero.get("huntsman_runtime",{}).is_empty():
+		var hunt:Dictionary=hero.huntsman_runtime;var recent_form_source:="none" if hunt.form_events.is_empty() else str(hunt.form_events[-1].source);var prepared_modifier:=HuntsmanSystem.prepare_basic_attack(hero,{"active_effects":[]})
+		lines.append("FORM  %s  SOURCE %s"%[str(hunt.form).to_upper(),recent_form_source]);lines.append("BA RANGE %.1f  MOD %.2f  ARMOR %.1f"%[float(hero.range),float(prepared_modifier.multiplier),float(hero.armor)]);lines.append("Q HUMAN/WORGEN  %.1f / %.1f"%[float(hunt.human_q_cooldown),float(hunt.worgen_q_cooldown)]);lines.append("E SHARED  %.1f"%float(hunt.shared_e_cooldown));lines.append("INNER BEAST  %.1f (%.1f)"%[float(hunt.inner_beast_remaining),float(hunt.inner_beast_elapsed)]);lines.append("BLOCK %d  WIZENED %d / %.1f"%[BlockChargeSystem.charges(hero,"huntsman_block"),int(hunt.wizened_attacks),float(hunt.wizened_remaining)]);lines.append("MARK  %s  x%d  %.1f"%[str(hunt.marked_target_id),int(hunt.mark_stacks),float(hunt.mark_remaining)]);lines.append("COCKTAIL QUEST  %d / 15"%int(hunt.cocktail_quest_stacks));lines.append("TELEMETRY  %s"%str(hunt.telemetry))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])
@@ -237,6 +240,9 @@ func draw_combat_enemies() -> void:
 		var target_outline:=Color.WHITE if focused_enemy_index==i else C_GOLD if heroes.size()>selected and heroes[selected].target==i else Color("5f2931")
 		var enemy_radius:=62.0 if e.type=="Defense Dummy" else 46.0;draw_circle(e.pos,enemy_radius,enemy_color); draw_circle(e.pos,enemy_radius+6,target_outline,4); if not victory_sequence and (e.revealed or e.hp<e.max_hp):health_bar(e.pos+Vector2(-54,-enemy_radius-24),108,e.hp/e.max_hp,C_RED); draw_string(ThemeDB.fallback_font,e.pos+Vector2(-55,6),"DEFENSE" if e.type=="Defense Dummy" else str(e.get("display_name",e.type)).substr(0,12),HORIZONTAL_ALIGNMENT_CENTER,110,15,C_TEXT)
 		if not victory_sequence:
+			for huntsman in heroes:
+				if str(huntsman.get("class",""))=="Huntsman" and str(huntsman.get("huntsman_runtime",{}).get("marked_target_id",""))==str(e.get("combat_id","")):
+					var mark_ratio:=clampf(float(huntsman.huntsman_runtime.mark_remaining)/maxf(.01,float(HuntsmanData.VALUES.mark_duration)),0.0,1.0);draw_arc(e.pos,enemy_radius+15,-PI/2,-PI/2+TAU*mark_ratio,40,CLASSES.Huntsman.color,4);draw_string(ThemeDB.fallback_font,e.pos+Vector2(19,-enemy_radius-8),"x%d"%int(huntsman.huntsman_runtime.mark_stacks),HORIZONTAL_ALIGNMENT_CENTER,28,11,CLASSES.Huntsman.color)
 			for mage in heroes:
 				if str(mage.get("class",""))=="Mage" and not mage.get("mage_runtime",{}).is_empty() and mage.mage_runtime.bomb_state.bombs_by_target.has(str(e.combat_id)):
 					var bomb:Dictionary=mage.mage_runtime.bomb_state.bombs_by_target[str(e.combat_id)];var bomb_ratio:=clampf(float(bomb.remaining)/maxf(0.01,float(MageData.VALUES.w_duration)),0.0,1.0);draw_arc(e.pos,enemy_radius+12,-PI/2,-PI/2+TAU*bomb_ratio,36,Color("ff9a4f"),4)
@@ -278,6 +284,10 @@ func draw_combat_heroes() -> void:
 		if h.shield>0 and not victory_sequence:draw_circle(h.pos,63,Color("5fa8ff"),4)
 		var role_ink:=Color("d9f3ff",.38) if concealment_visual=="invisible" else Color("eadcff",.72) if concealment_visual=="vanished" else Color("101827")
 		draw_circle(h.pos,48,col);draw_role_icon(h.pos,h["class"],role_ink);if not victory_sequence:draw_rogue_concealment(h,concealment_visual);if not victory_sequence and (h.hp<h.max_hp or h.last_hit>0 or h.shield>0):health_bar_with_shield(h.pos+Vector2(-54,-70),108,h)
+		if not victory_sequence and str(h.get("class",""))=="Huntsman" and not h.get("huntsman_runtime",{}).is_empty():
+			if HuntsmanSystem.is_worgen(h):draw_colored_polygon(PackedVector2Array([h.pos+Vector2(-28,-35),h.pos+Vector2(-17,-61),h.pos+Vector2(-4,-37)]),Color(CLASSES.Huntsman.color,.82));draw_colored_polygon(PackedVector2Array([h.pos+Vector2(28,-35),h.pos+Vector2(17,-61),h.pos+Vector2(4,-37)]),Color(CLASSES.Huntsman.color,.82))
+			else:draw_arc(h.pos,54,-PI*.85,-PI*.15,18,Color("d8c29d"),4)
+			if float(h.huntsman_runtime.inner_beast_remaining)>0.0:draw_arc(h.pos,58,battle_time*2.5,battle_time*2.5+PI*1.55,36,Color(CLASSES.Huntsman.color,.85),4)
 		if not victory_sequence:draw_hero_channel_bar(h)
 		if not victory_sequence and str(h.get("class",""))=="Rogue" and not h.get("rogue_runtime",{}).is_empty():
 			var point_count:int=ComboPointSystem.current(h);var point_max:int=ComboPointSystem.maximum(h);var pip_start:float=float(h.pos.x)-(point_max-1)*7.0
@@ -380,6 +390,9 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Templar":action_name=str(TemplarData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Protector":action_name=str(ProtectorData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Sentinel":action_name=str(SentinelData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif active["class"]=="Huntsman" and slot==0:action_name="Razor Swipe" if HuntsmanSystem.is_worgen(active) else "Gilnean Cocktail"
+			elif active["class"]=="Huntsman" and slot==2:action_name="Disengage" if HuntsmanSystem.is_worgen(active) else "Darkflight"
+			elif slot==3 and active["class"]=="Huntsman":action_name=str(HuntsmanData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"
 			elif slot==4 and active["class"]=="Sentinel" and SentinelSystem.has_talent(active,"sentinel_l30_2") and float(active.get("sentinel_runtime",{}).get("d_cooldown",0.0))>0.0:action_name="Trueshot"
@@ -397,7 +410,8 @@ func draw_ability_bar_hud()->void:
 			var templar_trait_active:bool=slot==4 and str(active.get("class",""))=="Templar" and bool(active.get("templar_runtime",{}).get("trait_active",false))
 			var protector_trait_active:bool=slot==4 and str(active.get("class",""))=="Protector" and (bool(active.get("spirit_form",false)) or not active.get("protector_runtime",{}).get("wrath",{}).is_empty())
 			var sentinel_trait_active:bool=slot==4 and str(active.get("class",""))=="Sentinel" and float(active.get("sentinel_runtime",{}).get("mark_remaining",0.0))>0.0
-			var highlighted_state:bool=cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active or protector_trait_active or sentinel_trait_active
+			var huntsman_trait_active:bool=slot==4 and str(active.get("class",""))=="Huntsman" and HuntsmanSystem.is_worgen(active)
+			var highlighted_state:bool=cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active or protector_trait_active or sentinel_trait_active or huntsman_trait_active
 			if highlighted_state:
 				var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 				draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)

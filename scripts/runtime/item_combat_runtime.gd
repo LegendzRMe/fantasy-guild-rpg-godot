@@ -140,6 +140,9 @@ func build_damage_request(target:Dictionary,resolved_amount:float,source_action:
 	elif str(target.get("class",""))=="Protector" and not target.get("protector_runtime",{}).is_empty():
 		var protector_sources:=ProtectorSystem.armor_sources(target)
 		if not protector_sources.is_empty():request["armor_sources"]=protector_sources
+	elif str(target.get("class",""))=="Huntsman" and not target.get("huntsman_runtime",{}).is_empty():
+		var huntsman_block:=BlockChargeSystem.armor_source(target,float(HuntsmanData.VALUES.thick_skin_armor),"thick_skin","huntsman_block")
+		if not huntsman_block.is_empty():request["armor_sources"]=[huntsman_block]
 	var shared_armor:Array=target.get("temporary_armor_sources",[]).duplicate(true)
 	if not shared_armor.is_empty():
 		var combined:Array=request.get("armor_sources",[]).duplicate(true);combined.append_array(shared_armor);request["armor_sources"]=combined
@@ -210,6 +213,13 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	var ranger_basic_result:={}
 	if str(source.get("class",""))=="Ranger" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("ranger_runtime",{}).is_empty():
 		ranger_basic_result=RangerSystem.on_basic_attack_released(source,target);resolved_amount*=float(ranger_basic_result.multiplier)
+	var huntsman_basic_result:={}
+	if str(source.get("class",""))=="Huntsman" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("huntsman_runtime",{}).is_empty():
+		huntsman_basic_result=HuntsmanSystem.prepare_basic_attack(source,target);resolved_amount*=float(huntsman_basic_result.multiplier)
+		if HuntsmanSystem.has_talent(source,"huntsman_l24_3") and bool(huntsman_basic_result.get("worgen",false)):
+			var alpha_request:=PercentageHealthDamageSystem.request(source,target,.03,.0075,"Alpha Killer")
+			var alpha_result:=deal_damage(source,target,float(alpha_request.amount),"percentage_health","physical","Alpha Killer",false,"huntsman_alpha",[],false)
+			HuntsmanSystem.telemetry_add(source,"percentage_damage",float(alpha_result.resolved_damage))
 	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and ClericSystem.has_talent(source,"cleric_l21_2") and CombatSystem.is_blinded(target):resolved_amount*=2.0
 	var guardian_basic_result:={}
 	if str(source.get("class",""))=="Guardian" and source_action=="basic_attack" and not source.get("guardian_runtime",{}).is_empty():
@@ -236,6 +246,20 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(target.get("class",""))=="Slayer" and not target.get("slayer_runtime",{}).is_empty() and BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"slayer_block"):SlayerSystem.telemetry_add(target,"block_consumed")
 	if str(target.get("class",""))=="Shaman" and not target.get("shaman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"shaman_block")
 	if str(target.get("class",""))=="Templar" and not target.get("templar_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"templar_block")
+	if str(target.get("class",""))=="Huntsman" and not target.get("huntsman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"huntsman_block")
+	if not huntsman_basic_result.is_empty():
+		HuntsmanSystem.resolve_basic_attack(source,float(result.get("resolved_damage",0.0)),bool(huntsman_basic_result.get("wizened",false)))
+		if HuntsmanSystem.has_talent(source,"huntsman_l12_3") and float(source.huntsman_runtime.inner_beast_remaining)>0.0 and float(result.get("resolved_damage",0.0))>0.0:
+			var huntsman_heal:=deal_healing(source,source,float(source.max_hp)*.005,"trait","Insatiable","huntsman_insatiable");HuntsmanSystem.telemetry_add(source,"self_healing",float(huntsman_heal.effective_amount))
+		if HuntsmanSystem.has_talent(source,"huntsman_l30_1") and not bool(huntsman_basic_result.get("worgen",false)):
+			var shot_direction:=Vector2(source.pos).direction_to(target.pos)
+			for splash_target in enemies:
+				if splash_target==target or splash_target.hp<=0.0:continue
+				var behind_offset:=Vector2(splash_target.pos)-Vector2(target.pos)
+				if behind_offset.length()>float(HuntsmanData.SPACE.splash_radius) or behind_offset==Vector2.ZERO or shot_direction.dot(behind_offset.normalized())<=0.0:continue
+				var splash:=deal_damage(source,splash_target,float(result.get("resolved_damage",0.0)),"splash","physical","Blunderbuss",false,"huntsman_blunderbuss",[],false);HuntsmanSystem.telemetry_add(source,"splash_damage",float(splash.resolved_damage))
+		if HuntsmanSystem.has_talent(source,"huntsman_l30_2") and bool(huntsman_basic_result.get("worgen",false)):
+			for cleave_target in enemies:if cleave_target!=target and cleave_target.hp>0.0 and cleave_target.pos.distance_to(target.pos)<=float(HuntsmanData.SPACE.cleave_radius):var cleave:=deal_damage(source,cleave_target,float(result.get("resolved_damage",0.0)),"cleave","physical","Tooth and Claw",false,"huntsman_tooth_claw",[],false);HuntsmanSystem.telemetry_add(source,"cleave_damage",float(cleave.resolved_damage))
 	if str(source.get("class",""))=="Protector" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("protector_runtime",{}).is_empty():
 		ProtectorSystem.note_basic_attack(source,target,combat_blockers,Vector2(source.pos),Vector2(target.pos),float(result.get("resolved_damage",0.0)))
 		ProtectorSystem.telemetry_add(source,"basic_attack_damage",float(result.get("resolved_damage",0.0)))
@@ -261,6 +285,8 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		ProtectorSystem.telemetry_add(target,"damage_taken",float(result.get("resolved_damage",0.0)))
 		if bool(result.get("defeated",false)):ProtectorSystem.telemetry_add(target,"deaths")
 	if bool(result.get("defeated",false)):
+		for huntsman in heroes:
+			if str(huntsman.get("class",""))=="Huntsman" and str(huntsman.get("huntsman_runtime",{}).get("marked_target_id",""))==str(target.get("combat_id","")):HuntsmanSystem.clear_mark(huntsman)
 		for sentinel in heroes:
 			if str(sentinel.get("class",""))!="Sentinel" or sentinel.get("sentinel_runtime",{}).is_empty():continue
 			SentinelSystem.note_defeat(sentinel,target);var reveal:Dictionary=sentinel.sentinel_runtime.w_reveals.get(str(target.combat_id),{})

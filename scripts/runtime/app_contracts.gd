@@ -79,6 +79,9 @@ func show_combat_hall() -> void:
 func start_sentinel_testing_zone() -> void:
 	pass
 
+func start_huntsman_testing_zone() -> void:
+	pass
+
 
 func show_zone_map(_zone: int) -> void:
 	pass
