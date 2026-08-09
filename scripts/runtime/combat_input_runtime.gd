@@ -284,6 +284,12 @@ func begin_trait()->void:
 		if use_slayer_trait(hero):queue_redraw()
 	elif str(hero.get("class",""))=="Shaman":
 		if use_shaman_trait(hero):queue_redraw()
+	elif str(hero.get("class",""))=="Protector" and ProtectorSystem.has_talent(hero,"protector_l30_1"):
+		use_ability(4,hero.pos)
+		queue_redraw()
+	elif str(hero.get("class",""))=="Sentinel":
+		use_ability(4,get_global_mouse_position())
+		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false

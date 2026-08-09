@@ -45,7 +45,7 @@ func sentinel_cast_w(hero:Dictionary,point:Vector2)->bool:
 	if not AbilitySlotSystem.can_activate(hero.sentinel_runtime.w_slot):return false
 	var direction:Vector2=Vector2(hero.pos).direction_to(point);if direction==Vector2.ZERO:direction=Vector2(hero.facing_direction)
 	AbilitySlotSystem.spend(hero.sentinel_runtime.w_slot);var max_hits:=2 if int(hero.sentinel_runtime.e_quest_stacks)>=20 else 1
-	hero.sentinel_runtime.w_projectiles.append({"position":Vector2(hero.pos),"origin":Vector2(hero.pos),"direction":direction,"leg_traveled":0.0,"total_traveled":0.0,"returning":false,"hit_ids":[],"max_hits":max_hits});SentinelSystem.telemetry_add(hero,"w_casts");sentinel_visual("sentinel_w",hero.pos,hero.pos+direction*float(SentinelData.SPACE.w_range),.35,{"width":float(SentinelData.SPACE.w_width)*(1.25 if SentinelSystem.has_talent(hero,"sentinel_l9_1") else 1.0)});return true
+	hero.sentinel_runtime.w_projectiles.append({"position":Vector2(hero.pos),"origin":Vector2(hero.pos),"direction":direction,"leg_traveled":0.0,"total_traveled":0.0,"returning":false,"hit_ids":[],"max_hits":max_hits});SentinelSystem.telemetry_add(hero,"w_casts");return true
 func sentinel_cast_e(hero:Dictionary,point:Vector2,automatic:bool=false)->bool:
 	if not automatic and float(hero.ability_cds[2])>0.0:return false
 	var range_limit:=SentinelSystem.e_range(hero);var center:Vector2=sentinel_clamped_point(hero,point,range_limit);hero.sentinel_runtime.pending_flares.append({"center":center,"remaining":float(SentinelData.VALUES.e_delay),"automatic":automatic})
@@ -58,8 +58,9 @@ func sentinel_cast_heroic(hero:Dictionary,point:Vector2)->bool:
 		hero.ability_cds[3]=float(SentinelData.VALUES.r1_cooldown);hero.sentinel_runtime.shadowstalk={"remaining":float(SentinelData.VALUES.r1_duration),"tick":0.0,"stationary":{}}
 		for ally in heroes:if ally.hp>0.0:StealthDetectionSystem.set_stealth_source(ally,"sentinel_shadowstalk:%s"%str(hero.combat_id),true);hero.sentinel_runtime.shadowstalk.stationary[str(ally.combat_id)]={"time":0.0,"last_pos":Vector2(ally.pos)}
 		if SentinelSystem.has_talent(hero,"sentinel_l27_r1"):for enemy in enemies:StealthDetectionSystem.reveal(enemy,10.0)
-		SentinelSystem.telemetry_add(hero,"r1_casts");return true
-	if heroic=="sentinel_l15_r2":hero.ability_cds[3]=float(SentinelData.VALUES.r2_cooldown);hero.sentinel_runtime.starfalls.append({"center":sentinel_clamped_point(hero,point,float(SentinelData.SPACE.e_range)),"remaining":float(SentinelData.VALUES.r2_duration),"tick":0.0});SentinelSystem.telemetry_add(hero,"r2_casts");return true
+		SentinelSystem.telemetry_add(hero,"r1_casts");sentinel_visual("sentinel_shadowstalk",hero.pos,hero.pos,float(SentinelData.VALUES.r1_duration),{"radius":115.0});return true
+	if heroic=="sentinel_l15_r2":
+		var starfall_center:=sentinel_clamped_point(hero,point,float(SentinelData.SPACE.e_range));hero.ability_cds[3]=float(SentinelData.VALUES.r2_cooldown);hero.sentinel_runtime.starfalls.append({"center":starfall_center,"remaining":float(SentinelData.VALUES.r2_duration),"tick":0.0});SentinelSystem.telemetry_add(hero,"r2_casts");sentinel_visual("sentinel_starfall",starfall_center,starfall_center,float(SentinelData.VALUES.r2_duration),{"radius":float(SentinelData.SPACE.starfall_radius)});return true
 	return false
 func sentinel_cast_trait(hero:Dictionary)->bool:
 	if SentinelSystem.has_talent(hero,"sentinel_l30_2") and float(hero.sentinel_runtime.d_cooldown)>0.0:
@@ -88,6 +89,7 @@ func resolve_sentinel_flare(hero:Dictionary,flare:Dictionary)->void:
 	sentinel_visual("sentinel_flare",flare.center,flare.center,.55,{"radius":float(SentinelData.SPACE.e_radius)})
 func update_sentinel_projectile(hero:Dictionary,p:Dictionary,delta:float)->bool:
 	var previous:=Vector2(p.position);var step:=float(SentinelData.SPACE.w_speed)*delta;p.position=previous+Vector2(p.direction)*step;p.leg_traveled=float(p.leg_traveled)+step;p.total_traveled=float(p.total_traveled)+step
+	sentinel_visual("sentinel_w",previous,Vector2(p.position),maxf(.08,delta*1.6),{"width":float(SentinelData.SPACE.w_width)*(1.25 if SentinelSystem.has_talent(hero,"sentinel_l9_1") else 1.0)})
 	var hit_width:=float(SentinelData.SPACE.w_width)*(1.25 if SentinelSystem.has_talent(hero,"sentinel_l9_1") else 1.0);var hits:=enemies.filter(func(target):return target.hp>0.0 and str(target.combat_id) not in p.hit_ids and CombatGeometry.segment_distance_to_point(previous,p.position,target.pos)<=hit_width+float(target.get("combat_radius",28.0)))
 	hits.sort_custom(func(a,b):return previous.distance_squared_to(a.pos)<previous.distance_squared_to(b.pos))
 	for target in hits:

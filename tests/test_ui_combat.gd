@@ -19,6 +19,9 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,rogue_range_start!=null and endless_start!=null,"Every former Testing Zone launch action should remain available through the Combat Hall.")
 	var custom_testing_party:Array=[4,5,7,8];main.state.selected_team=custom_testing_party.duplicate();main.state.active_team=custom_testing_party.duplicate()
 	TestSupport.check(errors,main.testing_party_indices()==custom_testing_party,"Testing battles should resolve the currently selected team instead of silently substituting a fixed party.")
+	for requested_class:String in ["Warlock","Rogue","Slayer","Priest","Shaman","Templar","Protector","Sentinel"]:
+		var class_party:Array=main.testing_party_for_class(requested_class)
+		TestSupport.check(errors,class_party.size()==4 and class_party.any(func(hero_index):return str(main.state.heroes[int(hero_index)].get("class",""))==requested_class),requested_class+" Range should safely inject its required class when the selected team omits it.")
 	main.state.selected_team=[0,1,2,3];main.state.active_team=[0,1,2,3];main.start_testing_zone()
 	TestSupport.check(errors,main.testing_zone_active and main.enemies.size()==7 and main.enemies.filter(func(enemy):return bool(enemy.get("boss",false))).size()==2 and main.enemies.any(func(enemy):return float(enemy.get("control_profile",{}).get("blind_duration_multiplier",0.0))==0.5),"The testing range should retain its dummy layout and include default-immune and partially Blind-vulnerable Boss targets without waves.")
 	var ranger_battle_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Ranger")

@@ -33,7 +33,7 @@ func draw_hero_channel_bar(hero:Dictionary)->void:
 	draw_rect(Rect2(bar_position,Vector2(108,9)),Color("e0c3ff"),false,1.5)
 
 func rogue_concealment_visual_state(hero:Dictionary)->String:
-	if str(hero.get("class",""))!="Rogue" or not hero.has("concealment"):return ""
+	if not hero.has("concealment"):return ""
 	if StealthDetectionSystem.is_invisible(hero):return "invisible"
 	if bool(hero.get("rogue_runtime",{}).get("vanish_active",false)) or StealthDetectionSystem.is_stealthed(hero):return "vanished"
 	return ""
@@ -378,7 +378,11 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Priest":action_name=str(PriestData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Shaman":action_name=str(ShamanData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Templar":action_name=str(TemplarData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Protector":action_name=str(ProtectorData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Sentinel":action_name=str(SentinelData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
+			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"
+			elif slot==4 and active["class"]=="Sentinel" and SentinelSystem.has_talent(active,"sentinel_l30_2") and float(active.get("sentinel_runtime",{}).get("d_cooldown",0.0))>0.0:action_name="Trueshot"
 			var cleric_trait_active:bool=false
 			if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
 			var hatred_ratio:float=0.0
@@ -391,7 +395,10 @@ func draw_ability_bar_hud()->void:
 			var frostwolf_ratio:float=clampf(float(active.get("shaman_runtime",{}).get("frostwolf_stacks",0))/float(ShamanData.VALUES.trait_threshold),0.0,1.0) if slot==4 and str(active.get("class",""))=="Shaman" else 0.0
 			var frostwolf_ready:bool=frostwolf_ratio>=0.8
 			var templar_trait_active:bool=slot==4 and str(active.get("class",""))=="Templar" and bool(active.get("templar_runtime",{}).get("trait_active",false))
-			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active:
+			var protector_trait_active:bool=slot==4 and str(active.get("class",""))=="Protector" and (bool(active.get("spirit_form",false)) or not active.get("protector_runtime",{}).get("wrath",{}).is_empty())
+			var sentinel_trait_active:bool=slot==4 and str(active.get("class",""))=="Sentinel" and float(active.get("sentinel_runtime",{}).get("mark_remaining",0.0))>0.0
+			var highlighted_state:bool=cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active or protector_trait_active or sentinel_trait_active
+			if highlighted_state:
 				var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 				draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
 			draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
@@ -403,7 +410,7 @@ func draw_ability_bar_hud()->void:
 			draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 			if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
 			if active["class"]=="Rogue" and slot==2 and ComboPointSystem.current(active)<=0:draw_octagon(center,37,Color(0,0,0,.58),C_MUTED,2)
-			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+			if highlighted_state:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
 			if active["class"]=="Shaman" and slot==2 and int(active.get("shaman_runtime",{}).get("windfury_attacks",0))>0:draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),str(int(active.shaman_runtime.windfury_attacks)),HORIZONTAL_ALIGNMENT_CENTER,24,11,C_TEXT)
 			if not warlock_trait_state.is_empty() and slot==4:draw_string(ThemeDB.fallback_font,center+Vector2(14,-20),"%d%%"%int(warlock_trait_state.cost_percent),HORIZONTAL_ALIGNMENT_CENTER,42,9,C_TEXT)
 			if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:
@@ -415,6 +422,13 @@ func draw_ability_bar_hud()->void:
 				elif slot==3 and MageSystem.has_talent(active,"mage_l27_r1") and not active.mage_runtime.phoenix.is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d"%int(active.mage_runtime.phoenix.reposition_charges),HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 			if active["class"]=="Slayer" and slot==1 and not active.get("slayer_runtime",{}).is_empty():
 				var slayer_slot:=AbilitySlotSystem.ui_state(active.slayer_runtime.w_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[slayer_slot.charges,slayer_slot.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+			if active["class"]=="Shaman" and slot==0 and not active.get("shaman_runtime",{}).is_empty():
+				var shaman_slot:=AbilitySlotSystem.ui_state(active.shaman_runtime.q_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[shaman_slot.charges,shaman_slot.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+			if active["class"]=="Templar" and slot==3 and str(active.get("selected_heroic_id",""))=="templar_l15_r1" and not active.get("templar_runtime",{}).is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),str(int(active.templar_runtime.r1_charges)),HORIZONTAL_ALIGNMENT_CENTER,24,11,C_TEXT)
+			if active["class"]=="Protector" and slot==2 and not active.get("protector_runtime",{}).is_empty():
+				var protector_slot:=AbilitySlotSystem.ui_state(active.protector_runtime.smite_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[protector_slot.charges,protector_slot.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+			if active["class"]=="Sentinel" and slot in [0,1] and not active.get("sentinel_runtime",{}).is_empty():
+				var sentinel_slot:=AbilitySlotSystem.ui_state(active.sentinel_runtime.q_slot if slot==0 else active.sentinel_runtime.w_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[sentinel_slot.charges,sentinel_slot.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 
 func draw_tutorial_completion_hud()->void:
 	if tutorial_active and tutorial_step==4:

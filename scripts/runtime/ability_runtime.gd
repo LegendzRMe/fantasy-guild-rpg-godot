@@ -22,6 +22,7 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 		if h["class"]=="Protector" and slot==0 and not h.get("protector_runtime",{}).get("q_sequence",{}).is_empty():pass
 		elif h["class"]=="Protector" and slot==2 and AbilitySlotSystem.can_activate(h.protector_runtime.smite_slot):pass
 		elif h["class"]=="Protector" and slot==4 and protector_trait_input:pass
+		elif h["class"]=="Sentinel" and slot==4 and sentinel_trait_input:pass
 		elif slot==0 and hero_has_passive(h,"twin_incantation"):
 			if int(h.get("q_charges",0))<=0:return
 		elif h["class"]=="Mage" and slot==1 and MageSystem.trait_is_armed(h):pass
