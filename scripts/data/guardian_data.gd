@@ -1,5 +1,7 @@
 extends RefCounted
 
+const CombatBalanceData = preload("res://scripts/data/combat_balance_data.gd")
+
 const CLASS_ID := "guardian"
 const SCALE_PER_LEVEL := 1.04
 const ACTION_KEYS := ["D","Q","W","E","R"]
@@ -88,7 +90,7 @@ const CLASS_DEFINITION := {
 	"ai_behavior_tags":["tank","melee","high_threat"],"color":Color("5fa8ff"),"ability":"Storm Bolt",
 	"base_health":2765.0,"health_growth":0.04,"base_power":88.0,"power_growth":0.04,"base_armor":0.0,
 	"basic_action_type":"attack","basic_action_power_coefficient":1.0,"basic_action_interval":1.0/1.11,"basic_action_range":55.0,
-	"movement_speed":135.0,"base_critical_chance":0.05,"critical_damage":2.0,"health_regeneration":0.0,"threat_modifier":5.0,
+	"movement_speed":135.0,"base_critical_chance":0.05,"critical_damage":2.0,"health_regeneration":0.0,"threat_modifier":CombatBalanceData.TANK_THREAT_MODIFIER,
 	"basic_action_damage_type":"physical","armor_family":"plate","armor_proficiency":"plate","weapon_proficiencies":["one_handed","two_handed","weapon_and_shield"]
 }
 

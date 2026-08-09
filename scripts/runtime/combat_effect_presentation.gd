@@ -110,6 +110,18 @@ func draw_combat_effect(fx:Dictionary)->void:
 			var pulse_radius:=float(fx.get("radius",100.0));draw_circle(fx.from,pulse_radius,Color(col,alpha*.10));draw_arc(fx.from,pulse_radius*clampf(progress*1.7,.1,1.0),0,TAU,48,col,6)
 		"templar_purifier_beam":
 			draw_line(fx.from,fx.to,Color(col,alpha*.65),12);draw_circle(fx.to,28,Color(col,alpha*.18));draw_arc(fx.to,32,0,TAU,32,Color.WHITE,3)
+		"protector_sword_throw":
+			var sword_pos:Vector2=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));draw_line(fx.from,sword_pos,Color(col,.45),4);draw_line(sword_pos+Vector2(-10,16),sword_pos+Vector2(10,-16),col,7);draw_circle(sword_pos,18,Color(col,alpha*.12))
+		"protector_teleport","protector_judgment":
+			var dash_pos:Vector2=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));draw_line(fx.from,dash_pos,Color(col,.4),12);draw_circle(dash_pos,20+progress*28,Color(col,alpha*.18));draw_arc(dash_pos,24+progress*30,0,TAU,36,col,5)
+		"protector_wall_warning","protector_force_wall":
+			draw_line(fx.from,fx.to,Color(col,alpha*.4),16);draw_line(fx.from,fx.to,Color.WHITE,3)
+		"protector_smite":
+			var side:Vector2=Vector2(fx.from).direction_to(Vector2(fx.to)).orthogonal()*float(fx.get("width",55.0));draw_colored_polygon(PackedVector2Array([fx.from-side*.35,fx.to-side,fx.to+side,fx.from+side*.35]),Color(col,alpha*.16));draw_line(fx.from,fx.to,col,5)
+		"protector_judgment_warning":
+			draw_line(fx.from,fx.to,Color(col,alpha*.4),5);draw_arc(fx.to,34,0,TAU,32,col,4)
+		"protector_wrath","protector_wrath_explosion":
+			var wrath_radius:=float(fx.get("radius",115.0));draw_circle(fx.from,wrath_radius,Color(col,alpha*.10));draw_arc(fx.from,wrath_radius*clampf(.3+progress,0.0,1.0),0,TAU,52,col,7)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":
@@ -125,7 +137,7 @@ func draw_combat_effect(fx:Dictionary)->void:
 		var text_pos=fx.to+Vector2(-28,-48-progress*30)
 		draw_string(ThemeDB.fallback_font,text_pos,fx.text,HORIZONTAL_ALIGNMENT_CENTER,90,17,col)
 func draw_role_icon(pos:Vector2,hero_class:String,ink:Color=Color("101827"))->void:
-	if hero_class in ["Guardian","Templar"]:
+	if hero_class in ["Guardian","Templar","Protector"]:
 		var shield=PackedVector2Array([pos+Vector2(-11,-13),pos+Vector2(11,-13),pos+Vector2(9,5),pos+Vector2(0,15),pos+Vector2(-9,5)])
 		draw_colored_polygon(shield,ink);draw_polyline(shield+PackedVector2Array([shield[0]]),Color.WHITE,2)
 	elif hero_class in ["Cleric","Priest"]:

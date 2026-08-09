@@ -69,6 +69,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Priest":PriestSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Shaman":ShamanSystem.initialize_runtime(heroes[-1],is_testing_save(),data.get("talent_mastery",{}),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Templar":TemplarSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
+		elif str(heroes[-1].get("class",""))=="Protector":ProtectorSystem.initialize_runtime(heroes[-1],is_testing_save())
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -222,6 +223,29 @@ func start_templar_testing_zone() -> void:
 		if fixture.type=="Boss":enemies[-1].control_profile={"blind_duration_multiplier":0.5,"slow_multiplier":0.5,"displacement":false}
 	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,8000.0);enemy.max_hp=enemy.hp
 	for ally in heroes:if str(ally.get("class",""))!="Templar":ally.hp*=0.45
+	queue_redraw()
+
+func start_protector_testing_zone() -> void:
+	var test_party:Array=selected_party_indices()
+	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Protector"):
+		var protector_index:int=-1
+		for hero_index in state.heroes.size():
+			if str(state.heroes[hero_index].get("class",""))=="Protector":protector_index=hero_index;break
+		if protector_index<0:flash("Protector fixture unavailable.");show_combat_hall();return
+		test_party=[protector_index]
+		for hero_index in state.heroes.size():
+			if hero_index!=protector_index:test_party.append(hero_index)
+			if test_party.size()>=4:break
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="protector_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	for hero in heroes:if str(hero.get("class",""))=="Protector":hero.protector_runtime.telemetry_enabled=true
+	var fixtures:=[{"position":Vector2(480,130),"type":"Raider","tags":[]},{"position":Vector2(570,130),"type":"Archer","tags":[]},{"position":Vector2(660,130),"type":"Brute","tags":["elite"]},{"position":Vector2(490,235),"type":"Swift","tags":["summon"]},{"position":Vector2(620,235),"type":"Dummy","tags":["temporary_combat"]},{"position":Vector2(920,180),"type":"Boss","tags":["boss"]},{"position":Vector2(1010,485),"type":"Defense Dummy","tags":["training"]}]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);enemies[-1].passive_test_enemy=true
+		for tag in fixture.tags:if tag not in enemies[-1].combat_tags:enemies[-1].combat_tags.append(tag)
+		if fixture.type=="Boss":enemies[-1].control_profile={"slow_multiplier":0.5,"stun_multiplier":0.25,"displacement":false}
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:protector_permanent",Rect2(760,255,34,155)))
+	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,9000.0);enemy.max_hp=enemy.hp
+	for ally in heroes:if str(ally.get("class",""))!="Protector":ally.hp*=0.55
 	queue_redraw()
 
 func selected_party_indices() -> Array:

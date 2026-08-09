@@ -137,6 +137,9 @@ func build_damage_request(target:Dictionary,resolved_amount:float,source_action:
 		if source_action=="basic_attack" and not templar_block.is_empty():templar_sources.append(templar_block)
 		if TemplarSystem.has_talent(target,"templar_l21_3") and (bool(target.templar_runtime.trait_active) or float(target.templar_runtime.trait_after_armor)>0.0):templar_sources.append({"id":"phase_bulwark","armor":float(TemplarData.VALUES.phase_bulwark_armor),"remaining":1.0})
 		if not templar_sources.is_empty():request["armor_sources"]=templar_sources
+	elif str(target.get("class",""))=="Protector" and not target.get("protector_runtime",{}).is_empty():
+		var protector_sources:=ProtectorSystem.armor_sources(target)
+		if not protector_sources.is_empty():request["armor_sources"]=protector_sources
 	var shared_armor:Array=target.get("temporary_armor_sources",[]).duplicate(true)
 	if not shared_armor.is_empty():
 		var combined:Array=request.get("armor_sources",[]).duplicate(true);combined.append_array(shared_armor);request["armor_sources"]=combined
@@ -180,7 +183,10 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
 	if EvasionSystem.should_evade(target,source_action,hostile,bool(source.get("bypass_evasion",false))):
 		var miss:=EvasionSystem.miss_result(source_action,damage_type);combat_events.append(CombatSystem.create_event("basic_attack_evaded",source,target,miss,{"source_action":source_action,"action_tags":[source_action],"origin":origin}));if str(target.get("class",""))=="Slayer":SlayerSystem.telemetry_add(target,"evaded_attacks");return miss
-	var resolved_amount:=amount;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
+	var active_damage_multiplier:=1.0
+	for active_effect in source.get("active_effects",[]):
+		if float(active_effect.get("remaining_duration",0.0))>0.0:active_damage_multiplier=maxf(active_damage_multiplier,float(active_effect.get("damage_multiplier",1.0)))
+	var resolved_amount:=amount*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
 	if str(source.get("class",""))=="Templar" and source_action=="basic_attack" and not source.get("templar_runtime",{}).is_empty():
 		resolved_amount*=TemplarSystem.basic_attack_multiplier(source)
 		if originating_effect_id=="":
@@ -227,7 +233,15 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(target.get("class",""))=="Slayer" and not target.get("slayer_runtime",{}).is_empty() and BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"slayer_block"):SlayerSystem.telemetry_add(target,"block_consumed")
 	if str(target.get("class",""))=="Shaman" and not target.get("shaman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"shaman_block")
 	if str(target.get("class",""))=="Templar" and not target.get("templar_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"templar_block")
+	if str(source.get("class",""))=="Protector" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("protector_runtime",{}).is_empty():
+		ProtectorSystem.note_basic_attack(source,target,combat_blockers,Vector2(source.pos),Vector2(target.pos),float(result.get("resolved_damage",0.0)))
+		ProtectorSystem.telemetry_add(source,"basic_attack_damage",float(result.get("resolved_damage",0.0)))
+		ProtectorSystem.telemetry_add(source,"basic_attack_threat",CombatSystem.damage_threat(result,float(source.get("threat_modifier",1.0))))
+		if ProtectorSystem.has_talent(source,"protector_l18_2") and ProtectorSystem.crosses_own_wall(source,source.pos,target.pos,combat_blockers) and float(result.get("resolved_damage",0.0))>0.0:CombatSystem.apply_control(target,"slow",float(ProtectorData.VALUES.w_crossing_duration),float(ProtectorData.VALUES.w_crossing_slow))
 	templar_after_damage(source,target,result,source_action,originating_effect_id)
+	if str(target.get("class",""))=="Protector" and not target.get("protector_runtime",{}).is_empty():
+		ProtectorSystem.telemetry_add(target,"damage_taken",float(result.get("resolved_damage",0.0)))
+		if bool(result.get("defeated",false)):ProtectorSystem.telemetry_add(target,"deaths")
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("rogue_runtime",{}).is_empty():
 		if ComboPointSystem.successful_hit(result):
 			RogueSystem.double_strike_roll(source)
@@ -335,6 +349,8 @@ func update_timed_combat_effects(unit:Dictionary,delta:float)->void:
 		else:unit.shield_sources[shield_index]=shield_source
 	for effect_index in range(unit.get("active_effects",[]).size()-1,-1,-1):
 		var active_effect:Dictionary=unit.active_effects[effect_index]
+		if float(active_effect.get("delay",0.0))>0.0:
+			active_effect.delay=maxf(0.0,float(active_effect.delay)-delta);unit.active_effects[effect_index]=active_effect;continue
 		if float(active_effect.get("remaining_duration",0.0))<=0.0:continue
 		active_effect.remaining_duration=float(active_effect.remaining_duration)-delta
 		if active_effect.remaining_duration<=0.0:unit.active_effects.remove_at(effect_index)

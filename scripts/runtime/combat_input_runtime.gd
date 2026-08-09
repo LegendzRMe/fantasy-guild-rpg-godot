@@ -25,6 +25,40 @@ func load_templar_test_build(hero:Dictionary,build_index:int)->void:
 	var build:Dictionary=TemplarData.TEST_BUILDS[clampi(build_index,0,TemplarData.TEST_BUILDS.size()-1)];var level:int=int(build.level)
 	hero.level=level;hero.power=TemplarData.scaled(float(TemplarData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=TemplarData.scaled(float(TemplarData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);TemplarSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_protector_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=ProtectorData.TEST_BUILDS[clampi(build_index,0,ProtectorData.TEST_BUILDS.size()-1)]
+	var level:int=int(build.level)
+	hero.level=level;hero.power=ProtectorData.scaled(float(ProtectorData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=ProtectorData.scaled(float(ProtectorData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.range=float(ProtectorData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);ProtectorSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func protector_range_hero():
+	for hero in heroes:
+		if str(hero.get("class",""))=="Protector":return hero
+	return null
+
+func handle_protector_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="protector_range":return false
+	var hero=protector_range_hero();if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_4:
+		var build_index:=int(event.keycode-KEY_1);load_protector_test_build(hero,build_index);flash("Protector build: %s"%str(ProtectorData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.alt_pressed:return false
+	match event.keycode:
+		KEY_C:
+			hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.protector_runtime.aspect_cooldown=0.0
+			hero.protector_runtime.smite_slot=AbilitySlotSystem.create(2 if ProtectorSystem.has_talent(hero,"protector_l30_3") else 1,float(ProtectorData.VALUES.e_cooldown));flash("Protector cooldowns and Smite charges reset")
+		KEY_K:hero.hp=0.0;hero.protector_runtime.wrath_resolved=false;flash("Archangel's Wrath triggered")
+		KEY_H:for ally in heroes:ally.hp=ally.max_hp;flash("All allies restored")
+		KEY_W:
+			for blocker_index in range(combat_blockers.size()-1,-1,-1):
+				if ProtectorSystem.own_wall(hero,combat_blockers[blocker_index]):combat_blockers.remove_at(blocker_index)
+			hero.protector_runtime.walls.clear();flash("Protector walls reset")
+		KEY_T:
+			var target_index:=combat_enemy_target()
+			if target_index>=0:
+				for ally_index in heroes.size():enemies[target_index].threat[ally_index]=100.0+ally_index*250.0
+				flash("Selected enemy Threat configured")
+		_:return false
+	queue_redraw();return true
+
 func handle_templar_range_shortcut(event:InputEventKey)->bool:
 	if not testing_zone_active or testing_zone_mode!="templar_range":return false
 	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Templar":hero=candidate;break
@@ -306,6 +340,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_protector_range_shortcut(event):return true
 	if handle_templar_range_shortcut(event):return true
 	if handle_shaman_range_shortcut(event):return true
 	if handle_priest_range_shortcut(event):return true

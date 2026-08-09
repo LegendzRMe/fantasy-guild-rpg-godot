@@ -44,6 +44,7 @@ Owns mutable application, menu, map, tutorial, item-overlay, and combat state de
 - `scripts/runtime/slayer_runtime.gd`: Slayer V1 Dive/Sweep movement, Evasion, Heroics, encounter talent updates, named Shields, and Slayer-range behavior. Shared Evasion, Block-charge, charge, target-category, percentage-Health, and status rules remain outside the runtime.
 - `scripts/runtime/priest_runtime.gd`: Priest V1 automatic ally resolution, traveling Divine Star, Chastise, Heroics, Spirit Form, talent effects, and Priest-range orchestration. Deterministic selection and state math remain in focused shared/class systems.
 - `scripts/runtime/templar_runtime.gd`: Templar V1 Blade Dash pathing, Twin Blades strike scheduling, Shield Ally ownership links, Heroics, and Templar-range orchestration. Shared threat, Shield, Block, Armor reduction, target-category, and control rules remain outside the class runtime.
+- `scripts/runtime/protector_runtime.gd`: Protector V1 El'druin recasts, oriented Force Wall ownership, Smite fields, Heroics, Archangel state, and Protector-range orchestration. Segment blockers, charges, Threat, Armor, Invulnerable, and control remain shared systems.
 - `scripts/runtime/enemy_combat_runtime.gd`: waves, spawning, encounter objectives, enemy target selection, and combat lookup helpers.
 - `scripts/runtime/ability_runtime.gd`: temporary class ability execution and cast-position resolution.
 - `scripts/runtime/combat_input_runtime.gd`: combat selection, drag commands, ability aiming, keyboard, mouse, touch, and tutorial input gates.
@@ -85,6 +86,8 @@ Slayer follows the same split through `slayer_data.gd`, `slayer_system.gd`, `sla
 Priest follows the same split through `priest_data.gd`, `priest_system.gd`, `priest_runtime.gd`, and `priest_ability_presenter.gd`. Class-neutral deterministic ally resolution and Protected/Invulnerable queries are reusable without importing Priest runtime code.
 
 Templar follows the same split through `templar_data.gd`, `templar_system.gd`, `templar_runtime.gd`, and `templar_ability_presenter.gd`. Shield Ally stores source-aware owner/bearer/cast records while its redirected threat is applied through the existing threat table. Geometry calibration and deliberate source overrides are documented separately in `docs/templar_geometry_calibration.md` and `docs/templar_conversion_v1.md`.
+
+Protector follows the same split through `protector_data.gd`, `protector_system.gd`, `protector_runtime.gd`, and `protector_ability_presenter.gd`. Its class runtime owns Q/W/E/R/D state while oriented movement-only collision lives in shared `CombatGeometry`, Smite charges use `AbilitySlotSystem`, and Tank Threat uses `CombatBalanceData`. See `docs/protector_conversion_v1.md`, `docs/protector_geometry_calibration.md`, `docs/temporary_pathing_blockers_v1.md`, and `docs/threat_system_v1.md`.
 
 ### `scripts/data/talent_data.gd`
 

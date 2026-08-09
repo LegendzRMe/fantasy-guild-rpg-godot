@@ -128,6 +128,9 @@ func draw_combat_background() -> void:
 func draw_shared_combat_objects()->void:
 	for blocker in combat_blockers:
 		if not CombatGeometry.blocker_active(blocker):continue
+		if str(blocker.get("shape","rect"))=="segment":
+			draw_line(Vector2(blocker.from),Vector2(blocker.to),Color("66d8ff88"),float(blocker.thickness));draw_line(Vector2(blocker.from),Vector2(blocker.to),Color("dff8ff"),3)
+			continue
 		var fill:=Color("73513b") if bool(blocker.get("destructible",false)) else Color("465267")
 		draw_rect(blocker.rect,fill);draw_rect(blocker.rect,C_GOLD if bool(blocker.get("destructible",false)) else C_MUTED,false,3)
 		if bool(blocker.get("destructible",false)):
@@ -153,6 +156,8 @@ func draw_combat_debug_overlay()->void:
 		var shaman:Dictionary=hero.shaman_runtime;lines.append("FROSTWOLF  %d / %d"%[int(shaman.frostwolf_stacks),int(ShamanData.VALUES.trait_threshold)]);lines.append("Q CHARGES  %d / %d"%[int(shaman.q_slot.current_charges),int(shaman.q_slot.max_charges)]);lines.append("WIND FURY  %d  %.2f"%[int(shaman.windfury_attacks),float(shaman.windfury_remaining)]);lines.append("ANCESTRAL  %d / %d%s"%[int(shaman.ancestral_stacks),int(ShamanData.VALUES.ancestral_max)," READY" if bool(shaman.ancestral_ready) else ""]);lines.append("GATHERING  %d / %d"%[int(shaman.gathering_stacks),int(ShamanData.VALUES.gathering_max)]);lines.append("THUNDER  %d / %d"%[int(shaman.thunder_stacks),int(ShamanData.VALUES.thunder_max)]);lines.append("ECHO/CRASH/MAEL  %d / %d / %d"%[int(shaman.encounter_progress.get("echo",0)),int(shaman.encounter_progress.get("crash",0)),int(shaman.encounter_progress.get("maelstrom",0))]);lines.append("MYTHIC  %d / %d / %d"%[ShamanSystem.mastery_progress(hero,"shaman_l9_1"),ShamanSystem.mastery_progress(hero,"shaman_l9_2"),ShamanSystem.mastery_progress(hero,"shaman_l9_3")])
 	if str(hero.get("class",""))=="Templar" and not hero.get("templar_runtime",{}).is_empty():
 		var templar:Dictionary=hero.templar_runtime;lines.append("OVERLOAD CD  %.2f"%float(templar.trait_cooldown));lines.append("D SHIELD  %.0f"%TemplarSystem.named_shield_amount(hero,"templar_shield_overload"));lines.append("PROTECTOR  %d"%int(templar.protector_stacks));lines.append("E DEPLETIONS  %d"%int(templar.give_twenty_depletions));lines.append("LINK BUCKET  %.1f"%float(templar.together_bucket))
+	if str(hero.get("class",""))=="Protector" and not hero.get("protector_runtime",{}).is_empty():
+		var protector:Dictionary=hero.protector_runtime;var owned_walls:Array=combat_blockers.filter(func(blocker):return ProtectorSystem.own_wall(hero,blocker));lines.append("SWORD  %s"%("ACTIVE" if not protector.q_sequence.is_empty() else "NONE"));lines.append("Q EMPOWERED  %s"%str(bool(protector.q_sequence.get("empowered",false))));lines.append("WALLS  %d  %s"%[owned_walls.size(),str(owned_walls.map(func(blocker):return "%s %.1f"%[str(blocker.cast_id),float(blocker.remaining_duration)]))]);lines.append("SMITE  %d/%d  FIELDS %d"%[int(protector.smite_slot.current_charges),int(protector.smite_slot.max_charges),protector.smite_fields.size()]);lines.append("LAST PURGE  %s"%str(protector.last_purge));lines.append("ASPECT CD  %.1f"%float(protector.aspect_cooldown));lines.append("WRATH  %s"%str(protector.wrath.get("phase","none")));lines.append("ARMOR SOURCES  %s"%str(ProtectorSystem.armor_sources(hero)))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])

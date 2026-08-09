@@ -158,6 +158,24 @@ static func run(main:Node) -> Array:
 		var dash_origin:Vector2=templar.pos;linked_enemy.pos=dash_origin+Vector2.RIGHT*90.0;linked_enemy.hp=linked_enemy.max_hp;templar.ability_cds[0]=0.0;main.cast_templar_q(templar,dash_origin+Vector2.RIGHT*200.0);for step in 20:main.update_templar_runtime(.06)
 		TestSupport.check(errors,templar.pos.distance_to(dash_origin)<1.0 and linked_enemy.hp<linked_enemy.max_hp and templar.templar_runtime.blade_dashes.is_empty(),"Blade Dash should sweep contacts outward and return the Templar to the saved origin.")
 	else:TestSupport.check(errors,false,"The testing save should include a Templar runtime fixture.")
+	var protector_save_index:int=main.state.heroes.find_custom(func(saved_hero):return str(saved_hero.get("class",""))=="Protector")
+	if protector_save_index>=0:
+		# The range deliberately constructs Protector + three allies even when the saved active team omits Protector.
+		main.state.selected_team=[0,1,2,3];main.state.active_team=main.state.selected_team.duplicate();main.start_protector_testing_zone()
+		var protector_index:int=main.heroes.find_custom(func(runtime_hero):return str(runtime_hero.get("class",""))=="Protector")
+		var protector:Dictionary=main.heroes[protector_index];main.selected=protector_index
+		TestSupport.check(errors,main.testing_zone_mode=="protector_range" and main.heroes.size()==4 and main.enemies.any(func(enemy):return bool(enemy.get("boss",false))) and main.combat_blockers.any(func(blocker):return str(blocker.combat_id)=="blocker:protector_permanent"),"Protector Range should automatically include Protector, three allies, Boss control, and permanent terrain fixtures.")
+		protector.selected_talents={"tier_3":"protector_l15_r1","tier_8":"protector_l30_3"};protector.selected_heroic_id="protector_l15_r1";main.ProtectorSystem.initialize_runtime(protector,true);protector.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+		var wall_point:Vector2=protector.pos+Vector2.RIGHT*180.0
+		TestSupport.check(errors,main.cast_protector_w(protector,wall_point),"Protector should place a delayed Force Wall at valid ground.")
+		main.update_protector_runtime(.51)
+		var owned_walls:Array=main.combat_blockers.filter(func(blocker):return main.ProtectorSystem.own_wall(protector,blocker))
+		TestSupport.check(errors,owned_walls.size()==1 and bool(owned_walls[0].blocks_movement) and not bool(owned_walls[0].blocks_projectiles) and not bool(owned_walls[0].blocks_line_of_sight),"An activated Force Wall should be movement-only owned terrain.")
+		var smite_target:Vector2=protector.pos+Vector2.RIGHT*150.0
+		TestSupport.check(errors,main.cast_protector_e(protector,smite_target) and main.cast_protector_e(protector,smite_target),"Seal of El'druin should allow two immediate runtime Smite casts.")
+		protector.hp=0.0;protector.protector_runtime.wrath_resolved=false;main.update_protector_runtime(.01)
+		TestSupport.check(errors,bool(protector.spirit_form) and is_equal_approx(float(protector.hp),1.0) and str(protector.protector_runtime.wrath.phase)=="active","Actual defeat should enter the controllable Archangel's Wrath state before ordinary incapacitation.")
+	else:TestSupport.check(errors,false,"The testing save should include a Protector runtime fixture.")
 	main.state.selected_team=[0,1,3,2];main.state.active_team=[0,1,3,2];main.start_testing_endless(17)
 	TestSupport.check(errors,main.testing_zone_mode=="endless" and main.testing_endless_level==17 and main.battle_hero_indices==main.state.selected_team and main.enemies.size()==4 and main.enemies.all(func(enemy):return int(enemy.level)==17 and bool(enemy.get("testing_endless_enemy",false)) and enemy.rewarded),"Endless Arena should use the selected team and begin with enemies scaled to the selected fixed level.")
 	var endless_mage_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Mage");main.selected=endless_mage_index;main.focused_enemy_index=-1;main.heroes[endless_mage_index].target=-1;main.toast="";main.begin_ability(1)

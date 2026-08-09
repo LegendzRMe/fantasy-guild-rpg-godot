@@ -47,15 +47,23 @@ func clear_hero_command(hero:Dictionary,reason:String="")->void:
 	CombatRulesV1.clear_assignment(hero,reason);hero.target=-1;hero.heal_target=-1;hero.dest=hero.pos
 
 func issue_hero_move(hero:Dictionary,destination:Vector2)->void:
+	if str(hero.get("class",""))=="Protector" and str(hero.get("protector_runtime",{}).get("wrath",{}).get("phase",""))=="channel":return
 	if not (str(hero.get("class",""))=="Ranger" and float(hero.get("ranger_runtime",{}).get("strafe_remaining",0.0))>0.0):interrupt_unit_action(hero,"movement")
 	CombatRulesV1.issue_move(hero,destination);hero.target=-1;hero.heal_target=-1
 
 func active_movement_multiplier(unit:Dictionary)->float:
 	var multiplier:=1.0
 	if str(unit.get("class",""))=="Shaman" and int(unit.get("shaman_runtime",{}).get("windfury_attacks",0))>0:multiplier*=ShamanSystem.windfury_movement_multiplier(unit)
+	if str(unit.get("class",""))=="Protector" and not unit.get("protector_runtime",{}).is_empty():multiplier*=ProtectorSystem.movement_multiplier(unit)
 	for effect in unit.get("active_effects",[]):
 		if float(effect.get("remaining_duration",0.0))>0.0:multiplier*=float(effect.get("movement_speed_multiplier",1.0))
 	return multiplier
+
+func active_basic_attack_range(unit:Dictionary)->float:
+	var bonus:=0.0
+	for effect in unit.get("active_effects",[]):
+		if float(effect.get("remaining_duration",0.0))>0.0:bonus=maxf(bonus,float(effect.get("basic_attack_range_bonus",0.0)))
+	return float(unit.get("range",0.0))+bonus
 
 func begin_unit_cast(unit:Dictionary,slot:int,duration:float,is_heroic:bool=false,channel_duration:float=0.0,requires_line_of_sight:bool=true,full_cooldown:float=-1.0)->void:
 	CombatRulesV1.preserve_command(unit)
@@ -168,6 +176,14 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 			interrupt_unit_action(hero,"incapacitated");CombatRulesV1.incapacitate(hero)
 			if str(hero.combat_id) not in incapacitated_hero_ids:incapacitated_hero_ids.append(str(hero.combat_id))
 		return
+	if bool(hero.get("spirit_form",false)):
+		if int(hero.get("command_state",CombatRulesV1.CommandState.IDLE))==CombatRulesV1.CommandState.MOVE:
+			var spirit_before:Vector2=hero.pos
+			hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*active_movement_multiplier(hero)*delta,42.0,combat_blockers)
+			hero.dest=hero.move_destination
+			if hero.pos.distance_to(hero.move_destination)<=4.0:hero.command_state=CombatRulesV1.CommandState.IDLE;hero.dest=hero.pos
+			elif hero.pos!=spirit_before:hero.facing_direction=spirit_before.direction_to(hero.pos)
+		return
 	if str(hero.get("class",""))=="Warlock" and float(hero.get("warlock_runtime",{}).get("banished_remaining",0.0))>0.0:return
 	var fear_effects:Array=hero.get("active_effects",[]).filter(func(effect):return str(effect.get("control_type",""))=="fear" and float(effect.get("remaining_duration",0.0))>0.0)
 	if not fear_effects.is_empty():
@@ -194,7 +210,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 		if not target_is_valid_for(hero,target,kind):clear_hero_command(hero,"target invalid");return
 		var has_los:=CombatGeometry.has_line_of_sight(hero.pos,target.pos,combat_blockers)
 		if bool(hero.assignment_had_line_of_sight) and not has_los:clear_hero_command(hero,"line of sight lost");return
-		var usable_range:=float(hero.range)-CombatRulesV1.RANGE_TOLERANCE;var distance:float=hero.pos.distance_to(target.pos)
+		var usable_range:=active_basic_attack_range(hero)-CombatRulesV1.RANGE_TOLERANCE;var distance:float=hero.pos.distance_to(target.pos)
 		if not has_los:
 			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers)
 			if hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"no reachable line of sight")

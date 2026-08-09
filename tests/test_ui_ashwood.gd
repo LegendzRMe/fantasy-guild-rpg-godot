@@ -87,8 +87,8 @@ static func run(main:Node) -> Array:
 	main.spawn_enemy(Vector2(1180,330),"Raider")
 	var protection_enemy:Dictionary=main.enemies[-1]
 	TestSupport.check(errors,main.preferred_enemy_target(protection_enemy)==main.OBJECTIVE_THREAT_TARGET,"Protection enemies should enter the battle targeting the vulnerable signal ally.")
-	main.add_damage_threat(protection_enemy,0,10.0)
-	TestSupport.check(errors,main.preferred_enemy_target(protection_enemy)==0,"Brann's five-times Tank threat should pull a protection enemy away from the ally.")
+	main.add_damage_threat(protection_enemy,0,40.0)
+	TestSupport.check(errors,main.preferred_enemy_target(protection_enemy)==0,"Brann's canonical Tank threat should pull a protection enemy away from the ally once it crosses the normal aggro threshold.")
 	main.add_enemy_threat(protection_enemy,1,80.0)
 	protection_enemy.target=0
 	TestSupport.check(errors,main.preferred_enemy_target(protection_enemy)==1,"Sufficient non-Tank threat should eventually pull an enemy away from Brann.")
