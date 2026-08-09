@@ -21,6 +21,25 @@ func load_shaman_test_build(hero:Dictionary,build_index:int)->void:
 	var build:Dictionary=ShamanData.TEST_BUILDS[clampi(build_index,0,ShamanData.TEST_BUILDS.size()-1)];var level:int=int(build.level);var mastery:Dictionary=hero.get("shaman_runtime",{}).get("mastery",{}).duplicate(true)
 	hero.level=level;hero.power=ShamanData.scaled(float(ShamanData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=ShamanData.scaled(float(ShamanData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);ShamanSystem.initialize_runtime(hero,true,mastery);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_templar_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=TemplarData.TEST_BUILDS[clampi(build_index,0,TemplarData.TEST_BUILDS.size()-1)];var level:int=int(build.level)
+	hero.level=level;hero.power=TemplarData.scaled(float(TemplarData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=TemplarData.scaled(float(TemplarData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);TemplarSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func handle_templar_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="templar_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Templar":hero=candidate;break
+	if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_4:
+		var build_index:=int(event.keycode-KEY_1);load_templar_test_build(hero,build_index);flash("Templar build: %s"%str(TemplarData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.alt_pressed:return false
+	match event.keycode:
+		KEY_C:hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.templar_runtime.trait_cooldown=0.0;flash("Templar cooldowns reset")
+		KEY_D:hero.hp=float(hero.max_hp)*.70;hero.templar_runtime.trait_cooldown=0.0;flash("Shield Overload armed")
+		KEY_Q:hero.templar_runtime.protector_stacks=100;flash("Protector stacks: 100")
+		KEY_E:for ally in heroes:if ally!=hero:ally.hp=maxf(1.0,float(ally.max_hp)*.35);flash("Allies damaged for Shield Ally testing")
+		_:return false
+	queue_redraw();return true
+
 func shaman_range_hero():
 	for hero in heroes:
 		if str(hero.get("class",""))=="Shaman":return hero
@@ -287,6 +306,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_templar_range_shortcut(event):return true
 	if handle_shaman_range_shortcut(event):return true
 	if handle_priest_range_shortcut(event):return true
 	if handle_rogue_range_shortcut(event):return true
