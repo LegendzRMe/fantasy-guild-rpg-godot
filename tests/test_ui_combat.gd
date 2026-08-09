@@ -144,6 +144,20 @@ static func run(main:Node) -> Array:
 	main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_one");main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_two")
 	var hp_before_third:float=item_dummy.hp;main.deal_damage(item_rogue,item_dummy,item_rogue.damage,"basic_attack","physical","cut_three")
 	TestSupport.check(errors,int(item_rogue.thousand_cuts_count)==0 and hp_before_third-item_dummy.hp>(hp_before_three-hp_before_third)*.45,"Every third Basic Attack should trigger the two Thousand Cuts extra strikes without advancing its own counter.")
+	var templar_save_index:int=main.state.heroes.find_custom(func(saved_hero):return str(saved_hero.get("class",""))=="Templar")
+	if templar_save_index>=0:
+		main.state.selected_team=[templar_save_index,1,2,3];main.state.active_team=main.state.selected_team.duplicate();main.start_templar_testing_zone()
+		var templar_index:int=main.heroes.find_custom(func(runtime_hero):return str(runtime_hero.get("class",""))=="Templar");var templar:Dictionary=main.heroes[templar_index];main.selected=templar_index
+		TestSupport.check(errors,main.testing_zone_mode=="templar_range" and main.enemies.any(func(enemy):return "elite" in enemy.combat_tags) and main.enemies.any(func(enemy):return bool(enemy.get("boss",false))),"Templar Range should expose target-category and Boss fixtures.")
+		templar.selected_talents={"tier_4":"templar_l18_2"};main.TemplarSystem.initialize_runtime(templar,true);templar.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+		TestSupport.check(errors,main.cast_templar_e(templar),"Shield Ally should cast when another living ally is in range.")
+		var bearer:Dictionary=main.heroes.filter(func(ally):return ally!=templar and not ally.get("templar_shield_links",[]).is_empty())[0];var linked_enemy:Dictionary=main.enemies[0];var threat_before:float=float(linked_enemy.threat.get(templar_index,0.0));main.deal_damage(bearer,linked_enemy,20.0,"basic_attack","physical","templar_link_test")
+		TestSupport.check(errors,float(linked_enemy.threat.get(templar_index,0.0))>threat_before and float(templar.templar_runtime.together_bucket)>0.0,"Shield Ally bearer damage should duplicate threat to its exact Templar and feed Together We Are Strong.")
+		templar.hp=float(templar.max_hp)*.70;templar.templar_runtime.trait_cooldown=0.0;var hostile:Dictionary=linked_enemy;main.deal_damage(hostile,templar,10.0,"basic_attack","true","templar_trait_test")
+		TestSupport.check(errors,main.TemplarSystem.named_shield_amount(templar,"templar_shield_overload")>0.0 and bool(templar.templar_runtime.trait_active),"Hostile damage below 75% should activate the exact Shield Overload source.")
+		var dash_origin:Vector2=templar.pos;linked_enemy.pos=dash_origin+Vector2.RIGHT*90.0;linked_enemy.hp=linked_enemy.max_hp;templar.ability_cds[0]=0.0;main.cast_templar_q(templar,dash_origin+Vector2.RIGHT*200.0);for step in 20:main.update_templar_runtime(.06)
+		TestSupport.check(errors,templar.pos.distance_to(dash_origin)<1.0 and linked_enemy.hp<linked_enemy.max_hp and templar.templar_runtime.blade_dashes.is_empty(),"Blade Dash should sweep contacts outward and return the Templar to the saved origin.")
+	else:TestSupport.check(errors,false,"The testing save should include a Templar runtime fixture.")
 	main.state.selected_team=[0,1,3,2];main.state.active_team=[0,1,3,2];main.start_testing_endless(17)
 	TestSupport.check(errors,main.testing_zone_mode=="endless" and main.testing_endless_level==17 and main.battle_hero_indices==main.state.selected_team and main.enemies.size()==4 and main.enemies.all(func(enemy):return int(enemy.level)==17 and bool(enemy.get("testing_endless_enemy",false)) and enemy.rewarded),"Endless Arena should use the selected team and begin with enemies scaled to the selected fixed level.")
 	var endless_mage_index:int=main.heroes.find_custom(func(hero):return str(hero.get("class",""))=="Mage");main.selected=endless_mage_index;main.focused_enemy_index=-1;main.heroes[endless_mage_index].target=-1;main.toast="";main.begin_ability(1)

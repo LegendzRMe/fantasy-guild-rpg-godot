@@ -151,6 +151,11 @@ func draw_combat_debug_overlay()->void:
 		var runtime:Dictionary=hero.warlock_runtime;lines.append("TAP LOCK  %.2f"%float(runtime.life_tap_lockout));lines.append("DARKNESS  %.0f / %.0f"%[float(runtime.darkness_progress),float(WarlockData.VALUES.darkness_damage_requirement)]);lines.append("CORRUPTION  %d"%runtime.periodic_effects.size());lines.append("BANISHED  %.2f"%float(runtime.banished_remaining))
 	if str(hero.get("class",""))=="Shaman" and not hero.get("shaman_runtime",{}).is_empty():
 		var shaman:Dictionary=hero.shaman_runtime;lines.append("FROSTWOLF  %d / %d"%[int(shaman.frostwolf_stacks),int(ShamanData.VALUES.trait_threshold)]);lines.append("Q CHARGES  %d / %d"%[int(shaman.q_slot.current_charges),int(shaman.q_slot.max_charges)]);lines.append("WIND FURY  %d  %.2f"%[int(shaman.windfury_attacks),float(shaman.windfury_remaining)]);lines.append("ANCESTRAL  %d / %d%s"%[int(shaman.ancestral_stacks),int(ShamanData.VALUES.ancestral_max)," READY" if bool(shaman.ancestral_ready) else ""]);lines.append("GATHERING  %d / %d"%[int(shaman.gathering_stacks),int(ShamanData.VALUES.gathering_max)]);lines.append("THUNDER  %d / %d"%[int(shaman.thunder_stacks),int(ShamanData.VALUES.thunder_max)]);lines.append("ECHO/CRASH/MAEL  %d / %d / %d"%[int(shaman.encounter_progress.get("echo",0)),int(shaman.encounter_progress.get("crash",0)),int(shaman.encounter_progress.get("maelstrom",0))]);lines.append("MYTHIC  %d / %d / %d"%[ShamanSystem.mastery_progress(hero,"shaman_l9_1"),ShamanSystem.mastery_progress(hero,"shaman_l9_2"),ShamanSystem.mastery_progress(hero,"shaman_l9_3")])
+	if str(hero.get("class",""))=="Templar" and not hero.get("templar_runtime",{}).is_empty():
+		var templar:Dictionary=hero.templar_runtime;lines.append("OVERLOAD CD  %.2f"%float(templar.trait_cooldown));lines.append("D SHIELD  %.0f"%TemplarSystem.named_shield_amount(hero,"templar_shield_overload"));lines.append("PROTECTOR  %d"%int(templar.protector_stacks));lines.append("E DEPLETIONS  %d"%int(templar.give_twenty_depletions));lines.append("LINK BUCKET  %.1f"%float(templar.together_bucket))
+	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
+	if debug_enemy!=null:
+		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])
 	var debug_height:=190.0+maxi(0,lines.size()-8)*20.0;draw_rect(Rect2(18,16,285,debug_height),Color(0.02,.03,.05,.88));draw_rect(Rect2(18,16,285,debug_height),C_MUTED,false,2)
 	for line_index in lines.size():draw_string(ThemeDB.fallback_font,Vector2(32,42+line_index*20),lines[line_index],HORIZONTAL_ALIGNMENT_LEFT,-1,13,C_TEXT)
 	if str(hero.get("class",""))=="Mage" and not hero.get("mage_runtime",{}).is_empty():
@@ -365,6 +370,7 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Slayer":action_name=str(SlayerData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Priest":action_name=str(PriestData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Shaman":action_name=str(ShamanData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Templar":action_name=str(TemplarData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			var cleric_trait_active:bool=false
 			if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
@@ -377,7 +383,8 @@ func draw_ability_bar_hud()->void:
 			var slayer_evasion_active:bool=slot==2 and str(active.get("class",""))=="Slayer" and EvasionSystem.is_active(active)
 			var frostwolf_ratio:float=clampf(float(active.get("shaman_runtime",{}).get("frostwolf_stacks",0))/float(ShamanData.VALUES.trait_threshold),0.0,1.0) if slot==4 and str(active.get("class",""))=="Shaman" else 0.0
 			var frostwolf_ready:bool=frostwolf_ratio>=0.8
-			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready:
+			var templar_trait_active:bool=slot==4 and str(active.get("class",""))=="Templar" and bool(active.get("templar_runtime",{}).get("trait_active",false))
+			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active:
 				var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 				draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
 			draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
@@ -389,7 +396,7 @@ func draw_ability_bar_hud()->void:
 			draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 			if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
 			if active["class"]=="Rogue" and slot==2 and ComboPointSystem.current(active)<=0:draw_octagon(center,37,Color(0,0,0,.58),C_MUTED,2)
-			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
+			if cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
 			if active["class"]=="Shaman" and slot==2 and int(active.get("shaman_runtime",{}).get("windfury_attacks",0))>0:draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),str(int(active.shaman_runtime.windfury_attacks)),HORIZONTAL_ALIGNMENT_CENTER,24,11,C_TEXT)
 			if not warlock_trait_state.is_empty() and slot==4:draw_string(ThemeDB.fallback_font,center+Vector2(14,-20),"%d%%"%int(warlock_trait_state.cost_percent),HORIZONTAL_ALIGNMENT_CENTER,42,9,C_TEXT)
 			if active["class"]=="Ranger" and not active.get("ranger_runtime",{}).is_empty() and slot in [2,3]:

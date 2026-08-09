@@ -102,6 +102,14 @@ func draw_combat_effect(fx:Dictionary)->void:
 			var rift_width:=maxf(5.0,float(fx.get("width",24.0))*.18);draw_line(fx.from,fx.to,Color("8fe7ff",alpha*.24),rift_width*2.0);draw_line(fx.from,fx.to,col,rift_width)
 		"shaman_earthquake":
 			var quake_radius:=float(fx.get("radius",180.0));draw_circle(fx.from,quake_radius,Color(col,alpha*.08));draw_arc(fx.from,quake_radius*clampf(progress*1.6,0.1,1.0),0,TAU,56,col,6)
+		"templar_blade_dash":
+			var dash_dir:Vector2=Vector2(fx.from).direction_to(Vector2(fx.to));draw_line(fx.from,fx.to,Color(col,.35),10);draw_line(fx.to-dash_dir*22,fx.to,col,5);draw_arc(fx.to,14,0,TAU,20,Color.WHITE,2)
+		"templar_shield_ally":
+			draw_line(fx.from,fx.to,Color(col,.55),4);draw_arc(fx.to,58,0,TAU,36,col,5)
+		"templar_suppression":
+			var pulse_radius:=float(fx.get("radius",100.0));draw_circle(fx.from,pulse_radius,Color(col,alpha*.10));draw_arc(fx.from,pulse_radius*clampf(progress*1.7,.1,1.0),0,TAU,48,col,6)
+		"templar_purifier_beam":
+			draw_line(fx.from,fx.to,Color(col,alpha*.65),12);draw_circle(fx.to,28,Color(col,alpha*.18));draw_arc(fx.to,32,0,TAU,32,Color.WHITE,3)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":
@@ -117,7 +125,7 @@ func draw_combat_effect(fx:Dictionary)->void:
 		var text_pos=fx.to+Vector2(-28,-48-progress*30)
 		draw_string(ThemeDB.fallback_font,text_pos,fx.text,HORIZONTAL_ALIGNMENT_CENTER,90,17,col)
 func draw_role_icon(pos:Vector2,hero_class:String,ink:Color=Color("101827"))->void:
-	if hero_class=="Guardian":
+	if hero_class in ["Guardian","Templar"]:
 		var shield=PackedVector2Array([pos+Vector2(-11,-13),pos+Vector2(11,-13),pos+Vector2(9,5),pos+Vector2(0,15),pos+Vector2(-9,5)])
 		draw_colored_polygon(shield,ink);draw_polyline(shield+PackedVector2Array([shield[0]]),Color.WHITE,2)
 	elif hero_class in ["Cleric","Priest"]:

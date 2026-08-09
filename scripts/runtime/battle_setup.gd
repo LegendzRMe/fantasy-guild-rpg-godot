@@ -68,6 +68,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Slayer":SlayerSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Priest":PriestSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Shaman":ShamanSystem.initialize_runtime(heroes[-1],is_testing_save(),data.get("talent_mastery",{}),ProgressionScopeSystem.new_encounter_id("battle"))
+		elif str(heroes[-1].get("class",""))=="Templar":TemplarSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -147,7 +148,7 @@ func start_testing_zone() -> void:
 		elif str(hero.get("class",""))=="Warlock":hero.warlock_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Priest":hero.priest_runtime.telemetry_enabled=true
 		elif str(hero.get("class",""))=="Shaman":hero.shaman_runtime.telemetry_enabled=true
-		elif str(hero.get("class",""))=="Shaman":hero.shaman_runtime.telemetry_enabled=true
+		elif str(hero.get("class",""))=="Templar":hero.templar_runtime.telemetry_enabled=true
 	testing_dummy_attacks_enabled=true
 	total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
 	spawn_enemy(Vector2(650,120),"Dummy");enemies[-1]["passive_test_enemy"]=true
@@ -206,6 +207,21 @@ func start_shaman_testing_zone() -> void:
 		if fixture.type=="Boss":enemies[-1].control_profile={"root_multiplier":0.25,"stun_multiplier":0.25,"slow_multiplier":0.5,"displacement":false}
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:shaman_worldbreaker_test",Rect2(760,280,32,150),{"blocks_movement":true,"blocks_line_of_sight":false,"blocks_projectiles":false}))
 	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,7000.0);enemy.max_hp=enemy.hp
+	queue_redraw()
+
+func start_templar_testing_zone() -> void:
+	var test_party:Array=selected_party_indices()
+	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Templar"):
+		flash("Add a Templar to the selected team first.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="templar_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	for hero in heroes:if str(hero.get("class",""))=="Templar":hero.templar_runtime.telemetry_enabled=true
+	var fixtures:=[{"position":Vector2(500,135),"type":"Raider","tags":[]},{"position":Vector2(585,135),"type":"Brute","tags":["elite"]},{"position":Vector2(670,135),"type":"Archer","tags":["named"]},{"position":Vector2(500,230),"type":"Swift","tags":["summon"]},{"position":Vector2(585,230),"type":"Dummy","tags":["temporary_combat"]},{"position":Vector2(850,165),"type":"Boss","tags":["boss"]},{"position":Vector2(950,500),"type":"Defense Dummy","tags":["training"]}]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);enemies[-1].passive_test_enemy=true
+		for tag in fixture.tags:if tag not in enemies[-1].combat_tags:enemies[-1].combat_tags.append(tag)
+		if fixture.type=="Boss":enemies[-1].control_profile={"blind_duration_multiplier":0.5,"slow_multiplier":0.5,"displacement":false}
+	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,8000.0);enemy.max_hp=enemy.hp
+	for ally in heroes:if str(ally.get("class",""))!="Templar":ally.hp*=0.45
 	queue_redraw()
 
 func selected_party_indices() -> Array:
