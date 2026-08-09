@@ -35,6 +35,63 @@ func load_sentinel_test_build(hero:Dictionary,build_index:int)->void:
 	hero.level=level;hero.power=SentinelData.scaled(float(SentinelData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=SentinelData.scaled(float(SentinelData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.range=float(SentinelData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);SentinelSystem.initialize_runtime(hero,true)
 	hero.sentinel_runtime.e_quest_stacks=int(build.get("quest_stacks",0));hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_huntsman_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=HuntsmanData.TEST_BUILDS[clampi(build_index,0,HuntsmanData.TEST_BUILDS.size()-1)];var level:int=int(build.level)
+	hero.level=level;hero.power=HuntsmanData.scaled(float(HuntsmanData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=HuntsmanData.scaled(float(HuntsmanData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.range=float(HuntsmanData.SPACE.human_basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);HuntsmanSystem.initialize_runtime(hero,true,"testing:hunt")
+	hero.huntsman_runtime.cocktail_quest_stacks=int(build.get("quest_stacks",0));hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func handle_huntsman_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="huntsman_range":return false
+	var hero=null
+	for candidate in heroes:if str(candidate.get("class",""))=="Huntsman":hero=candidate;break
+	if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_5:
+		var build_index:=int(event.keycode-KEY_1);load_huntsman_test_build(hero,build_index);flash("Huntsman build: %s"%str(HuntsmanData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.ctrl_pressed:return false
+	var target=huntsman_debug_target()
+	match event.keycode:
+		KEY_H:HuntsmanSystem.change_form(hero,"human","Testing shortcut",battle_time);flash("Huntsman: Human")
+		KEY_W:HuntsmanSystem.change_form(hero,"worgen","Testing shortcut",battle_time);flash("Huntsman: Worgen")
+		KEY_C:hero.huntsman_runtime.human_q_cooldown=0.0;hero.huntsman_runtime.worgen_q_cooldown=0.0;hero.huntsman_runtime.shared_e_cooldown=0.0;hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];flash("Huntsman cooldowns reset")
+		KEY_I:HuntsmanSystem.activate_inner_beast(hero);hero.ability_cds[1]=0.0;flash("Inner Beast active and ready")
+		KEY_B:
+			if BlockChargeSystem.charges(hero,"huntsman_block")>0:hero.huntsman_block={"charges":0,"maximum":2}
+			else:BlockChargeSystem.grant(hero,2,2,"huntsman_block")
+			flash("Block charges: %d"%BlockChargeSystem.charges(hero,"huntsman_block"))
+		KEY_S:
+			var stealth_on:=not StealthDetectionSystem.is_stealthed(hero);StealthDetectionSystem.set_stealth_source(hero,"huntsman_testing",stealth_on);flash("Stealth: %s"%str(stealth_on))
+		KEY_Q:
+			var quest_values:=[0,14,15];var quest_index:=(quest_values.find(int(hero.huntsman_runtime.cocktail_quest_stacks))+1)%quest_values.size();hero.huntsman_runtime.cocktail_quest_stacks=quest_values[quest_index];flash("Cocktail quest: %d / 15"%int(hero.huntsman_runtime.cocktail_quest_stacks))
+		KEY_M:
+			if str(hero.huntsman_runtime.marked_target_id)!="":HuntsmanSystem.clear_mark(hero);flash("Mark cleared")
+			elif target!=null:HuntsmanSystem.apply_mark(hero,target);flash("Marked %s"%str(target.get("display_name",target.get("type","target"))))
+		KEY_R:hero.huntsman_runtime.marked_reactivation=not bool(hero.huntsman_runtime.marked_reactivation);flash("Mark reactivation: %s"%str(hero.huntsman_runtime.marked_reactivation))
+		KEY_G:
+			if HuntsmanSystem.has_talent(hero,"huntsman_l27_r2"):hero.selected_talents.erase("tier_7")
+			else:hero.selected_heroic_id="huntsman_l15_r2";hero.selected_talents["tier_3"]="huntsman_l15_r2";hero.selected_talents["tier_7"]="huntsman_l27_r2"
+			flash("Gilnean Roulette: %s"%str(HuntsmanSystem.has_talent(hero,"huntsman_l27_r2")))
+		KEY_P:hero.selected_talents["tier_4"]="huntsman_l18_3";flash("Pounce enabled")
+		KEY_V:
+			hero.huntsman_runtime.wizened_attacks=(int(hero.huntsman_runtime.wizened_attacks)+1)%4;hero.huntsman_runtime.wizened_remaining=5.0 if int(hero.huntsman_runtime.wizened_attacks)>0 else 0.0;flash("Wizened charges: %d"%int(hero.huntsman_runtime.wizened_attacks))
+		KEY_L:
+			if target==null:return true
+			var controls:=["slow","root","stun"];var control_index:=int(hero.huntsman_runtime.get("testing_control_index",-1))+1;hero.huntsman_runtime.testing_control_index=control_index%controls.size();CombatSystem.apply_control(target,controls[hero.huntsman_runtime.testing_control_index],10.0,.30 if controls[hero.huntsman_runtime.testing_control_index]=="slow" else 1.0);flash("Applied %s"%controls[hero.huntsman_runtime.testing_control_index])
+		KEY_A:
+			if target==null:return true
+			var armor_values:=[0.0,75.0,250.0];var armor_index:=(armor_values.find(float(target.get("armor",0.0)))+1)%armor_values.size();target.armor=armor_values[armor_index];flash("Target Armor: %d"%int(target.armor))
+		KEY_1,KEY_2,KEY_3,KEY_4,KEY_5:
+			if target==null:return true
+			var stack_values:=[1,4,5,10,25];HuntsmanSystem.apply_mark(hero,target);hero.huntsman_runtime.mark_stacks=stack_values[int(event.keycode-KEY_1)];HuntsmanSystem.refresh_mark_source(hero,target);flash("Mark stacks: %d"%int(hero.huntsman_runtime.mark_stacks))
+		_:return false
+	queue_redraw();return true
+
+func huntsman_debug_target():
+	var enemy_index:=combat_enemy_target()
+	if enemy_index>=0 and enemy_index<enemies.size() and enemies[enemy_index].hp>0.0:return enemies[enemy_index]
+	for enemy in enemies:if enemy.hp>0.0:return enemy
+	return null
+	return false
+
 func sentinel_range_hero():
 	for hero in heroes:
 		if str(hero.get("class",""))=="Sentinel":return hero
@@ -376,6 +433,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_huntsman_range_shortcut(event):return true
 	if handle_sentinel_range_shortcut(event):return true
 	if handle_protector_range_shortcut(event):return true
 	if handle_templar_range_shortcut(event):return true

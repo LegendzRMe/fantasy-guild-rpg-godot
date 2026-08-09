@@ -149,6 +149,16 @@ func draw_combat_effect(fx:Dictionary)->void:
 			for star_index in 7:
 				var star_angle:float=TAU*float(star_index)/7.0+float(progress)*.7;var star_distance:float=starfall_radius*(.25+.58*float((star_index%3)+1)/3.0);var star_position:=Vector2(fx.to)+Vector2.RIGHT.rotated(star_angle)*star_distance
 				draw_circle(star_position,4+star_pulse*3,Color(Color.WHITE,alpha));draw_line(star_position-Vector2(0,18),star_position,Color(col,alpha*.55),3)
+		"huntsman_cocktail_projectile","huntsman_marked_projectile":
+			var bullet_pos:Vector2=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));draw_line(fx.from,bullet_pos,Color(col,alpha*.45),4);draw_circle(bullet_pos,7,Color.WHITE);draw_arc(bullet_pos,11,0,TAU,16,col,3)
+		"huntsman_cocktail_cone":
+			var cone_dir:Vector2=Vector2(fx.from).direction_to(Vector2(fx.to));var cone_side:=cone_dir.orthogonal()*float(fx.get("radius",130.0))*.55;draw_colored_polygon(PackedVector2Array([fx.from,fx.to+cone_side,fx.to-cone_side]),Color(col,alpha*.16));draw_line(fx.from,fx.to+cone_side,col,3);draw_line(fx.from,fx.to-cone_side,col,3)
+		"huntsman_swipe":
+			draw_line(fx.from,fx.to,Color(col,alpha*.42),9);draw_arc(fx.to,float(fx.get("radius",60.0)),-PI*.85,PI*.25,30,col,7)
+		"huntsman_darkflight","huntsman_disengage","huntsman_r1","huntsman_mark_leap":
+			var leap_pos:Vector2=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));draw_line(fx.from,leap_pos,Color(col,alpha*.35),10);draw_circle(leap_pos,15+progress*18,Color(col,alpha*.18));draw_arc(leap_pos,20+progress*20,0,TAU,28,col,4)
+		"huntsman_inner_beast":
+			var beast_radius:=float(fx.get("radius",62.0));draw_circle(fx.from,beast_radius,Color(col,alpha*.10));draw_arc(fx.from,beast_radius*(.55+.45*progress),0,TAU,40,col,6)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":

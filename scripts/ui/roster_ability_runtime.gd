@@ -13,6 +13,7 @@ const ShamanAbilityPresenter = preload("res://scripts/data/shaman_ability_presen
 const TemplarAbilityPresenter = preload("res://scripts/data/templar_ability_presenter.gd")
 const ProtectorAbilityPresenter = preload("res://scripts/data/protector_ability_presenter.gd")
 const SentinelAbilityPresenter = preload("res://scripts/data/sentinel_ability_presenter.gd")
+const HuntsmanAbilityPresenter = preload("res://scripts/data/huntsman_ability_presenter.gd")
 
 
 func recruitment_preview_value(candidate: Dictionary, field_id: String, value: String, unavailable: bool = false) -> String:
@@ -472,6 +473,13 @@ func open_roster_ability_details(hero: Dictionary, action_key: String, heroic_id
 	elif str(hero.get("class", "")) == "Sentinel":
 		var presenter_hero:=hero.duplicate(true);var presenter_stats:=hero_final_stats(hero);presenter_hero["power"]=float(presenter_stats.power);presenter_hero["max_hp"]=float(presenter_stats.health);presenter_hero["hp"]=float(presenter_stats.health);presenter_hero["ability_cds"]=[0.0,0.0,0.0,0.0,0.0]
 		SentinelSystem.initialize_runtime(presenter_hero,false);details=SentinelAbilityPresenter.details(presenter_hero,action_key,heroic_id)
+	elif str(hero.get("class", "")) == "Huntsman":
+		var presenter_hero:Dictionary=hero.duplicate(true)
+		var presenter_stats:=hero_final_stats(hero)
+		presenter_hero["power"]=float(presenter_stats.power)
+		presenter_hero["max_hp"]=float(presenter_stats.health);presenter_hero["hp"]=float(presenter_stats.health)
+		presenter_hero["ability_cds"]=[0.0,0.0,0.0,0.0,0.0];presenter_hero["active_effects"]=[];presenter_hero["armor"]=float(presenter_stats.armor)
+		HuntsmanSystem.initialize_runtime(presenter_hero,false);details=HuntsmanAbilityPresenter.details(presenter_hero,action_key,heroic_id)
 	elif str(hero.get("class", "")) == "Rogue":
 		var presenter_hero := hero.duplicate(true)
 		var presenter_stats := hero_final_stats(hero)

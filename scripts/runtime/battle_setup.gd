@@ -71,6 +71,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Templar":TemplarSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Protector":ProtectorSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Sentinel":SentinelSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
+		elif str(heroes[-1].get("class",""))=="Huntsman":HuntsmanSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -248,6 +249,32 @@ func start_sentinel_testing_zone() -> void:
 	var ratios:=[1.0,.80,.50,.21,.19,.11,.09,.01]
 	for ally_index in heroes.size():heroes[ally_index].hp=maxf(1.0,float(heroes[ally_index].max_hp)*float(ratios[ally_index%ratios.size()]))
 	for hero in heroes:if str(hero.get("class",""))=="Sentinel":hero.sentinel_runtime.telemetry_enabled=true
+	queue_redraw()
+
+func start_huntsman_testing_zone() -> void:
+	var test_party:Array=testing_party_for_class("Huntsman")
+	if test_party.is_empty():flash("Huntsman fixture unavailable.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="huntsman_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	var fixtures:=[
+		{"position":Vector2(430,130),"type":"Raider","tags":["standard"],"armor":0.0},
+		{"position":Vector2(535,130),"type":"Archer","tags":["enemy_hero"],"armor":35.0},
+		{"position":Vector2(640,130),"type":"Swift","tags":["summon"],"summon":true},
+		{"position":Vector2(745,130),"type":"Brute","tags":["elite"],"armor":75.0,"control":"slow"},
+		{"position":Vector2(535,245),"type":"Dummy","tags":["training"]},
+		{"position":Vector2(650,245),"type":"Raider","tags":["named"],"control":"root"},
+		{"position":Vector2(765,245),"type":"Archer","tags":["standard"],"control":"stun"},
+		{"position":Vector2(925,190),"type":"Boss","tags":["boss"],"armor":250.0,"detector":true},
+		{"position":Vector2(1080,500),"type":"Defense Dummy","tags":["temporary_combat"],"temporary":true}
+	]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);enemies[-1].passive_test_enemy=true
+		for tag in fixture.tags:if tag not in enemies[-1].combat_tags:enemies[-1].combat_tags.append(tag)
+		enemies[-1].armor=float(fixture.get("armor",enemies[-1].get("armor",0.0)));enemies[-1].summoned_unit=bool(fixture.get("summon",false));enemies[-1].temporary_combat=bool(fixture.get("temporary",false))
+		if str(fixture.get("control",""))!="":CombatSystem.apply_control(enemies[-1],str(fixture.control),600.0,.30 if str(fixture.control)=="slow" else 1.0)
+		if bool(fixture.get("detector",false)):enemies[-1].detection_profile={"detect_stealthed":true,"detect_invisible":true,"detection_radius":420.0,"reveal_duration":2.0}
+		if fixture.type=="Boss":enemies[-1].control_profile={"slow_multiplier":.5,"stun_multiplier":.25,"displacement":false}
+	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,10000.0);enemy.max_hp=enemy.hp
+	for hero in heroes:if str(hero.get("class",""))=="Huntsman":hero.huntsman_runtime.telemetry_enabled=true
 	queue_redraw()
 
 func selected_party_indices() -> Array:
