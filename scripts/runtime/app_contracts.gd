@@ -76,6 +76,9 @@ func show_council_chamber(_tab:String="Factions") -> void:
 func show_combat_hall() -> void:
 	pass
 
+func start_sentinel_testing_zone() -> void:
+	pass
+
 
 func show_zone_map(_zone: int) -> void:
 	pass

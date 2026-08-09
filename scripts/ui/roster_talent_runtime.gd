@@ -24,6 +24,8 @@ func guardian_talent_name(talent_id: String) -> String:
 		return str(TemplarData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 	if talent_id.begins_with("protector_"):
 		return str(ProtectorData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
+	if talent_id.begins_with("sentinel_"):
+		return str(SentinelData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 	return str(GuardianData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 
 
@@ -50,6 +52,8 @@ func roster_talent_description(hero_class: String, option_id: String) -> String:
 		return str(TemplarData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	if hero_class == "Protector":
 		return str(ProtectorData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
+	if hero_class == "Sentinel":
+		return str(SentinelData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	return "Talent details are still being developed."
 
 

@@ -187,6 +187,8 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	for active_effect in source.get("active_effects",[]):
 		if float(active_effect.get("remaining_duration",0.0))>0.0:active_damage_multiplier=maxf(active_damage_multiplier,float(active_effect.get("damage_multiplier",1.0)))
 	var resolved_amount:=amount*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
+	if source_action=="basic_attack":
+		for effect in source.get("active_effects",[]):resolved_amount*=float(effect.get("basic_attack_damage_multiplier",1.0))
 	if str(source.get("class",""))=="Templar" and source_action=="basic_attack" and not source.get("templar_runtime",{}).is_empty():
 		resolved_amount*=TemplarSystem.basic_attack_multiplier(source)
 		if originating_effect_id=="":
@@ -227,6 +229,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll);var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
 		if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
+	if str(source.get("class",""))=="Sentinel" and source_action in ["basic_ability","heroic"] and originating_effect_id!="sentinel_e_auto" and float(result.get("resolved_damage",0.0))>0.0 and TargetCategorySystem.qualifies_immediate(target):SentinelSystem.reduce_q(source,float(SentinelData.VALUES.q_ability_cdr))
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and not source.get("rogue_runtime",{}).is_empty() and bool(source.rogue_runtime.vanish_active):RogueSystem.break_vanish(source)
 	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and float(result.get("resolved_damage",0.0))>0.0 and bool(target.rogue_runtime.vanish_active) and not StealthDetectionSystem.is_unrevealable(target):RogueSystem.break_vanish(target)
 	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and damage_type=="physical":BlockChargeSystem.consume_legacy(target.rogue_runtime,3,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)))
@@ -238,10 +241,30 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		ProtectorSystem.telemetry_add(source,"basic_attack_damage",float(result.get("resolved_damage",0.0)))
 		ProtectorSystem.telemetry_add(source,"basic_attack_threat",CombatSystem.damage_threat(result,float(source.get("threat_modifier",1.0))))
 		if ProtectorSystem.has_talent(source,"protector_l18_2") and ProtectorSystem.crosses_own_wall(source,source.pos,target.pos,combat_blockers) and float(result.get("resolved_damage",0.0))>0.0:CombatSystem.apply_control(target,"slow",float(ProtectorData.VALUES.w_crossing_duration),float(ProtectorData.VALUES.w_crossing_slow))
+	if str(source.get("class",""))=="Sentinel" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("sentinel_runtime",{}).is_empty():
+		var sentinel_basic:=SentinelSystem.note_basic_attack(source,target,float(result.get("resolved_damage",0.0)))
+		if float(sentinel_basic.get("self_heal_fraction",0.0))>0.0:
+			var self_result:=deal_healing(source,source,float(source.max_hp)*float(sentinel_basic.self_heal_fraction),"trait","Hunter's Mark","sentinel_mark");SentinelSystem.telemetry_add(source,"d_self_healing",float(self_result.effective_amount))
+		if bool(sentinel_basic.get("own_mark",false)) and SentinelSystem.has_talent(source,"sentinel_l12_2"):
+			for ally in heroes:if ally.hp>0.0 and ally.pos.distance_to(target.pos)<=float(SentinelData.SPACE.mark_mending_radius):deal_healing(source,ally,float(ally.max_hp)*.04,"trait","Mark of Mending","sentinel_mark_mending")
+		if bool(sentinel_basic.get("own_mark",false)) and SentinelSystem.has_talent(source,"sentinel_l18_3"):
+			for splash_target in enemies:if splash_target!=target and splash_target.hp>0.0 and splash_target.pos.distance_to(target.pos)<=90.0:deal_damage(source,splash_target,float(result.get("resolved_damage",0.0)),"splash","physical","Huntress' Fury",false,"sentinel_huntress_splash",[],false)
+		if bool(sentinel_basic.get("auto_flare",false)):source.sentinel_runtime.pending_flares.append({"center":Vector2(target.pos),"remaining":float(SentinelData.VALUES.e_delay),"automatic":true})
+		if SentinelSystem.has_talent(source,"sentinel_l24_3"):
+			var ice_id:="sentinel_iceblade:%s"%str(source.combat_id);var ice_amount:=.02
+			for ice_effect in target.get("active_effects",[]):if str(ice_effect.get("source_id",""))==ice_id:ice_amount=minf(.10,float(ice_effect.get("amount",0.0))+.02)
+			OutgoingDamageReductionSystem.apply(target,ice_id,ice_amount,2.0)
+		if not source.sentinel_runtime.elune_chosen.is_empty() and float(source.sentinel_runtime.elune_chosen.get("remaining",0.0))>0.0:
+			var chosen=SentinelSystem.select_lowest(heroes,source.pos,float(SentinelData.SPACE.q_range));if chosen!=null:deal_healing(source,chosen,float(result.get("resolved_damage",0.0))*1.75,"trait","Elune's Chosen","sentinel_elune_chosen")
 	templar_after_damage(source,target,result,source_action,originating_effect_id)
 	if str(target.get("class",""))=="Protector" and not target.get("protector_runtime",{}).is_empty():
 		ProtectorSystem.telemetry_add(target,"damage_taken",float(result.get("resolved_damage",0.0)))
 		if bool(result.get("defeated",false)):ProtectorSystem.telemetry_add(target,"deaths")
+	if bool(result.get("defeated",false)):
+		for sentinel in heroes:
+			if str(sentinel.get("class",""))!="Sentinel" or sentinel.get("sentinel_runtime",{}).is_empty():continue
+			SentinelSystem.note_defeat(sentinel,target);var reveal:Dictionary=sentinel.sentinel_runtime.w_reveals.get(str(target.combat_id),{})
+			if not reveal.is_empty() and not bool(reveal.get("reset_used",false)):sentinel.sentinel_runtime.w_slot.current_charges=mini(int(sentinel.sentinel_runtime.w_slot.max_charges),int(sentinel.sentinel_runtime.w_slot.current_charges)+1);reveal.reset_used=true;SentinelSystem.telemetry_add(sentinel,"w_death_resets")
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("rogue_runtime",{}).is_empty():
 		if ComboPointSystem.successful_hit(result):
 			RogueSystem.double_strike_roll(source)
@@ -340,6 +363,9 @@ func apply_unit_shield(source:Dictionary,target:Dictionary,amount:float,origin=n
 
 func update_timed_combat_effects(unit:Dictionary,delta:float)->void:
 	ArmorReductionSystem.update(unit,delta)
+	for armor_index in range(unit.get("temporary_armor_sources",[]).size()-1,-1,-1):
+		unit.temporary_armor_sources[armor_index].remaining=float(unit.temporary_armor_sources[armor_index].get("remaining",0.0))-delta
+		if float(unit.temporary_armor_sources[armor_index].remaining)<=0.0:unit.temporary_armor_sources.remove_at(armor_index)
 	for shield_index in range(unit.get("shield_sources",[]).size()-1,-1,-1):
 		var shield_source:Dictionary=unit.shield_sources[shield_index];var shield_duration:=float(shield_source.get("remaining_duration",0.0))
 		if shield_duration<=0.0:continue

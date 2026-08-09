@@ -3,7 +3,7 @@ extends RefCounted
 const DEFAULT_DETECTION := {"detect_stealthed":false,"detect_invisible":false,"detection_radius":0.0,"reveal_duration":2.0,"acquisition_chance":1.0,"acquisition_interval":0.25}
 
 static func initialize(unit:Dictionary) -> void:
-	unit["concealment"]={"stealthed":false,"invisible":false,"revealed_remaining":0.0,"unrevealable_remaining":0.0,"unit_passing":false,"sources":{}}
+	unit["concealment"]={"stealthed":false,"invisible":false,"revealed_remaining":0.0,"unrevealable_remaining":0.0,"unit_passing":false,"sources":{},"stealth_sources":{}}
 
 static func state(unit:Dictionary) -> Dictionary:
 	if not unit.has("concealment"):initialize(unit)
@@ -19,6 +19,11 @@ static func set_source(unit:Dictionary,source_id:String,active:bool,unrevealable
 	else:value.sources.erase(source_id)
 	refresh_sources(value)
 
+static func set_stealth_source(unit:Dictionary,source_id:String,active:bool)->void:
+	var value:=state(unit);value["stealth_sources"]=value.get("stealth_sources",{})
+	if active:value.stealth_sources[source_id]=true
+	else:value.stealth_sources.erase(source_id)
+
 static func refresh_sources(value:Dictionary) -> void:
 	var source_invisible:bool=not value.sources.is_empty();var source_unrevealable:bool=false;var source_passing:bool=false
 	for source in value.sources.values():source_unrevealable=source_unrevealable or bool(source.get("unrevealable",false));source_passing=source_passing or bool(source.get("unit_passing",false))
@@ -30,7 +35,7 @@ static func is_unrevealable(unit:Dictionary) -> bool:
 static func is_invisible(unit:Dictionary) -> bool:
 	var value:=state(unit);return bool(value.invisible) or bool(value.get("source_invisible",false))
 
-static func is_stealthed(unit:Dictionary) -> bool:return bool(state(unit).stealthed)
+static func is_stealthed(unit:Dictionary) -> bool:var value:=state(unit);return bool(value.stealthed) or not value.get("stealth_sources",{}).is_empty()
 
 static func directly_targetable(observer:Dictionary,target:Dictionary,distance:float=INF) -> bool:
 	var value:=state(target)

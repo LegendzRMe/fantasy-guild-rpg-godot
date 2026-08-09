@@ -30,6 +30,36 @@ func load_protector_test_build(hero:Dictionary,build_index:int)->void:
 	var level:int=int(build.level)
 	hero.level=level;hero.power=ProtectorData.scaled(float(ProtectorData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=ProtectorData.scaled(float(ProtectorData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.range=float(ProtectorData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);ProtectorSystem.initialize_runtime(hero,true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_sentinel_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=SentinelData.TEST_BUILDS[clampi(build_index,0,SentinelData.TEST_BUILDS.size()-1)];var level:int=int(build.level)
+	hero.level=level;hero.power=SentinelData.scaled(float(SentinelData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=SentinelData.scaled(float(SentinelData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.range=float(SentinelData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);SentinelSystem.initialize_runtime(hero,true)
+	hero.sentinel_runtime.e_quest_stacks=int(build.get("quest_stacks",0));hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func sentinel_range_hero():
+	for hero in heroes:
+		if str(hero.get("class",""))=="Sentinel":return hero
+	return null
+
+func handle_sentinel_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="sentinel_range":return false
+	var hero=sentinel_range_hero();if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_5:
+		var build_index:=int(event.keycode-KEY_1);load_sentinel_test_build(hero,build_index);flash("Sentinel build: %s"%str(SentinelData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.alt_pressed:return false
+	match event.keycode:
+		KEY_C:
+			hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.sentinel_runtime.q_slot=AbilitySlotSystem.create(2,float(SentinelData.VALUES.q_cooldown),AbilitySlotSystem.RechargeMode.FULL_REFILL);hero.sentinel_runtime.w_slot=AbilitySlotSystem.create(2 if SentinelSystem.has_talent(hero,"sentinel_l30_1") else 1,SentinelSystem.w_cooldown(hero),AbilitySlotSystem.RechargeMode.INDEPENDENT);hero.sentinel_runtime.d_cooldown=0.0;hero.sentinel_runtime.trueshot_cooldown=0.0;flash("Sentinel cooldowns and charges reset")
+		KEY_H:
+			var ratios:=[1.0,.80,.50,.21,.19,.11,.09,.01]
+			for ally_index in heroes.size():heroes[ally_index].hp=maxf(1.0,float(heroes[ally_index].max_hp)*float(ratios[ally_index%ratios.size()]))
+			flash("Sentinel ally health ratios staged")
+		KEY_Q:hero.sentinel_runtime.e_quest_stacks=84;flash("Lunar Flare quest completed")
+		KEY_M:
+			var target_index:=combat_enemy_target()
+			if target_index>=0:SentinelSystem.apply_mark(hero,enemies[target_index],false);flash("Hunter's Mark applied")
+		_:return false
+	queue_redraw();return true
+
 func protector_range_hero():
 	for hero in heroes:
 		if str(hero.get("class",""))=="Protector":return hero
@@ -340,6 +370,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_sentinel_range_shortcut(event):return true
 	if handle_protector_range_shortcut(event):return true
 	if handle_templar_range_shortcut(event):return true
 	if handle_shaman_range_shortcut(event):return true

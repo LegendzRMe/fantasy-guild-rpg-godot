@@ -122,6 +122,14 @@ func draw_combat_effect(fx:Dictionary)->void:
 			draw_line(fx.from,fx.to,Color(col,alpha*.4),5);draw_arc(fx.to,34,0,TAU,32,col,4)
 		"protector_wrath","protector_wrath_explosion":
 			var wrath_radius:=float(fx.get("radius",115.0));draw_circle(fx.from,wrath_radius,Color(col,alpha*.10));draw_arc(fx.from,wrath_radius*clampf(.3+progress,0.0,1.0),0,TAU,52,col,7)
+		"sentinel_q":
+			draw_line(fx.from,fx.to,Color(col,alpha*.55),4);draw_circle(fx.to,17+progress*24,Color(col,alpha*.16));draw_arc(fx.to,19+progress*25,0,TAU,30,col,4)
+		"sentinel_w":
+			var owl_dir:Vector2=Vector2(fx.from).direction_to(Vector2(fx.to));var owl_pos:Vector2=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));var wing:=owl_dir.orthogonal()*float(fx.get("width",24.0))*.45;draw_line(fx.from,owl_pos,Color(col,alpha*.28),3);draw_polyline(PackedVector2Array([owl_pos-wing,owl_pos+owl_dir*11.0,owl_pos+wing]),col,5);draw_circle(owl_pos,4,Color.WHITE)
+		"sentinel_flare_warning":
+			var warning_radius:=float(fx.get("radius",62.0));draw_circle(fx.to,warning_radius,Color(col,.06));draw_arc(fx.to,warning_radius,-PI/2,-PI/2+TAU*(1.0-progress),48,col,4);draw_line(fx.to-Vector2(warning_radius*.35,0),fx.to+Vector2(warning_radius*.35,0),Color(col,.4),2);draw_line(fx.to-Vector2(0,warning_radius*.35),fx.to+Vector2(0,warning_radius*.35),Color(col,.4),2)
+		"sentinel_flare":
+			var flare_radius:=float(fx.get("radius",62.0));draw_circle(fx.to,flare_radius*clampf(progress*1.8,.2,1.0),Color(col,alpha*.20));draw_arc(fx.to,flare_radius,0,TAU,48,col,6);draw_circle(fx.to,10+progress*18,Color(Color.WHITE,alpha))
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":

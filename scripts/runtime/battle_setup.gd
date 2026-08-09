@@ -70,6 +70,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Shaman":ShamanSystem.initialize_runtime(heroes[-1],is_testing_save(),data.get("talent_mastery",{}),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Templar":TemplarSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Protector":ProtectorSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Sentinel":SentinelSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -246,6 +247,26 @@ func start_protector_testing_zone() -> void:
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:protector_permanent",Rect2(760,255,34,155)))
 	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,9000.0);enemy.max_hp=enemy.hp
 	for ally in heroes:if str(ally.get("class",""))!="Protector":ally.hp*=0.55
+	queue_redraw()
+
+func start_sentinel_testing_zone() -> void:
+	var test_party:Array=selected_party_indices()
+	if not test_party.any(func(hero_index):return str(state.heroes[hero_index].get("class",""))=="Sentinel"):
+		var sentinel_index:=-1
+		for hero_index in state.heroes.size():if str(state.heroes[hero_index].get("class",""))=="Sentinel":sentinel_index=hero_index;break
+		if sentinel_index<0:flash("Sentinel fixture unavailable.");show_combat_hall();return
+		test_party=[sentinel_index]
+		for hero_index in state.heroes.size():if hero_index!=sentinel_index:test_party.append(hero_index);if test_party.size()>=4:break
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="sentinel_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	var fixtures:=[{"position":Vector2(440,120),"type":"Raider","tags":[]},{"position":Vector2(530,120),"type":"Archer","tags":["elite"]},{"position":Vector2(620,120),"type":"Swift","tags":["summon"]},{"position":Vector2(710,120),"type":"Dummy","tags":["training"]},{"position":Vector2(850,205),"type":"Boss","tags":["boss"]},{"position":Vector2(1110,500),"type":"Defense Dummy","tags":["training"]}]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);enemies[-1].passive_test_enemy=true
+		for tag in fixture.tags:if tag not in enemies[-1].combat_tags:enemies[-1].combat_tags.append(tag)
+		if fixture.type=="Boss":enemies[-1].control_profile={"slow_multiplier":.5,"stun_multiplier":.25,"displacement":false}
+	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,9000.0);enemy.max_hp=enemy.hp
+	var ratios:=[1.0,.80,.50,.21,.19,.11,.09,.01]
+	for ally_index in heroes.size():heroes[ally_index].hp=maxf(1.0,float(heroes[ally_index].max_hp)*float(ratios[ally_index%ratios.size()]))
+	for hero in heroes:if str(hero.get("class",""))=="Sentinel":hero.sentinel_runtime.telemetry_enabled=true
 	queue_redraw()
 
 func selected_party_indices() -> Array:
