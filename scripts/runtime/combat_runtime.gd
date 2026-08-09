@@ -72,6 +72,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_shaman_runtime(delta)
 	update_templar_runtime(delta)
 	update_protector_runtime(delta)
+	update_sentinel_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 
@@ -89,6 +90,7 @@ func update_combat_heroes(delta:float) -> bool:
 			h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta*cooldown_rate)
 		if str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty():h.ability_cds[4]=float(h.warlock_runtime.life_tap_lockout)
 		if str(h.get("class",""))=="Templar" and not h.get("templar_runtime",{}).is_empty():h.ability_cds[4]=float(h.templar_runtime.trait_cooldown)
+		if str(h.get("class",""))=="Sentinel" and not h.get("sentinel_runtime",{}).is_empty():h.ability_cds[4]=float(h.sentinel_runtime.trueshot_cooldown) if SentinelSystem.has_talent(h,"sentinel_l30_2") and float(h.sentinel_runtime.d_cooldown)>0.0 else float(h.sentinel_runtime.d_cooldown)
 		if h.hp>0:update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):

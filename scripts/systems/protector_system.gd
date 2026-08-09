@@ -3,6 +3,7 @@ extends RefCounted
 const ProtectorData=preload("res://scripts/data/protector_data.gd")
 const AbilitySlotSystem=preload("res://scripts/systems/ability_slot_system.gd")
 const CombatGeometry=preload("res://scripts/combat/combat_geometry.gd")
+const OutgoingDamageReductionSystem=preload("res://scripts/systems/outgoing_damage_reduction_system.gd")
 
 static func has_talent(unit:Dictionary,id:String)->bool:return id in unit.get("selected_talents",{}).values()
 static func ability_amount(unit:Dictionary,value:float)->float:
@@ -54,14 +55,10 @@ static func clear_highest_other_ally_threat(enemy:Dictionary,protector_index:int
 	enemy.threat[chosen]=0.0;return {"cleared":true,"hero_index":chosen,"amount":highest}
 
 static func apply_outgoing_reduction(unit:Dictionary,source_id:String,duration:float)->void:
-	unit["active_effects"]=unit.get("active_effects",[]).filter(func(effect):return not (str(effect.get("effect_family",""))=="outgoing_damage_reduction" and str(effect.get("source_id",""))==source_id))
-	unit.active_effects.append({"id":"protector_wrath_reduction:%s"%source_id,"effect_family":"outgoing_damage_reduction","source_id":source_id,"amount":float(ProtectorData.VALUES.trait_damage_reduction),"remaining_duration":duration})
+	OutgoingDamageReductionSystem.apply(unit,source_id,float(ProtectorData.VALUES.trait_damage_reduction),duration)
 
 static func outgoing_damage_multiplier(unit:Dictionary)->float:
-	var strongest:=0.0
-	for effect in unit.get("active_effects",[]):
-		if str(effect.get("effect_family",""))=="outgoing_damage_reduction" and float(effect.get("remaining_duration",0.0))>0.0:strongest=maxf(strongest,float(effect.get("amount",0.0)))
-	return 1.0-clampf(strongest,0.0,1.0)
+	return OutgoingDamageReductionSystem.multiplier(unit)
 
 static func movement_multiplier(unit:Dictionary)->float:
 	var result:=1.0

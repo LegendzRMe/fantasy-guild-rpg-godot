@@ -76,6 +76,16 @@ func draw_combat_effect(fx:Dictionary)->void:
 			var rain_radius:=float(fx.get("radius",42.0));draw_circle(fx.to,rain_radius,Color("7f2aa6",alpha*.27));draw_line(fx.to-Vector2(18,75),fx.to,Color("db8cff",alpha),9);draw_arc(fx.to,rain_radius,0,TAU,40,Color("ffd6ff",alpha),5)
 		"warlock_life_tap":
 			var tap_color:=Color("e2a5ff") if bool(fx.get("free",false)) else Color("b15cff");draw_circle(fx.from,30+progress*32,Color(tap_color,alpha*.12));draw_arc(fx.from,30+progress*32,0,TAU,36,Color(tap_color,alpha),5)
+		"rogue_dash","rogue_opener":
+			var rogue_direction:Vector2=Vector2(fx.from).direction_to(Vector2(fx.to));var rogue_position:Vector2=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));var rogue_side:=rogue_direction.orthogonal()
+			draw_line(fx.from,rogue_position,Color(col,alpha*.32),10);draw_line(rogue_position-rogue_direction*22.0-rogue_side*10.0,rogue_position,col,5);draw_line(rogue_position-rogue_direction*22.0+rogue_side*10.0,rogue_position,col,5)
+			if fx.kind=="rogue_opener":draw_arc(fx.to,18+progress*18,0,TAU,28,Color.WHITE,4)
+		"rogue_blade_flurry":
+			var blade_radius:=float(fx.get("radius",75.0));var blade_rotation:float=float(progress)*TAU*1.8
+			draw_circle(fx.from,blade_radius,Color(col,alpha*.08));draw_arc(fx.from,blade_radius,blade_rotation,blade_rotation+PI*1.45,48,col,7);draw_arc(fx.from,blade_radius*.68,-blade_rotation,-blade_rotation+PI*1.15,40,Color.WHITE,3)
+		"rogue_eviscerate":
+			var finisher_direction:Vector2=Vector2(fx.from).direction_to(Vector2(fx.to));var finisher_side:=finisher_direction.orthogonal()*18.0
+			draw_line(fx.from,fx.to,Color(col,alpha*.35),5);draw_line(fx.to-finisher_side-finisher_direction*18.0,fx.to+finisher_side,col,8);draw_line(fx.to+finisher_side-finisher_direction*18.0,fx.to-finisher_side,Color.WHITE,3)
 		"slayer_dive", "slayer_hunt":
 			var dash_pos:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));var dash_dir:Vector2=fx.from.direction_to(fx.to);draw_line(fx.from,dash_pos,Color(col,.38),10);draw_line(dash_pos-dash_dir.rotated(.65)*15,dash_pos+dash_dir.rotated(.65)*15,col,5);draw_line(dash_pos-dash_dir.rotated(-.65)*15,dash_pos+dash_dir.rotated(-.65)*15,col,5)
 		"slayer_sweep":
@@ -122,6 +132,23 @@ func draw_combat_effect(fx:Dictionary)->void:
 			draw_line(fx.from,fx.to,Color(col,alpha*.4),5);draw_arc(fx.to,34,0,TAU,32,col,4)
 		"protector_wrath","protector_wrath_explosion":
 			var wrath_radius:=float(fx.get("radius",115.0));draw_circle(fx.from,wrath_radius,Color(col,alpha*.10));draw_arc(fx.from,wrath_radius*clampf(.3+progress,0.0,1.0),0,TAU,52,col,7)
+		"sentinel_q":
+			draw_line(fx.from,fx.to,Color(col,alpha*.55),4);draw_circle(fx.to,17+progress*24,Color(col,alpha*.16));draw_arc(fx.to,19+progress*25,0,TAU,30,col,4)
+		"sentinel_w":
+			var owl_dir:Vector2=Vector2(fx.from).direction_to(Vector2(fx.to));var owl_pos:Vector2=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));var wing:=owl_dir.orthogonal()*float(fx.get("width",24.0))*.45;draw_line(fx.from,owl_pos,Color(col,alpha*.28),3);draw_polyline(PackedVector2Array([owl_pos-wing,owl_pos+owl_dir*11.0,owl_pos+wing]),col,5);draw_circle(owl_pos,4,Color.WHITE)
+		"sentinel_flare_warning":
+			var warning_radius:=float(fx.get("radius",62.0));draw_circle(fx.to,warning_radius,Color(col,.06));draw_arc(fx.to,warning_radius,-PI/2,-PI/2+TAU*(1.0-progress),48,col,4);draw_line(fx.to-Vector2(warning_radius*.35,0),fx.to+Vector2(warning_radius*.35,0),Color(col,.4),2);draw_line(fx.to-Vector2(0,warning_radius*.35),fx.to+Vector2(0,warning_radius*.35),Color(col,.4),2)
+		"sentinel_flare":
+			var flare_radius:=float(fx.get("radius",62.0));draw_circle(fx.to,flare_radius*clampf(progress*1.8,.2,1.0),Color(col,alpha*.20));draw_arc(fx.to,flare_radius,0,TAU,48,col,6);draw_circle(fx.to,10+progress*18,Color(Color.WHITE,alpha))
+		"sentinel_shadowstalk":
+			var shadow_radius:=float(fx.get("radius",105.0));var shadow_rotation:float=float(progress)*TAU
+			draw_circle(fx.from,shadow_radius,Color(col,alpha*.07));draw_arc(fx.from,shadow_radius,shadow_rotation,shadow_rotation+PI*1.55,52,col,5);draw_arc(fx.from,shadow_radius-12,-shadow_rotation,-shadow_rotation+PI*1.3,48,Color.WHITE,2)
+		"sentinel_starfall":
+			var starfall_radius:=float(fx.get("radius",150.0));var star_pulse:float=.72+.12*sin(float(progress)*TAU*8.0)
+			draw_circle(fx.to,starfall_radius,Color(col,alpha*.075));draw_arc(fx.to,starfall_radius,0,TAU,64,Color(col,alpha*.82),4)
+			for star_index in 7:
+				var star_angle:float=TAU*float(star_index)/7.0+float(progress)*.7;var star_distance:float=starfall_radius*(.25+.58*float((star_index%3)+1)/3.0);var star_position:=Vector2(fx.to)+Vector2.RIGHT.rotated(star_angle)*star_distance
+				draw_circle(star_position,4+star_pulse*3,Color(Color.WHITE,alpha));draw_line(star_position-Vector2(0,18),star_position,Color(col,alpha*.55),3)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":

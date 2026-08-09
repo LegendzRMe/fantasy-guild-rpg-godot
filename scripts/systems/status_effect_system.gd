@@ -55,6 +55,18 @@ static func remove_removable_controls(unit:Dictionary)->Array:
 	unit["active_effects"] = retained
 	return removed
 
+static func remove_controls(unit:Dictionary,control_types:Array)->Array:
+	var removed:Array = []
+	var retained:Array = []
+	for effect in unit.get("active_effects", []):
+		var control_type:=str(effect.get("control_type", ""))
+		if control_type in control_types:
+			removed.append(control_type)
+		else:
+			retained.append(effect)
+	unit["active_effects"] = retained
+	return removed
+
 static func apply_unstoppable(unit:Dictionary,duration:float)->Dictionary:
 	var removed := remove_removable_controls(unit)
 	unit["active_effects"] = strongest_refresh(unit.get("active_effects", []), {

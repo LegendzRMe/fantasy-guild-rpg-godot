@@ -180,6 +180,9 @@ static func is_blinded(unit:Dictionary)->bool:
 static func apply_unstoppable(unit:Dictionary,duration:float)->Dictionary:
 	return StatusEffectSystem.apply_unstoppable(unit,duration)
 
+static func remove_controls(unit:Dictionary,control_types:Array)->Array:
+	return StatusEffectSystem.remove_controls(unit,control_types)
+
 static func is_unstoppable(unit:Dictionary)->bool:
 	return StatusEffectSystem.is_unstoppable(unit)
 
