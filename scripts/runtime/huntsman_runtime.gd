@@ -169,7 +169,8 @@ func update_huntsman_projectile(hero:Dictionary, projectile:Dictionary, delta:fl
 func update_huntsman_runtime(delta:float) -> void:
 	for hero in heroes:
 		if str(hero.get("class", "")) != "Huntsman" or hero.get("huntsman_runtime", {}).is_empty(): continue
-		HuntsmanSystem.update(hero, delta)
+		var druids:=heroes.filter(func(unit):return str(unit.get("class",""))=="Druid")
+		HuntsmanSystem.update(hero,delta,DruidSystem.cooldown_rate_from_innervate(hero,druids,0),DruidSystem.cooldown_rate_from_innervate(hero,druids,2))
 		if float(hero.huntsman_runtime.get("eyes_remaining", 0.0)) > 0.0:
 			hero.huntsman_runtime.eyes_remaining = maxf(0.0, float(hero.huntsman_runtime.eyes_remaining) - delta)
 			if float(hero.huntsman_runtime.eyes_remaining) <= 0.0: StealthDetectionSystem.set_stealth_source(hero, "huntsman_eyes:%s" % str(hero.combat_id), false)

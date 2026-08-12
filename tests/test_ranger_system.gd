@@ -40,6 +40,7 @@ static func run()->Array:
 	AbilitySlotSystem.reduce_active_recharge(sequential,5.0);AbilitySlotSystem.update(sequential,5.0);TestSupport.check(errors,sequential.current_charges==2,"Direct recharge reduction should affect only the active sequential timer.")
 	var independent:=AbilitySlotSystem.create(2,10.0,AbilitySlotSystem.RechargeMode.INDEPENDENT);AbilitySlotSystem.spend(independent);AbilitySlotSystem.spend(independent);AbilitySlotSystem.update(independent,10.0)
 	TestSupport.check(errors,independent.current_charges==2 and independent.timers.is_empty(),"Independent charges should recharge concurrently for Cleric-compatible effects.")
+	var innervated:=ranger();AbilitySlotSystem.spend(innervated.ranger_runtime.slots.e);AbilitySlotSystem.spend(innervated.ranger_runtime.slots.r);var e_before:float=float(innervated.ranger_runtime.slots.e.timers[0]);var r_before:float=float(innervated.ranger_runtime.slots.r.timers[0]);RangerSystem.update(innervated,2.0,1.5)
+	TestSupport.check(errors,is_equal_approx(float(innervated.ranger_runtime.slots.e.timers[0]),e_before-3.0) and is_equal_approx(float(innervated.ranger_runtime.slots.r.timers[0]),r_before-2.0),"External cooldown recovery should accelerate Ranger E charges without affecting Heroic R charges.")
 	var presenter:=RangerAbilityPresenter.details(hero,"Q");TestSupport.check(errors,str(presenter.description).contains("140") and not str(presenter.description).contains("140."),"Ranger player-facing damage should be rounded down to whole numbers.")
 	return errors
-

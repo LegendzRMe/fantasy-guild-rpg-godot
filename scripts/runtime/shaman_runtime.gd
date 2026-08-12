@@ -145,7 +145,8 @@ func update_shaman_runtime(delta:float)->void:
 		if float(combat_blockers[blocker_index].remaining_duration)<=0.0:combat_blockers.remove_at(blocker_index)
 	for hero in heroes:
 		if str(hero.get("class",""))!="Shaman" or hero.get("shaman_runtime",{}).is_empty():continue
-		ShamanSystem.update(hero,delta);hero.ability_cds[0]=float(hero.shaman_runtime.q_slot.timers[0]) if not hero.shaman_runtime.q_slot.timers.is_empty() else 0.0
+		var druids:=heroes.filter(func(unit):return str(unit.get("class",""))=="Druid")
+		ShamanSystem.update(hero,delta,DruidSystem.cooldown_rate_from_innervate(hero,druids,0));hero.ability_cds[0]=float(hero.shaman_runtime.q_slot.timers[0]) if not hero.shaman_runtime.q_slot.timers.is_empty() else 0.0
 		hero.basic_attack_interval=float(hero.base_basic_action_interval)/(1.0+float(ShamanData.VALUES.e_attack_speed) if int(hero.shaman_runtime.windfury_attacks)>0 else 1.0)
 		for index in range(hero.shaman_runtime.feral_spirits.size()-1,-1,-1):if update_shaman_feral(hero,hero.shaman_runtime.feral_spirits[index],delta):hero.shaman_runtime.feral_spirits.remove_at(index)
 		for index in range(hero.shaman_runtime.delayed_effects.size()-1,-1,-1):

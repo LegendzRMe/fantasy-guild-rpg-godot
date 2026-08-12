@@ -172,13 +172,13 @@ static func activate_frostwolf_grace(unit:Dictionary)->Dictionary:
 	if not has_talent(unit,"shaman_l21_2") or float(unit.ability_cds[4])>0.0:return {}
 	unit.ability_cds[4]=float(ShamanData.VALUES.frostwolf_grace_cooldown);var missing:=1.0-float(unit.hp)/maxf(1.0,float(unit.max_hp));return {"raw_healing":frostwolf_heal_amount(unit)*(1.0+missing*float(ShamanData.VALUES.frostwolf_grace_missing_bonus)),"health_before":float(unit.hp)}
 
-static func update(unit:Dictionary,delta:float)->void:
+static func update(unit:Dictionary,delta:float,q_rate:float=1.0)->void:
 	var runtime:Dictionary=unit.get("shaman_runtime",{});if runtime.is_empty():return
 	for key in ["windfury_remaining","elemental_remaining","ancestral_remaining"]:runtime[key]=maxf(0.0,float(runtime[key])-delta)
 	for marks_key in ["rolling_marks","alpha_marks","echo_assists"]:
 		for id in runtime[marks_key].keys():runtime[marks_key][id]=float(runtime[marks_key][id])-delta;if float(runtime[marks_key][id])<=0.0:runtime[marks_key].erase(id)
 	if float(runtime.windfury_remaining)<=0.0:runtime.windfury_attacks=0;runtime.windfury_targets=[]
-	AbilitySlotSystem.update(runtime.q_slot,delta)
+	AbilitySlotSystem.update(runtime.q_slot,delta,q_rate)
 
 static func reset_encounter(unit:Dictionary,new_encounter_id:String="")->void:
 	var mastery:Dictionary=unit.get("shaman_runtime",{}).get("mastery",{}).duplicate(true);var telemetry_enabled:=bool(unit.get("shaman_runtime",{}).get("telemetry_enabled",false));initialize_runtime(unit,telemetry_enabled,mastery,new_encounter_id)

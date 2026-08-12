@@ -83,8 +83,12 @@ static func add_stack(instances:Array, incoming:Dictionary, maximum:int) -> Arra
 
 static func advance(instance:Dictionary, delta:float) -> Dictionary:
 	var result:=instance.duplicate(true)
-	result.remaining_duration=maxf(0.0, float(result.remaining_duration)-delta)
-	result.next_tick=float(result.next_tick)-delta
+	# Only advance the tick clock while the effect is alive. A large frame must
+	# not manufacture ticks after expiration (for example, 5 seconds of delta
+	# on a 2-second HoT still resolves exactly the ticks at seconds 1 and 2).
+	var active_delta:=minf(maxf(0.0,delta),maxf(0.0,float(result.remaining_duration)))
+	result.remaining_duration=maxf(0.0,float(result.remaining_duration)-maxf(0.0,delta))
+	result.next_tick=float(result.next_tick)-active_delta
 	var ticks:=0
 	while float(result.next_tick)<=0.00001 and float(result.remaining_duration)>=0.0:
 		ticks+=1

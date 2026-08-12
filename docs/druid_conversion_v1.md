@@ -9,7 +9,7 @@ Druid is a mechanics-first, Malfurion-inspired proactive healer built with origi
 - `druid_runtime.gd` owns battlefield targeting, cast resolution, controls, Treant behavior, Heroic sequencing, and effects.
 - `druid_ability_presenter.gd` owns player-facing ability cards and talent-aware descriptions.
 - `periodic_status_system.gd` supplies class-neutral beneficial periodic instances, ownership, refresh, scheduled-healing queries, and bonus-tick snapshots.
-- `test_druid_system.gd` covers the deterministic mechanics; the shared UI suite covers registration, persistence, range access, and presentation contracts.
+- `test_druid_system.gd` covers deterministic mechanics, while `test_ui_druid_runtime.gd` exercises actual input and shared runtime interactions; the shared UI suite also covers registration, persistence, range access, and presentation contracts.
 
 All damage and healing enter the existing combat pipeline. Ability Power is applied before the generic outgoing-healing multiplier; healing-over-time multipliers are applied only to periodic healing. Effective healing and overhealing continue through normal threat, combat text, item hooks, and telemetry paths.
 
@@ -61,6 +61,6 @@ World-space effects distinguish Regrowth and mini-HoT ticks, Moonfire, growing R
 ## Known V1 tuning risks
 
 - Dense Regrowth coverage compounds Moonfire, Wild Growth, Serenity, and Nature's Swiftness; effective healing and overhealing telemetry should guide tuning.
-- Multiple Druids' Innervates currently stack multiplicatively through the generic cooldown-rate pipeline.
+- Multiple Druids' Innervates stack additively at +50% recovery rate per active source; Heroic cooldowns are never accelerated.
 - Treants are source-owned lightweight combat summons: they move and attack deterministically but are not yet full members of the enemy target-selection/threat entity graph.
 - Geometry is centralized for calibration. See `druid_geometry_calibration.md` for the assumptions that still need visual playtesting.

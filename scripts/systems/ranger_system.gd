@@ -94,14 +94,13 @@ static func activate_gloom(unit:Dictionary)->bool:
 	if not has_talent(unit,"ranger_l21_3") or float(unit.ability_cds[4])>0.0:return false
 	unit.ranger_runtime.gloom_remaining=5.0;unit.ranger_runtime.hatred=0;unit.ranger_runtime.hatred_remaining=0.0;unit.ability_cds[4]=5.0;refresh_derived_stats(unit);return true
 
-static func update(unit:Dictionary,delta:float)->Dictionary:
+static func update(unit:Dictionary,delta:float,e_rate:float=1.0)->Dictionary:
 	var runtime:Dictionary=unit.ranger_runtime;var result:={"gloom_heal":0.0}
 	if float(runtime.strafe_remaining)<=0.0 and int(runtime.hatred)>0:
 		runtime.hatred_remaining=maxf(0.0,float(runtime.hatred_remaining)-delta)
 		if runtime.hatred_remaining<=0.0:telemetry_add(unit,"hatred_expired",int(runtime.hatred));runtime.hatred=0
 	runtime.executioner_remaining=maxf(0.0,float(runtime.executioner_remaining)-delta);runtime.vault_empower_remaining=maxf(0.0,float(runtime.vault_empower_remaining)-delta);runtime.gloom_remaining=maxf(0.0,float(runtime.gloom_remaining)-delta)
 	var w_rate:=1.5 if has_talent(unit,"ranger_l24_1") and int(runtime.hatred)>=int(RangerData.VALUES.hatred_max) else 1.0
-	AbilitySlotSystem.update(runtime.slots.e,delta);AbilitySlotSystem.update(runtime.slots.r,delta)
+	AbilitySlotSystem.update(runtime.slots.e,delta,e_rate);AbilitySlotSystem.update(runtime.slots.r,delta)
 	if has_talent(unit,"ranger_l21_3"):result.gloom_heal=RangerData.scaled(1.25,int(unit.get("level",1)))*int(runtime.hatred)*delta
 	refresh_derived_stats(unit);return result
-

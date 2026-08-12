@@ -3,6 +3,7 @@ const TestSupport=preload("res://tests/test_support.gd")
 const ShamanData=preload("res://scripts/data/shaman_data.gd")
 const ShamanSystem=preload("res://scripts/systems/shaman_system.gd")
 const ProgressionScopeSystem=preload("res://scripts/systems/progression_scope_system.gd")
+const AbilitySlotSystem=preload("res://scripts/systems/ability_slot_system.gd")
 
 static func shaman(talents:Dictionary={},mastery:Dictionary={},level:int=1)->Dictionary:
 	var hero:={"class":"Shaman","combat_id":"hero:shaman","combat_team":"player","level":level,"hp":ShamanData.scaled(float(ShamanData.VALUES.health),level),"max_hp":ShamanData.scaled(float(ShamanData.VALUES.health),level),"power":ShamanData.scaled(float(ShamanData.VALUES.basic_attack_damage),level),"ability_cds":[0.0,0.0,0.0,0.0,0.0],"selected_talents":talents,"selected_heroic_id":"","active_effects":[],"pos":Vector2.ZERO,"shield":0.0,"shield_sources":[]}
@@ -63,4 +64,5 @@ static func run()->Array:
 	var saved:={};ProgressionScopeSystem.add_mastery(saved,"shaman_l9_1",7);var runtime:={};ProgressionScopeSystem.begin_encounter(runtime,"dungeon:1");ProgressionScopeSystem.add_encounter_progress(runtime,"quest",4);ProgressionScopeSystem.room_transition(runtime,"dungeon:1")
 	TestSupport.check(errors,int(runtime.encounter_progress.quest)==4 and ProgressionScopeSystem.mastery_progress(saved,"shaman_l9_1")==7,"Room transitions should preserve encounter progress and persistent mastery.")
 	ProgressionScopeSystem.end_encounter(runtime);TestSupport.check(errors,runtime.encounter_progress.is_empty() and ProgressionScopeSystem.mastery_progress(saved,"shaman_l9_1")==7,"Encounter end should clear encounter progress only.")
+	hero=shaman();AbilitySlotSystem.spend(hero.shaman_runtime.q_slot);var q_before:float=float(hero.shaman_runtime.q_slot.timers[0]);ShamanSystem.update(hero,2.0,1.5);TestSupport.check(errors,is_equal_approx(float(hero.shaman_runtime.q_slot.timers[0]),q_before-3.0),"External cooldown recovery should accelerate Shaman's internal Q charge slot.")
 	return errors

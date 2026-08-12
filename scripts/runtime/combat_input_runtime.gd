@@ -346,6 +346,7 @@ func begin_ability(slot:int,device:String="pc")->void:
 	if heroes[selected]["class"]=="Guardian" and slot==3 and guardian_heroic_id(heroes[selected])=="guardian_l15_r2":category="enemy"
 	if heroes[selected]["class"]=="Mage" and slot==3 and str(heroes[selected].get("selected_heroic_id",""))=="mage_l15_r2":category="enemy"
 	if heroes[selected]["class"]=="Slayer" and slot==3 and str(heroes[selected].get("selected_heroic_id",""))=="slayer_l15_r2":category="enemy"
+	if heroes[selected]["class"]=="Druid" and slot==3 and DruidSystem.has_talent(heroes[selected],"druid_l27_r2"):category="ground"
 	var mode="instant" if category=="self" else str(state.casting_settings[device].get(category,"cursor"))
 	if mode=="instant" or mode=="cursor" or mode=="facing" or mode=="target":
 		if (category=="enemy" and combat_enemy_target()<0) or (category=="ally" and (heroes[selected].heal_target<0 or heroes[selected].heal_target>=heroes.size())):
@@ -387,6 +388,9 @@ func begin_trait()->void:
 		queue_redraw()
 	elif str(hero.get("class",""))=="Sentinel":
 		use_ability(4,get_global_mouse_position())
+		queue_redraw()
+	elif str(hero.get("class",""))=="Druid":
+		use_ability(4,hero.pos)
 		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
@@ -440,9 +444,9 @@ func update_hero_drag(point:Vector2)->void:
 	drag_cursor=point
 	if drag_cursor.distance_to(drag_start)>12:drag_has_moved=true
 	drag_target_type="ground";drag_target_index=-1
-	if heroes[selected]["class"]=="Cleric":
+	if heroes[selected]["class"] in ["Cleric","Druid"]:
 		for hero_index in heroes.size():
-			if heroes[hero_index].hp>0 and heroes[hero_index].pos.distance_to(drag_cursor)<42:drag_target_type="ally";drag_target_index=hero_index;break
+			if hero_index!=selected and heroes[hero_index].hp>0 and heroes[hero_index].pos.distance_to(drag_cursor)<42:drag_target_type="ally";drag_target_index=hero_index;break
 	if drag_target_type=="ground":
 		for enemy_index in enemies.size():
 			if enemies[enemy_index].hp>0 and enemies[enemy_index].pos.distance_to(drag_cursor)<45:drag_target_type="enemy";drag_target_index=enemy_index;break

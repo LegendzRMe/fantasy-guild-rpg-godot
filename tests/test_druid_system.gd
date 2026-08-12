@@ -33,10 +33,14 @@ static func run()->Array:
 	var ticks:=1
 	for ignored in 19:ticks+=DruidSystem.advance(druid,1.0).regrowth_ticks.size()
 	TestSupport.check(errors,ticks==20 and druid.druid_runtime.regrowths.is_empty(),"Regrowth should schedule exactly 20 one-second ticks and expire on the final tick.")
+	var bounded:=PeriodicStatusSystem.advance(PeriodicStatusSystem.create_healing("bounded","owner","target",1.0,2.0,1.0),5.0)
+	TestSupport.check(errors,int(bounded.due_ticks)==2 and bool(bounded.expired),"A large frame must resolve only periodic ticks scheduled before expiration.")
 	DruidSystem.apply_regrowth(druid,a);DruidSystem.advance(druid,5.0);cast=DruidSystem.apply_regrowth(druid,a)
 	TestSupport.check(errors,bool(cast.refreshed) and druid.druid_runtime.regrowths.size()==1 and is_equal_approx(float(druid.druid_runtime.regrowths[0].remaining_duration),20.0),"Same-source Regrowth should replace/refresh rather than stack.")
 	var other:=unit({},"hero:druid:other");DruidSystem.apply_regrowth(other,a)
 	TestSupport.check(errors,DruidSystem.regrowth_for(druid,"ally:a")!=null and DruidSystem.regrowth_for(other,"ally:a")!=null,"Different Druids should own independent Regrowths on one ally.")
+	var rejuvenator:=unit({"tier_2":"druid_l12_1"});DruidSystem.apply_regrowth(rejuvenator,rejuvenator);DruidSystem.advance(rejuvenator,1.0);DruidSystem.apply_rejuvenation(rejuvenator,a)
+	TestSupport.check(errors,is_equal_approx(float(DruidSystem.regrowth_for(rejuvenator,"hero:druid").remaining_duration),19.0),"Rejuvenation must not shorten a longer direct self-Regrowth.")
 
 	var tank:=ally("ally:tank");TestSupport.check(errors,DruidSystem.designate_basic_healing_target(druid,tank),"A living ally should be manually designatable.")
 	var miss:=DruidSystem.note_basic_attack(druid,enemy("enemy:miss"),{"resolved_damage":0.0,"evaded":true},[druid,tank])
@@ -63,10 +67,13 @@ static func run()->Array:
 	var no_hot:=unit();TestSupport.check(errors,is_equal_approx(float(DruidSystem.moonfire_plan(no_hot,[enemy("enemy:x")]).combined_heal),130.0),"Moonfire computes one contact's native request; runtime only emits it for active Regrowth targets.")
 
 	var roots:=unit({"tier_1":"druid_l9_1","tier_4":"druid_l18_2"});var area:=DruidSystem.create_roots_area(roots,Vector2.ZERO)
-	TestSupport.check(errors,DruidSystem.roots_radius(roots,0.0)>float(DruidData.SPACE.roots_initial_radius) and DruidSystem.roots_radius(roots,3.0)>float(DruidData.SPACE.roots_max_radius),"Deep Roots should increase both initial and maximum growing radii by 25%.")
+	TestSupport.check(errors,is_equal_approx(DruidSystem.roots_radius(roots,0.0),float(DruidData.SPACE.roots_initial_radius)) and is_equal_approx(DruidSystem.roots_radius(roots,3.0),float(DruidData.SPACE.roots_max_radius)*1.25),"Deep Roots should preserve the initial radius and increase only the maximum growing radius by 25%.")
 	TestSupport.check(errors,is_equal_approx(float(area.remaining),3.0+1.25*1.4),"Deep Roots should extend post-growth persistence by 40%.")
 	var rooted:=DruidSystem.note_root_result(roots,enemy("enemy:root"),true)
 	TestSupport.check(errors,bool(rooted.verdant),"One successful primary Root should qualify Verdant Pulse.")
+	var emerald_druid:=unit({"tier_1":"druid_l9_3"});var emerald_total:=0.0
+	for rooted_index in 7:emerald_total+=float(DruidSystem.note_root_result(emerald_druid,enemy("enemy:emerald:%d"%rooted_index),true,false,rooted_index).emerald)
+	TestSupport.check(errors,is_equal_approx(emerald_total,float(DruidData.VALUES.emerald_cdr)*float(DruidData.VALUES.emerald_cap)),"Emerald Dreams should reward at most five successfully rooted unique enemies per primary cast.")
 	var immune:=DruidSystem.note_root_result(roots,enemy("enemy:immune","boss"),false)
 	TestSupport.check(errors,not bool(immune.verdant),"A Root-immune Boss should not qualify successful-Root talents.")
 	var quest:=unit({"tier_1":"druid_l9_2"});var before:=DruidSystem.treant_damage(quest);DruidSystem.note_root_result(quest,enemy("enemy:q"),true);var after:=DruidSystem.treant_damage(quest)
@@ -89,5 +96,13 @@ static func run()->Array:
 	TestSupport.check(errors,bool(innervate.cast) and is_equal_approx(float(innervate.communion),190.0) and is_equal_approx(float(innervator.druid_runtime.regrowths[0].remaining_duration),20.0),"Nature's Communion should cash out 50% of 20 remaining native ticks and fully refresh without consuming Regrowth.")
 	TestSupport.check(errors,int(innervator.druid_runtime.d_slot.max_charges)==2 and is_equal_approx(DruidSystem.innervate_recharge_rate(innervator),1.25),"Shan'do's Clarity should provide two charges and +25% recharge per own-Regrowth ally.")
 	TestSupport.check(errors,is_equal_approx(DruidSystem.cooldown_rate_from_innervate(a,[innervator],0),1.5) and is_equal_approx(DruidSystem.cooldown_rate_from_innervate(a,[innervator],3),1.0),"Innervate should accelerate Q/W/E recharge by 50% and never Heroics.")
+	var defeated:=ally("ally:defeated");defeated.hp=0.0;DruidSystem.apply_regrowth(innervator,defeated)
+	TestSupport.check(errors,is_equal_approx(DruidSystem.innervate_recharge_rate(innervator,[a,defeated]),1.25),"Shan'do recharge must count living own-Regrowth allies only.")
+	var ysera_communion:=unit({"tier_6":"druid_l24_1","tier_8":"druid_l30_3"});ysera_communion.hp=ysera_communion.max_hp;DruidSystem.apply_regrowth(ysera_communion,a);var ysera_cashout:=DruidSystem.cast_innervate(ysera_communion,a)
+	TestSupport.check(errors,is_equal_approx(float(ysera_cashout.communion),332.5),"Nature's Communion should include Ysera's active Regrowth source multiplier exactly once.")
+	var shower:=unit({"tier_8":"druid_l30_2"});var shower_target:=[enemy("enemy:shower")];var shower_base:=DruidData.scaled(float(DruidData.VALUES.moonfire_damage),1)
+	var shower_1:=DruidSystem.moonfire_plan(shower,shower_target);var shower_2:=DruidSystem.moonfire_plan(shower,shower_target);var shower_3:=DruidSystem.moonfire_plan(shower,shower_target)
+	TestSupport.check(errors,is_equal_approx(float(shower_1.damage),shower_base) and is_equal_approx(float(shower_2.damage),shower_base*1.2) and is_equal_approx(float(shower_3.damage),shower_base*1.4),"Lunar Shower should build after a Hero hit and empower successive Moonfires by 20% per stack.")
+	DruidSystem.advance(shower,6.0);TestSupport.check(errors,int(shower.druid_runtime.lunar_shower_stacks)==0,"Lunar Shower stacks should expire together after six seconds.")
 	TestSupport.check(errors,DruidData.TALENT_TIERS.size()==8 and DruidData.TEST_BUILDS.size()>=5 and DruidData.TEST_BUILDS.any(func(build):return "druid_l18_3" in build.get("talents",{}).values()),"Druid should expose the complete talent tree, five representative builds, and a Nature's Cure build.")
 	return errors

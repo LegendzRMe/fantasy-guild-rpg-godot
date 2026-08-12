@@ -372,7 +372,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	finalize_damage_events(source,target,result,source_action,damage_type,origin,source_is_summon,originating_effect_id,trigger_chain,before_ratio,retribution_bonus)
 	return result
 
-func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="",action_tags:Array=[])->Dictionary:
+func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="",action_tags:Array=[],resolution_overrides:Dictionary={})->Dictionary:
 	if bool(target.get("spirit_form",false)):return {"raw_amount":amount,"effective_amount":0.0,"overhealing":maxf(0.0,amount),"critical":false}
 	var incoming_multiplier:=1.0
 	for hero in heroes:
@@ -381,7 +381,8 @@ func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action
 	if str(source.get("combat_id",""))!=str(target.get("combat_id","")):
 		for rogue in heroes:
 			if str(rogue.get("class",""))=="Rogue" and RogueSystem.has_talent(rogue,"rogue_l21_3") and rogue.get("rogue_runtime",{}).get("garrotes",[]).any(func(instance):return str(instance.get("target_id",""))==str(target.get("combat_id","")) and float(instance.get("remaining_duration",0.0))>0.0):incoming_multiplier=minf(incoming_multiplier,float(RogueData.VALUES.strangle_external_multiplier))
-	var result:=CombatSystem.resolve_healing(source,target,{"amount":amount,"source_action":source_action,"incoming_multiplier":incoming_multiplier})
+	var healing_request:={"amount":amount,"source_action":source_action,"incoming_multiplier":incoming_multiplier};healing_request.merge(resolution_overrides,true)
+	var result:=CombatSystem.resolve_healing(source,target,healing_request)
 	var resolved_tags:Array=[source_action,"healing"]
 	for tag in action_tags:if tag not in resolved_tags:resolved_tags.append(tag)
 	var context:={"source_action":source_action,"action_tags":resolved_tags,"origin":origin,"originating_effect_id":originating_effect_id};var events:=CombatSystem.event_bundle_for_healing(source,target,result,context);combat_events.append_array(events)
@@ -433,8 +434,10 @@ func update_item_runtime(hero:Dictionary,delta:float)->void:
 		hero.borrowed_time_timer=float(hero.get("borrowed_time_timer",0.0))+delta
 		if hero.borrowed_time_timer>=8.0:hero.borrowed_time_timer=0.0;hero.borrowed_time_armed=true;item_feedback("Borrowed Time Ready",hero.pos,Color("b8d5ff"))
 	if hero_has_passive(hero,"twin_incantation"):
+		var druids:=heroes.filter(func(unit):return str(unit.get("class",""))=="Druid")
+		var q_recharge_rate:=DruidSystem.cooldown_rate_from_innervate(hero,druids,0)
 		for charge_index in range(hero.q_charge_timers.size()-1,-1,-1):
-			hero.q_charge_timers[charge_index]=float(hero.q_charge_timers[charge_index])-delta
+			hero.q_charge_timers[charge_index]=float(hero.q_charge_timers[charge_index])-delta*q_recharge_rate
 			if hero.q_charge_timers[charge_index]<=0.0:hero.q_charge_timers.remove_at(charge_index);hero.q_charges=mini(2,int(hero.q_charges)+1)
 		hero.ability_cds[0]=0.0 if int(hero.q_charges)>0 else (float(hero.q_charge_timers[0]) if not hero.q_charge_timers.is_empty() else 0.0)
 	for repeat_index in range(hero.get("pending_repeats",[]).size()-1,-1,-1):

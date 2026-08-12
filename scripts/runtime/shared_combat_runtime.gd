@@ -100,6 +100,7 @@ func update_unit_casts(unit:Dictionary,delta:float)->void:
 		if unit.active_cast.remaining<=0.0:
 			var cast:Dictionary=unit.active_cast;unit.active_cast={}
 			var cast_slot:int=int(cast.get("slot",-1));if cast_slot>=0:unit.ability_cds[cast_slot]=float(cast.get("full_cooldown",0.0))
+			if str(cast.get("completion_tag",""))=="druid_astral" and not unit.get("druid_runtime",{}).is_empty():unit.druid_runtime["astral_ready"]=true
 			if float(cast.get("channel_duration",0.0))>0.0:unit.command_state=CombatRulesV1.CommandState.CHANNEL;unit.active_channel={"slot":cast.slot,"remaining":cast.channel_duration,"duration":cast.channel_duration,"requires_line_of_sight":cast.requires_line_of_sight,"target_id":cast.target_id}
 			else:CombatRulesV1.restore_preserved_command(unit,target_is_valid_for(unit,unit_by_combat_id(str(unit.get("preserved_target_id",""))),str(unit.get("preserved_target_kind",""))))
 	elif not unit.get("active_channel",{}).is_empty():

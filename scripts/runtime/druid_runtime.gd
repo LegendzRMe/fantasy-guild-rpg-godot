@@ -14,8 +14,8 @@ func druid_selected_ally(hero:Dictionary,allow_self:bool=true):
 	if ally.hp<=0.0 or (not allow_self and ally==hero) or hero.pos.distance_to(ally.pos)>float(DruidData.SPACE.regrowth_range):return null
 	return ally
 
-func druid_heal(hero:Dictionary,target:Dictionary,amount:float,action:String,origin:String,effect_id:String,tags:Array=[])->Dictionary:
-	var result:=deal_healing(hero,target,amount,action,origin,effect_id,tags)
+func druid_heal(hero:Dictionary,target:Dictionary,amount:float,action:String,origin:String,effect_id:String,tags:Array=[],resolution_overrides:Dictionary={})->Dictionary:
+	var result:=deal_healing(hero,target,amount,action,origin,effect_id,tags,resolution_overrides)
 	hero.druid_runtime.recent_healing=float(result.effective_amount);hero.druid_runtime.recent_overhealing=float(result.overhealing)
 	return result
 
@@ -25,21 +25,22 @@ func druid_resolve_regrowth_tick(hero:Dictionary,tick:Dictionary,bonus:bool=fals
 	DruidSystem.telemetry_add(hero,"verdant_ticks" if bonus else "regrowth_ticks");DruidSystem.telemetry_add(hero,"regrowth_healing",float(result.effective_amount));DruidSystem.telemetry_add(hero,"regrowth_overhealing",float(result.overhealing));druid_visual("druid_regrowth_tick",hero.pos,target.pos,.35)
 	if DruidSystem.has_talent(hero,"druid_l21_1") and float(result.overhealing)>0.0:
 		var candidates:=heroes.filter(func(ally):return ally!=target and ally.hp>0.0);candidates.sort_custom(func(left,right):var ld:float=Vector2(target.pos).distance_squared_to(Vector2(left.pos));var rd:float=Vector2(target.pos).distance_squared_to(Vector2(right.pos));return str(left.combat_id)<str(right.combat_id) if is_equal_approx(ld,rd) else ld<rd)
-		if not candidates.is_empty():druid_heal(hero,candidates[0],float(result.overhealing),"basic_ability","Nature's Swiftness","druid_natures_swiftness",["healing"]);druid_visual("druid_swiftness",target.pos,candidates[0].pos,.35)
+		if not candidates.is_empty():druid_heal(hero,candidates[0],float(result.overhealing),"basic_ability","Nature's Swiftness","druid_natures_swiftness",["healing"],{"outgoing_multiplier":1.0,"incoming_multiplier":1.0,"can_crit":false});druid_visual("druid_swiftness",target.pos,candidates[0].pos,.35)
 
 func druid_cast_regrowth(hero:Dictionary)->bool:
 	if float(hero.ability_cds[0])>0.0:return false
 	var target=druid_selected_ally(hero,true);if target==null:return false
-	var snapshot_missing:=maxf(0.0,float(target.max_hp)-float(target.hp));var cast:=DruidSystem.apply_regrowth(hero,target,true)
-	if float(cast.lifebloom_fraction)>0.0:druid_heal(hero,target,snapshot_missing*float(cast.lifebloom_fraction),"basic_ability","Lifebloom","druid_lifebloom",["healing"]);druid_visual("druid_lifebloom",hero.pos,target.pos,.35)
+	var snapshot_missing:=maxf(0.0,float(target.max_hp)-float(target.hp));var removed:=DruidSystem.cleanse_regrowth_target(hero,target)
+	if DruidSystem.has_talent(hero,"druid_l30_1"):druid_heal(hero,target,snapshot_missing*float(DruidData.VALUES.lifebloom_missing),"basic_ability","Lifebloom","druid_lifebloom",["healing"]);druid_visual("druid_lifebloom",hero.pos,target.pos,.35)
+	var cast:=DruidSystem.apply_regrowth(hero,target,true,false)
 	DruidSystem.apply_rejuvenation(hero,target);hero.ability_cds[0]=float(DruidData.VALUES.q_cooldown);druid_visual("druid_regrowth",hero.pos,target.pos,.5,{"duration":float(cast.duration)});return true
 
 func druid_resolve_moonfire(hero:Dictionary,point:Vector2,free_cast:bool=false)->Dictionary:
 	var contacts:Array=[]
 	for target in enemies:if target.hp>0.0 and target.pos.distance_to(point)<=DruidSystem.moonfire_radius(hero)+float(target.get("combat_radius",28.0)):contacts.append(target)
-	var plan:=DruidSystem.moonfire_plan(hero,contacts,free_cast)
+	var plan:=DruidSystem.moonfire_plan(hero,contacts,free_cast,heroes)
 	for target in contacts:
-		var result:=deal_damage(hero,target,float(plan.damage),"basic_ability","magical","Moonfire",false,"druid_moonfire",[],true);DruidSystem.telemetry_add(hero,"moonfire_damage",float(result.resolved_damage));StealthDetectionSystem.reveal(target,float(plan.reveal));target.active_effects=CombatSystem.apply_named_effect(target.get("active_effects",[]),{"id":"druid_moonfire_reveal:%s"%str(hero.combat_id),"owner_id":str(hero.combat_id),"remaining_duration":float(plan.reveal)});DruidSystem.telemetry_add(hero,"moonfire_reveals")
+		var result:=deal_damage(hero,target,float(plan.damage),"basic_ability","magical","Moonfire",false,"druid_moonfire",[],true);DruidSystem.telemetry_add(hero,"moonfire_damage",float(result.resolved_damage));var revealed:=StealthDetectionSystem.reveal(target,float(plan.reveal));if revealed:target.active_effects=CombatSystem.apply_named_effect(target.get("active_effects",[]),{"id":"druid_moonfire_reveal:%s"%str(hero.combat_id),"owner_id":str(hero.combat_id),"remaining_duration":float(plan.reveal)});DruidSystem.telemetry_add(hero,"moonfire_reveals")
 	if int(plan.count)>0:
 		for regrowth in DruidSystem.active_regrowths(hero):
 			var ally=druid_ally_by_id(str(regrowth.target_id));if ally!=null and ally.hp>0.0:var healing:=druid_heal(hero,ally,float(plan.combined_heal),"basic_ability","Moonfire","druid_moonfire_heal",["healing"]);DruidSystem.telemetry_add(hero,"moonfire_healing",float(healing.effective_amount));druid_visual("druid_moonfire_heal",point,ally.pos,.4)
@@ -80,13 +81,14 @@ func druid_cast_heroic(hero:Dictionary,point:Vector2)->bool:
 	if str(hero.selected_heroic_id)=="druid_l15_r1":hero.ability_cds[3]=float(DruidData.VALUES.tranquility_cooldown);hero.druid_runtime.tranquility_remaining=float(DruidData.VALUES.tranquility_duration);hero.druid_runtime.tranquility_tick=1.0;druid_visual("druid_tranquility",hero.pos,hero.pos,.8,{"radius":float(DruidData.SPACE.tranquility_radius)});return true
 	if str(hero.selected_heroic_id)=="druid_l15_r2":
 		if DruidSystem.has_talent(hero,"druid_l27_r2"):
-			hero.druid_runtime.astral_pending=float(DruidData.VALUES.astral_channel);hero.druid_runtime.astral_point=hero.pos+(point-hero.pos).limit_length(float(DruidData.SPACE.astral_range));hero.ability_cds[3]=float(DruidData.VALUES.twilight_cooldown);return true
+			hero.druid_runtime.astral_pending=float(DruidData.VALUES.astral_channel);hero.druid_runtime.astral_point=hero.pos+(point-hero.pos).limit_length(float(DruidData.SPACE.astral_range));begin_unit_cast(hero,3,float(DruidData.VALUES.astral_channel),true,0.0,false,float(DruidData.VALUES.twilight_cooldown));hero.active_cast["completion_tag"]="druid_astral";return true
 		hero.druid_runtime.twilight_pending=float(DruidData.VALUES.twilight_delay);hero.druid_runtime.twilight_point=hero.pos;hero.ability_cds[3]=float(DruidData.VALUES.twilight_cooldown);return true
 	return false
 
 func cast_druid_ability(slot:int,point:Vector2,_item_repeat:bool=false)->bool:
 	if selected<0 or selected>=heroes.size():return false
 	var hero:Dictionary=heroes[selected];if str(hero.get("class",""))!="Druid" or hero.get("druid_runtime",{}).is_empty():return false
+	if not hero.get("active_cast",{}).is_empty() or not hero.get("active_channel",{}).is_empty():return false
 	match slot:
 		0:return druid_cast_regrowth(hero)
 		1:return druid_cast_moonfire(hero,point)
@@ -100,7 +102,7 @@ func update_druid_roots(hero:Dictionary,delta:float)->void:
 		var area:Dictionary=hero.druid_runtime.roots_areas[index];area.elapsed=float(area.elapsed)+delta;area.remaining=float(area.remaining)-delta;var any_success:=false
 		for target in enemies:
 			var id:=str(target.combat_id);if target.hp<=0.0 or id in area.contact_ids or target.pos.distance_to(area.point)>DruidSystem.roots_radius(hero,float(area.elapsed),bool(area.secondary))+float(target.get("combat_radius",28.0)):continue
-			area.contact_ids.append(id);var damage:=deal_damage(hero,target,DruidSystem.power_scaled(hero,float(DruidData.VALUES.roots_damage)),"basic_ability","magical","Entangling Roots",false,"druid_roots_secondary" if bool(area.secondary) else "druid_roots",[],true);var control:=CombatSystem.apply_control(target,"root",float(DruidData.VALUES.roots_duration));var root_result:=DruidSystem.note_root_result(hero,target,bool(control.applied),bool(area.secondary));any_success=any_success or bool(control.applied)
+			area.contact_ids.append(id);var damage:=deal_damage(hero,target,DruidSystem.power_scaled(hero,float(DruidData.VALUES.roots_damage)),"basic_ability","magical","Entangling Roots",false,"druid_roots_secondary" if bool(area.secondary) else "druid_roots",[],true);var control:=CombatSystem.apply_control(target,"root",float(DruidData.VALUES.roots_duration));var successful_index:=int(area.get("successful_roots",0));var root_result:=DruidSystem.note_root_result(hero,target,bool(control.applied),bool(area.secondary),successful_index);if bool(control.applied):area.successful_roots=successful_index+1;any_success=any_success or bool(control.applied)
 			if float(root_result.emerald)>0.0:var reduced:=minf(float(root_result.emerald),float(hero.druid_runtime.d_slot.timers[0]) if not hero.druid_runtime.d_slot.timers.is_empty() else 0.0);AbilitySlotSystem.reduce_active_recharge(hero.druid_runtime.d_slot,float(root_result.emerald));DruidSystem.telemetry_add(hero,"emerald_cdr",reduced)
 		if any_success and not bool(area.verdant_fired) and not bool(area.secondary) and DruidSystem.has_talent(hero,"druid_l18_2"):
 			area.verdant_fired=true;for tick in DruidSystem.bonus_regrowth_ticks(hero):druid_resolve_regrowth_tick(hero,tick,true);DruidSystem.telemetry_add(hero,"verdant_activations")
@@ -121,20 +123,20 @@ func update_druid_treants(hero:Dictionary,delta:float)->void:
 func update_druid_runtime(delta:float)->void:
 	for hero in heroes:
 		if str(hero.get("class",""))!="Druid" or hero.get("druid_runtime",{}).is_empty():continue
-		var update:=DruidSystem.advance(hero,delta)
+		var update:=DruidSystem.advance(hero,delta,heroes)
 		for tick in update.regrowth_ticks:druid_resolve_regrowth_tick(hero,tick,false)
 		for tick in update.mini_hot_ticks:
 			var target=druid_ally_by_id(str(tick.target_id));if target!=null and target.hp>0.0:var result:=druid_heal(hero,target,DruidSystem.basic_hot_tick_request(hero),"periodic","Druid Basic HoT","druid_basic_hot",["healing_over_time","periodic_healing","druid_basic_hot"]);DruidSystem.telemetry_add(hero,"mini_hot_ticks");DruidSystem.telemetry_add(hero,"mini_hot_healing",float(result.effective_amount));DruidSystem.telemetry_add(hero,"mini_hot_overhealing",float(result.overhealing));druid_visual("druid_basic_hot_tick",hero.pos,target.pos,.3)
 		if float(hero.druid_runtime.tranquility_remaining)>0.0:
-			hero.druid_runtime.tranquility_remaining=maxf(0.0,float(hero.druid_runtime.tranquility_remaining)-delta);hero.druid_runtime.tranquility_tick=float(hero.druid_runtime.tranquility_tick)-delta
-			if float(hero.druid_runtime.tranquility_tick)<=0.0:
-				hero.druid_runtime.tranquility_tick+=1.0;var regrowth_count:=DruidSystem.active_regrowths(hero).size();var multiplier:=1.0+(float(DruidData.VALUES.serenity_base)+regrowth_count*float(DruidData.VALUES.serenity_per_regrowth) if DruidSystem.has_talent(hero,"druid_l27_r1") else 0.0)
+			var active_delta:=minf(maxf(0.0,delta),float(hero.druid_runtime.tranquility_remaining));hero.druid_runtime.tranquility_remaining=maxf(0.0,float(hero.druid_runtime.tranquility_remaining)-maxf(0.0,delta));hero.druid_runtime.tranquility_tick=float(hero.druid_runtime.tranquility_tick)-active_delta
+			while float(hero.druid_runtime.tranquility_tick)<=0.00001:
+				hero.druid_runtime.tranquility_tick+=1.0;var regrowth_count:=DruidSystem.living_regrowth_count(hero,heroes);var multiplier:=1.0+(float(DruidData.VALUES.serenity_base)+regrowth_count*float(DruidData.VALUES.serenity_per_regrowth) if DruidSystem.has_talent(hero,"druid_l27_r1") else 0.0)
 				for ally in heroes:
 					if ally.hp<=0.0 or ally.pos.distance_to(hero.pos)>float(DruidData.SPACE.tranquility_radius):continue
 					var healing:=druid_heal(hero,ally,DruidSystem.power_scaled(hero,float(DruidData.VALUES.tranquility_tick))*multiplier,"periodic","Tranquility","druid_tranquility",["periodic_healing"]);DruidSystem.telemetry_add(hero,"tranquility_healing",float(healing.effective_amount))
-					if DruidSystem.regrowth_for(hero,str(ally.combat_id))!=null:PriestSystem.add_named_armor(ally,"druid_tranquility:%s"%str(hero.combat_id),float(DruidData.VALUES.tranquility_armor),1.1)
-		if float(hero.druid_runtime.astral_pending)>0.0:
-			hero.druid_runtime.astral_pending=maxf(0.0,float(hero.druid_runtime.astral_pending)-delta)
-			if float(hero.druid_runtime.astral_pending)<=0.0:hero.pos=Vector2(hero.druid_runtime.astral_point);hero.dest=hero.pos;druid_resolve_moonfire(hero,hero.pos,true);DruidSystem.telemetry_add(hero,"astral_teleports");DruidSystem.telemetry_add(hero,"astral_free_moonfires");hero.druid_runtime.twilight_pending=float(DruidData.VALUES.twilight_delay);hero.druid_runtime.twilight_point=hero.pos
+					if DruidSystem.regrowth_for(hero,str(ally.combat_id))!=null:PriestSystem.add_named_armor(ally,"druid_tranquility:%s"%str(hero.combat_id),float(DruidData.VALUES.tranquility_armor),1.1);DruidSystem.telemetry_add(hero,"tranquility_armor_uptime",1.0)
+		if bool(hero.druid_runtime.get("astral_ready",false)):
+			hero.druid_runtime.astral_ready=false;hero.druid_runtime.astral_pending=0.0;hero.pos=Vector2(hero.druid_runtime.astral_point);hero.dest=hero.pos;druid_resolve_moonfire(hero,hero.pos,true);DruidSystem.telemetry_add(hero,"astral_teleports");DruidSystem.telemetry_add(hero,"astral_free_moonfires");hero.druid_runtime.twilight_pending=float(DruidData.VALUES.twilight_delay);hero.druid_runtime.twilight_point=hero.pos
+		elif float(hero.druid_runtime.astral_pending)>0.0 and hero.get("active_cast",{}).is_empty():hero.druid_runtime.astral_pending=0.0
 		if float(hero.druid_runtime.twilight_pending)>0.0:hero.druid_runtime.twilight_pending=maxf(0.0,float(hero.druid_runtime.twilight_pending)-delta);if float(hero.druid_runtime.twilight_pending)<=0.0:druid_resolve_twilight(hero,Vector2(hero.druid_runtime.twilight_point))
 		update_druid_roots(hero,delta);update_druid_treants(hero,delta)

@@ -102,7 +102,8 @@ func update_sentinel_projectile(hero:Dictionary,p:Dictionary,delta:float)->bool:
 func update_sentinel_runtime(delta:float)->void:
 	for hero in heroes:
 		if str(hero.get("class",""))!="Sentinel" or hero.get("sentinel_runtime",{}).is_empty():continue
-		SentinelSystem.update(hero,delta);var rt:Dictionary=hero.sentinel_runtime
+		var druids:=heroes.filter(func(unit):return str(unit.get("class",""))=="Druid")
+		SentinelSystem.update(hero,delta,DruidSystem.cooldown_rate_from_innervate(hero,druids,0),DruidSystem.cooldown_rate_from_innervate(hero,druids,1));var rt:Dictionary=hero.sentinel_runtime
 		for reveal_id in rt.w_reveals.keys():rt.w_reveals[reveal_id].remaining=float(rt.w_reveals[reveal_id].remaining)-delta;if float(rt.w_reveals[reveal_id].remaining)<=0.0:rt.w_reveals.erase(reveal_id)
 		if not rt.elune_chosen.is_empty():
 			rt.elune_chosen.remaining=maxf(0.0,float(rt.elune_chosen.get("remaining",0.0))-delta);rt.elune_chosen.cooldown=maxf(0.0,float(rt.elune_chosen.get("cooldown",0.0))-delta)

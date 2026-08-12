@@ -81,9 +81,9 @@ static func note_basic_attack(unit:Dictionary,target:Dictionary,blockers:Array,f
 	if has_talent(unit,"protector_l18_2") and crosses_own_wall(unit,from,to,blockers):
 		unit.ability_cds[1]=maxf(0.0,float(unit.ability_cds[1])-float(ProtectorData.VALUES.w_crossing_reduction));telemetry_add(unit,"wall_crossing_attacks")
 
-static func update(unit:Dictionary,delta:float)->void:
+static func update(unit:Dictionary,delta:float,e_rate:float=1.0)->void:
 	var runtime:Dictionary=unit.get("protector_runtime",{});if runtime.is_empty():return
 	for key in ["aspect_cooldown","pursuit_remaining","stalwart_remaining","wicked_remaining","burning_empowered_remaining"]:runtime[key]=maxf(0.0,float(runtime.get(key,0.0))-delta)
-	var rate:=float(ProtectorData.VALUES.e_wicked_rate) if has_talent(unit,"protector_l24_3") and (not runtime.q_sequence.is_empty() or float(runtime.wicked_remaining)>0.0) else 1.0
+	var rate:=(float(ProtectorData.VALUES.e_wicked_rate) if has_talent(unit,"protector_l24_3") and (not runtime.q_sequence.is_empty() or float(runtime.wicked_remaining)>0.0) else 1.0)*e_rate
 	AbilitySlotSystem.update(runtime.smite_slot,delta,rate)
 	unit.ability_cds[2]=float(AbilitySlotSystem.ui_state(runtime.smite_slot).recharge)

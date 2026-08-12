@@ -119,7 +119,8 @@ func cast_ranger_ability(slot:int,point:Vector2,item_repeat:bool=false)->bool:
 func update_ranger_runtime(delta:float)->void:
 	for hero in heroes:
 		if hero.hp<=0 or str(hero.get("class",""))!="Ranger" or hero.get("ranger_runtime",{}).is_empty():continue
-		var result:=RangerSystem.update(hero,delta)
+		var druids:=heroes.filter(func(unit):return str(unit.get("class",""))=="Druid")
+		var result:=RangerSystem.update(hero,delta,DruidSystem.cooldown_rate_from_innervate(hero,druids,2))
 		if float(result.gloom_heal)>0.0:deal_healing(hero,hero,float(result.gloom_heal),"periodic","Gloom")
 		var e_slot:Dictionary=hero.ranger_runtime.slots.e;var r_slot:Dictionary=hero.ranger_runtime.slots.r
 		hero.ability_cds[2]=0.0 if int(e_slot.current_charges)>0 else (float(e_slot.timers[0]) if not e_slot.timers.is_empty() else 0.0)

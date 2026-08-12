@@ -147,10 +147,10 @@ static func end_metamorphosis(unit:Dictionary) -> void:
 			if float(unit.shield_sources[index].amount)<=0.0001:unit.shield_sources.remove_at(index)
 		unit.slayer_runtime.unending_thirst_shield=minf(source_total,cap)
 
-static func update(unit:Dictionary,delta:float) -> Dictionary:
+static func update(unit:Dictionary,delta:float,w_rate:float=1.0) -> Dictionary:
 	var runtime:Dictionary=unit.get("slayer_runtime",{});var output:={"immolation_tick":false,"metamorphosis_ended":false,"thirst_decay":0.0}
 	if runtime.is_empty():return output
-	EvasionSystem.update(unit,delta);AbilitySlotSystem.update(runtime.w_slot,delta);unit.basic_attack_interval=attack_interval(unit)
+	EvasionSystem.update(unit,delta);AbilitySlotSystem.update(runtime.w_slot,delta,w_rate);unit.basic_attack_interval=attack_interval(unit)
 	for key in ["movement_buff_remaining","sweep_bonus_remaining","immolation_remaining","blades_remaining","fiery_expires"]:runtime[key]=maxf(0.0,float(runtime.get(key,0.0))-delta)
 	for target_id in runtime.marked_targets.keys():runtime.marked_targets[target_id]=maxf(0.0,float(runtime.marked_targets[target_id])-delta);if float(runtime.marked_targets[target_id])<=0.0:runtime.marked_targets.erase(target_id)
 	for source in runtime.temporary_armor_sources:source.remaining=maxf(0.0,float(source.remaining)-delta)
