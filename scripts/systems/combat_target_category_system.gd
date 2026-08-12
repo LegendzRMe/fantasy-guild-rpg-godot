@@ -6,6 +6,8 @@ const QUEST_CATEGORIES := ["standard","elite","named","boss","enemy_hero"]
 static func category(unit:Dictionary) -> String:
 	var tags:Array = unit.get("combat_tags",[])
 	if bool(unit.get("object",false)) or "object" in tags:return "object"
+	var authored:=str(unit.get("target_category",""))
+	if authored in IMMEDIATE_CATEGORIES:return authored
 	if "training" in tags:return "training"
 	if "noncombat" in tags:return "noncombat"
 	if bool(unit.get("summoned_unit",false)) or "summon" in tags:return "summon"

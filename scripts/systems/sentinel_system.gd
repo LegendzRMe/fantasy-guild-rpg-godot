@@ -54,9 +54,9 @@ static func note_e_hit(unit:Dictionary,target:Dictionary,automatic:bool=false)->
 	if TargetCategorySystem.qualifies_quest(target):unit.sentinel_runtime.e_quest_stacks=mini(84,int(unit.sentinel_runtime.e_quest_stacks)+1);unit.sentinel_runtime.e_recent_hits[str(target.combat_id)]=float(SentinelData.VALUES.e_death_window);telemetry_add(unit,"e_quest_stacks")
 static func note_defeat(unit:Dictionary,target:Dictionary)->void:
 	var id:=str(target.get("combat_id",""));if float(unit.get("sentinel_runtime",{}).get("e_recent_hits",{}).get(id,0.0))>0.0:unit.sentinel_runtime.e_quest_stacks=mini(84,int(unit.sentinel_runtime.e_quest_stacks)+1);telemetry_add(unit,"e_quest_stacks")
-static func update(unit:Dictionary,delta:float)->Dictionary:
+static func update(unit:Dictionary,delta:float,q_rate:float=1.0,w_rate:float=1.0)->Dictionary:
 	var runtime:Dictionary=unit.get("sentinel_runtime",{});if runtime.is_empty():return {}
-	var before:=int(runtime.q_slot.current_charges);AbilitySlotSystem.update(runtime.q_slot,delta);AbilitySlotSystem.update(runtime.w_slot,delta);var refilled:bool=before<int(runtime.q_slot.max_charges) and int(runtime.q_slot.current_charges)==int(runtime.q_slot.max_charges)
+	var before:=int(runtime.q_slot.current_charges);AbilitySlotSystem.update(runtime.q_slot,delta,q_rate);AbilitySlotSystem.update(runtime.w_slot,delta,w_rate);var refilled:bool=before<int(runtime.q_slot.max_charges) and int(runtime.q_slot.current_charges)==int(runtime.q_slot.max_charges)
 	runtime.d_cooldown=maxf(0.0,float(runtime.d_cooldown)-delta);runtime.trueshot_cooldown=maxf(0.0,float(runtime.trueshot_cooldown)-delta);runtime.mark_remaining=maxf(0.0,float(runtime.mark_remaining)-delta)
 	if float(runtime.mark_remaining)<=0.0:runtime.marked_target_id=""
 	for id in runtime.e_recent_hits.keys():runtime.e_recent_hits[id]=float(runtime.e_recent_hits[id])-delta;if float(runtime.e_recent_hits[id])<=0.0:runtime.e_recent_hits.erase(id)

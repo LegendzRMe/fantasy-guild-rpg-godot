@@ -180,12 +180,12 @@ static func clear_mark(unit:Dictionary) -> void:
 	runtime.mark_stacks = 0
 	runtime.marked_reactivation = false
 
-static func update(unit:Dictionary, delta:float) -> void:
+static func update(unit:Dictionary, delta:float, q_rate:float=1.0, e_rate:float=1.0) -> void:
 	var runtime:Dictionary = unit.get("huntsman_runtime", {})
 	if runtime.is_empty(): return
-	runtime.human_q_cooldown = maxf(0.0, float(runtime.human_q_cooldown) - delta)
-	runtime.worgen_q_cooldown = maxf(0.0, float(runtime.worgen_q_cooldown) - delta)
-	runtime.shared_e_cooldown = maxf(0.0, float(runtime.shared_e_cooldown) - delta)
+	runtime.human_q_cooldown = maxf(0.0, float(runtime.human_q_cooldown) - delta * q_rate)
+	runtime.worgen_q_cooldown = maxf(0.0, float(runtime.worgen_q_cooldown) - delta * q_rate)
+	runtime.shared_e_cooldown = maxf(0.0, float(runtime.shared_e_cooldown) - delta * e_rate)
 	runtime.r1_repeat_remaining = maxf(0.0, float(runtime.r1_repeat_remaining) - delta)
 	if float(runtime.r1_repeat_remaining) <= 0.0: runtime.r1_repeat_available = false
 	if float(runtime.inner_beast_remaining) > 0.0:

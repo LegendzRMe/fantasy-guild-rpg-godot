@@ -14,12 +14,12 @@ static func run(main:Node) -> Array:
 	main.state.heroes[1].level=6
 	main.show_testing_zone_menu();await main.get_tree().process_frame
 	TestSupport.check(errors,main.screen=="combat_hall" and main.ui.find_child("TestingEndlessLevel",true,false)!=null and main.ui.find_child("TestingEndlessStart",true,false)!=null,"The Combat Hall should offer the Dummy Range and fixed-level Endless Arena launch controls.")
-	var endless_level_label:Control=main.ui.find_child("TestingEndlessLevelLabel",true,false);var endless_level_picker:Control=main.ui.find_child("TestingEndlessLevel",true,false);var rogue_range_start:Control=main.ui.find_child("TestingRogueRangeStart",true,false);var endless_start:Control=main.ui.find_child("TestingEndlessStart",true,false)
+	var endless_level_label:Control=main.ui.find_child("TestingEndlessLevelLabel",true,false);var endless_level_picker:Control=main.ui.find_child("TestingEndlessLevel",true,false);var rogue_range_start:Control=main.ui.find_child("TestingRogueRangeStart",true,false);var druid_range_start:Control=main.ui.find_child("TestingDruidRangeStart",true,false);var endless_start:Control=main.ui.find_child("TestingEndlessStart",true,false)
 	TestSupport.check(errors,endless_level_label!=null and endless_level_label.size.x>=120.0 and endless_level_label.size.y<=50.0 and endless_level_picker!=null and endless_level_picker.size.x>=135.0 and endless_level_picker.size.y<=50.0,"The Endless Arena level selector should remain a compact horizontal control instead of stretching or wrapping vertically.")
-	TestSupport.check(errors,rogue_range_start!=null and endless_start!=null,"Every former Testing Zone launch action should remain available through the Combat Hall.")
+	TestSupport.check(errors,rogue_range_start!=null and druid_range_start!=null and endless_start!=null,"Every former Testing Zone launch action and the Druid Range should remain available through the Combat Hall.")
 	var custom_testing_party:Array=[4,5,7,8];main.state.selected_team=custom_testing_party.duplicate();main.state.active_team=custom_testing_party.duplicate()
 	TestSupport.check(errors,main.testing_party_indices()==custom_testing_party,"Testing battles should resolve the currently selected team instead of silently substituting a fixed party.")
-	for requested_class:String in ["Warlock","Rogue","Slayer","Priest","Shaman","Templar","Protector","Sentinel"]:
+	for requested_class:String in ["Warlock","Rogue","Slayer","Priest","Shaman","Templar","Protector","Sentinel","Huntsman","Druid"]:
 		var class_party:Array=main.testing_party_for_class(requested_class)
 		TestSupport.check(errors,class_party.size()==4 and class_party.any(func(hero_index):return str(main.state.heroes[int(hero_index)].get("class",""))==requested_class),requested_class+" Range should safely inject its required class when the selected team omits it.")
 	main.state.selected_team=[0,1,2,3];main.state.active_team=[0,1,2,3];main.start_testing_zone()

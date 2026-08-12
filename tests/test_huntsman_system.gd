@@ -47,5 +47,7 @@ static func run() -> Array:
 	var prepared:=HuntsmanSystem.prepare_basic_attack(wizened,{"active_effects":[]})
 	TestSupport.check(errors,is_equal_approx(float(prepared.multiplier),1.70) and int(wizened.huntsman_runtime.wizened_attacks)==3,"Wizened Duelist should add to Worgen's Basic Attack bonus for the next three attacks.")
 	HuntsmanSystem.resolve_basic_attack(wizened,100.0,true);TestSupport.check(errors,int(wizened.huntsman_runtime.wizened_attacks)==2,"Only successful prepared primary Basic Attacks should consume Wizened Duelist.")
+	var innervated:=unit();innervated.huntsman_runtime.human_q_cooldown=10.0;innervated.huntsman_runtime.worgen_q_cooldown=10.0;innervated.huntsman_runtime.shared_e_cooldown=10.0;HuntsmanSystem.update(innervated,2.0,1.5,1.5)
+	TestSupport.check(errors,is_equal_approx(float(innervated.huntsman_runtime.human_q_cooldown),7.0) and is_equal_approx(float(innervated.huntsman_runtime.worgen_q_cooldown),7.0) and is_equal_approx(float(innervated.huntsman_runtime.shared_e_cooldown),7.0),"External cooldown recovery should accelerate both form-specific Q timers and shared E.")
 	TestSupport.check(errors,HuntsmanData.TALENT_TIERS.size()==8 and HuntsmanData.TEST_BUILDS.size()>=5,"Huntsman should expose every talent tier and representative test builds.")
 	return errors

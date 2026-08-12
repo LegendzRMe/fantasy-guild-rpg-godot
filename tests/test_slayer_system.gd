@@ -6,6 +6,7 @@ const SlayerSystem=preload("res://scripts/systems/slayer_system.gd")
 const EvasionSystem=preload("res://scripts/systems/evasion_system.gd")
 const BlockChargeSystem=preload("res://scripts/systems/block_charge_system.gd")
 const TargetCategorySystem=preload("res://scripts/systems/combat_target_category_system.gd")
+const AbilitySlotSystem=preload("res://scripts/systems/ability_slot_system.gd")
 
 static func slayer(talents:Dictionary={},level:int=1)->Dictionary:
 	var hero:={"class":"Slayer","combat_id":"hero:slayer","combat_affiliation":"player","level":level,"hp":SlayerData.scaled(1725.0,level),"max_hp":SlayerData.scaled(1725.0,level),"power":SlayerData.scaled(78.0,level),"ability_cds":[6.0,8.0,15.0,100.0,0.0],"selected_talents":talents,"selected_heroic_id":"slayer_l15_r1","base_basic_action_interval":1.0/1.82,"active_effects":[],"pos":Vector2.ZERO}
@@ -43,4 +44,5 @@ static func run()->Array:
 	hero=slayer({"tier_8":"slayer_l30_3"});var gained:=SlayerSystem.add_unending_thirst(hero,9999.0);TestSupport.check(errors,is_equal_approx(gained,hero.max_hp*.25),"Unending Thirst should cap at twenty-five percent current maximum Health.")
 	hero=slayer();var base_max:=float(hero.max_hp);var meta_bonus:=SlayerSystem.begin_metamorphosis(hero,99);TestSupport.check(errors,is_equal_approx(meta_bonus,SlayerSystem.scaled(hero,float(SlayerData.VALUES.r1_health_per_target))*int(SlayerData.VALUES.r1_target_cap)) and hero.max_hp>base_max,"Metamorphosis should cap temporary Health at five valid contacts.");SlayerSystem.end_metamorphosis(hero);TestSupport.check(errors,is_equal_approx(float(hero.max_hp),base_max),"Metamorphosis should safely remove only its temporary Health.")
 	hero=slayer({"tier_7":"slayer_l27_r1"});TestSupport.check(errors,is_equal_approx(SlayerSystem.attack_interval(hero),(1.0/1.82)/1.2) and hero.control_duration_multipliers.stun==.5,"Demonic Form should apply attack speed and shared Stun/Root duration modifiers.")
+	hero=slayer();AbilitySlotSystem.spend(hero.slayer_runtime.w_slot);var w_before:float=float(hero.slayer_runtime.w_slot.timers[0]);SlayerSystem.update(hero,2.0,1.5);TestSupport.check(errors,is_equal_approx(float(hero.slayer_runtime.w_slot.timers[0]),w_before-3.0),"External cooldown recovery should accelerate Slayer's internal W charge slot.")
 	return errors

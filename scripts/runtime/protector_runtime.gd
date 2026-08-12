@@ -158,7 +158,8 @@ func protector_finish_wrath(hero:Dictionary)->void:
 func update_protector_runtime(delta:float)->void:
 	for hero in heroes:
 		if str(hero.get("class",""))!="Protector" or hero.get("protector_runtime",{}).is_empty():continue
-		ProtectorSystem.update(hero,delta);var runtime:Dictionary=hero.protector_runtime
+		var druids:=heroes.filter(func(unit):return str(unit.get("class",""))=="Druid")
+		ProtectorSystem.update(hero,delta,DruidSystem.cooldown_rate_from_innervate(hero,druids,2));var runtime:Dictionary=hero.protector_runtime
 		if hero.hp>0.0 and not bool(hero.get("spirit_form",false)):ProtectorSystem.telemetry_add(hero,"time_alive",delta)
 		for blocker in combat_blockers:if ProtectorSystem.own_wall(hero,blocker):ProtectorSystem.telemetry_add(hero,"wall_active_seconds",delta)
 		if hero.hp<=0.0 and runtime.wrath.is_empty() and not bool(runtime.get("wrath_resolved",false)):protector_begin_wrath(hero,false,0.0)

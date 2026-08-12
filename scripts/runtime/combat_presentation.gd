@@ -163,6 +163,16 @@ func draw_combat_debug_overlay()->void:
 	if str(hero.get("class",""))=="Huntsman" and not hero.get("huntsman_runtime",{}).is_empty():
 		var hunt:Dictionary=hero.huntsman_runtime;var recent_form_source:="none" if hunt.form_events.is_empty() else str(hunt.form_events[-1].source);var prepared_modifier:=HuntsmanSystem.prepare_basic_attack(hero,{"active_effects":[]})
 		lines.append("FORM  %s  SOURCE %s"%[str(hunt.form).to_upper(),recent_form_source]);lines.append("BA RANGE %.1f  MOD %.2f  ARMOR %.1f"%[float(hero.range),float(prepared_modifier.multiplier),float(hero.armor)]);lines.append("Q HUMAN/WORGEN  %.1f / %.1f"%[float(hunt.human_q_cooldown),float(hunt.worgen_q_cooldown)]);lines.append("E SHARED  %.1f"%float(hunt.shared_e_cooldown));lines.append("INNER BEAST  %.1f (%.1f)"%[float(hunt.inner_beast_remaining),float(hunt.inner_beast_elapsed)]);lines.append("BLOCK %d  WIZENED %d / %.1f"%[BlockChargeSystem.charges(hero,"huntsman_block"),int(hunt.wizened_attacks),float(hunt.wizened_remaining)]);lines.append("MARK  %s  x%d  %.1f"%[str(hunt.marked_target_id),int(hunt.mark_stacks),float(hunt.mark_remaining)]);lines.append("COCKTAIL QUEST  %d / 15"%int(hunt.cocktail_quest_stacks));lines.append("TELEMETRY  %s"%str(hunt.telemetry))
+	if str(hero.get("class",""))=="Druid" and not hero.get("druid_runtime",{}).is_empty():
+		var druid:Dictionary=hero.druid_runtime;var designated=druid_ally_by_id(str(druid.designated_ally_id));var ally_distance:float=hero.pos.distance_to(designated.pos) if designated!=null else -1.0
+		lines.append("LEVEL %d  POWER %.1f  HP %.1f%%"%[int(hero.level),float(hero.power),DruidSystem.health_ratio(hero)*100.0]);lines.append("BA %.1f / %.2fs  TARGET %s  DIST %.1f"%[float(hero.damage),float(hero.basic_attack_interval),str(druid.designated_ally_id),ally_distance]);lines.append("MINI HOTS %d  %s"%[druid.mini_hots.size(),str(druid.mini_hots.map(func(hot):return "%.2f"%float(hot.remaining_duration)))]);lines.append("REGROWTH %s"%str(druid.regrowths.map(func(hot):return "%s %.2f"%[str(hot.target_id),float(hot.remaining_duration)])));lines.append("TICK %.1f  Q/W/E %.1f/%.1f/%.1f"%[DruidSystem.regrowth_tick_request(hero),float(hero.ability_cds[0]),float(hero.ability_cds[1]),float(hero.ability_cds[2])]);lines.append("INNERVATE %d/%d  RECHARGE x%.2f  REVIT %.1f"%[int(druid.d_slot.current_charges),int(druid.d_slot.max_charges),DruidSystem.innervate_recharge_rate(hero,heroes),float(druid.revitalize_remaining)]);lines.append("ROOTS %d  QUEST %d  TREANTS %d  DMG %.1f"%[druid.roots_areas.size(),int(druid.vengeful_quest_stacks),druid.treants.size(),DruidSystem.treant_damage(hero)]);lines.append("TRANQ %.1f  TWILIGHT %.1f  SHOWER %d"%[float(druid.tranquility_remaining),float(druid.twilight_pending),int(druid.lunar_shower_stacks)]);lines.append("CURE %d  HEAL/OVER %.1f/%.1f  COMM %.1f"%[int(druid.recent_cure_count),float(druid.recent_healing),float(druid.recent_overhealing),float(druid.recent_communion_snapshot)])
+		var telemetry_entries:Array=[];var telemetry_keys:Array=druid.telemetry.keys();telemetry_keys.sort()
+		for telemetry_key in telemetry_keys:
+			var telemetry_value:float=float(druid.telemetry[telemetry_key])
+			if absf(telemetry_value)>0.0001:telemetry_entries.append("%s %.1f"%[str(telemetry_key).left(12).to_upper(),telemetry_value])
+		if telemetry_entries.is_empty():lines.append("TELEMETRY  none")
+		else:
+			for entry_index in range(0,telemetry_entries.size(),2):lines.append("TEL  %s"%"  ".join(telemetry_entries.slice(entry_index,mini(entry_index+2,telemetry_entries.size()))))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])
@@ -262,6 +272,11 @@ func draw_combat_summons() -> void:
 			var phoenix_pos:=Vector2(phoenix.pos);draw_circle(phoenix_pos,18,Color("ff7a3d",.30));draw_circle(phoenix_pos,11,Color("ffb34f"));draw_colored_polygon(PackedVector2Array([phoenix_pos+Vector2(0,-19),phoenix_pos+Vector2(-17,10),phoenix_pos,phoenix_pos+Vector2(17,10)]),Color("ffd15c"))
 		for projectile in mage.mage_runtime.pyro_projectiles:
 			var pyro_pos:=Vector2(projectile.pos);draw_circle(pyro_pos,18,Color("ff7a3d",.28));draw_circle(pyro_pos,11,Color("ff7a3d"));draw_circle(pyro_pos,5,Color("fff2a8"))
+	for druid in heroes:
+		if str(druid.get("class",""))!="Druid" or druid.get("druid_runtime",{}).is_empty():continue
+		for treant in druid.druid_runtime.treants:
+			var treant_pos:=Vector2(treant.pos);var life_ratio:=clampf(float(treant.hp)/maxf(1.0,float(treant.max_hp)),0.0,1.0)
+			draw_circle(treant_pos,21,Color("74b96b",.18));draw_circle(treant_pos,13,Color("6f5438"));draw_line(treant_pos+Vector2(-9,-8),treant_pos+Vector2(-18,-20),Color("91d477"),5);draw_line(treant_pos+Vector2(9,-8),treant_pos+Vector2(18,-20),Color("91d477"),5);health_bar(treant_pos+Vector2(-22,-31),44,life_ratio,Color("78d878"))
 
 func draw_combat_heroes() -> void:
 	for i in heroes.size():
@@ -363,6 +378,14 @@ func draw_party_portraits_hud()->void:
 			var class_color:Color=CLASSES[heroes[hero_index]["class"]].color
 			var icon_color=class_color if is_selected else class_color.lerp(Color("929aa6"),.68)
 			draw_role_icon(center-Vector2(0,4),heroes[hero_index]["class"],icon_color)
+			var regrowth_sources:=0;var designated:=false
+			for druid in heroes:
+				if str(druid.get("class",""))!="Druid" or druid.get("druid_runtime",{}).is_empty():continue
+				if DruidSystem.regrowth_for(druid,str(heroes[hero_index].combat_id))!=null:regrowth_sources+=1
+				designated=designated or (hero_index==int(druid.get("heal_target",-1)) and str(druid.druid_runtime.get("designated_ally_id",""))==str(heroes[hero_index].combat_id))
+			if regrowth_sources>0:
+				draw_arc(center,portrait_radius+7,-PI*.92,-PI*.08,18,Color("79d879"),4);draw_string(ThemeDB.fallback_font,center+Vector2(12,-17),str(regrowth_sources),HORIZONTAL_ALIGNMENT_CENTER,13,10,Color("b9ffb1"))
+			if designated:draw_arc(center,portrait_radius+11,PI*.08,PI*.92,18,Color("e6d66f"),3)
 			draw_string(ThemeDB.fallback_font,center+Vector2(-8,20),str(i+1),HORIZONTAL_ALIGNMENT_CENTER,16,11,C_GOLD if is_selected else C_MUTED)
 
 func draw_ability_bar_hud()->void:
@@ -393,6 +416,7 @@ func draw_ability_bar_hud()->void:
 			elif active["class"]=="Huntsman" and slot==0:action_name="Razor Swipe" if HuntsmanSystem.is_worgen(active) else "Gilnean Cocktail"
 			elif active["class"]=="Huntsman" and slot==2:action_name="Disengage" if HuntsmanSystem.is_worgen(active) else "Darkflight"
 			elif slot==3 and active["class"]=="Huntsman":action_name=str(HuntsmanData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Druid":action_name=str(DruidData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"
 			elif slot==4 and active["class"]=="Sentinel" and SentinelSystem.has_talent(active,"sentinel_l30_2") and float(active.get("sentinel_runtime",{}).get("d_cooldown",0.0))>0.0:action_name="Trueshot"

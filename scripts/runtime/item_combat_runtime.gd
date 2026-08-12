@@ -175,6 +175,10 @@ func finalize_damage_events(source:Dictionary,target:Dictionary,result:Dictionar
 			if str(hero.get("class",""))=="Guardian" and not hero.get("guardian_runtime",{}).is_empty():GuardianSystem.process_marked_death(hero,str(target.get("combat_id","")),battle_time);GuardianSystem.process_haymaker_death(hero,str(target.get("combat_id","")),battle_time)
 			if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty():SlayerSystem.process_defeat(hero,target)
 			if str(hero.get("class",""))=="Shaman" and not hero.get("shaman_runtime",{}).is_empty() and not bool(target.get("summoned_unit",false)) and not bool(target.get("object",false)):ShamanSystem.note_echo_defeat(hero,str(target.get("combat_id","")))
+			if str(hero.get("class",""))=="Druid" and DruidSystem.has_talent(hero,"druid_l9_1") and not hero.get("druid_runtime",{}).is_empty():
+				for area in hero.druid_runtime.roots_areas:
+					if bool(area.get("secondary",false)) or float(area.get("remaining",0.0))<=0.0:continue
+					if Vector2(target.get("pos",Vector2.ZERO)).distance_to(Vector2(area.point))<=DruidSystem.roots_radius(hero,float(area.elapsed),false):hero.druid_runtime.roots_areas.append(DruidSystem.create_roots_area(hero,Vector2(target.pos),true));DruidSystem.telemetry_add(hero,"deep_roots_casts");break
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	if CombatSystem.is_protected(target):
@@ -220,6 +224,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 			var alpha_request:=PercentageHealthDamageSystem.request(source,target,.03,.0075,"Alpha Killer")
 			var alpha_result:=deal_damage(source,target,float(alpha_request.amount),"percentage_health","physical","Alpha Killer",false,"huntsman_alpha",[],false)
 			HuntsmanSystem.telemetry_add(source,"percentage_damage",float(alpha_result.resolved_damage))
+	if str(source.get("class",""))=="Druid" and source_action=="basic_attack" and originating_effect_id=="" and DruidSystem.has_talent(source,"druid_l12_2") and target.get("active_effects",[]).any(func(effect):return str(effect.get("id",""))=="druid_moonfire_reveal:%s"%str(source.get("combat_id","")) and float(effect.get("remaining_duration",0.0))>0.0):resolved_amount*=1.0+float(DruidData.VALUES.celestial_basic_damage)
 	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and ClericSystem.has_talent(source,"cleric_l21_2") and CombatSystem.is_blinded(target):resolved_amount*=2.0
 	var guardian_basic_result:={}
 	if str(source.get("class",""))=="Guardian" and source_action=="basic_attack" and not source.get("guardian_runtime",{}).is_empty():
@@ -247,6 +252,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(target.get("class",""))=="Shaman" and not target.get("shaman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"shaman_block")
 	if str(target.get("class",""))=="Templar" and not target.get("templar_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"templar_block")
 	if str(target.get("class",""))=="Huntsman" and not target.get("huntsman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"huntsman_block")
+	if str(source.get("class",""))=="Druid" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("druid_runtime",{}).is_empty():DruidSystem.note_basic_attack(source,target,result,heroes)
 	if not huntsman_basic_result.is_empty():
 		HuntsmanSystem.resolve_basic_attack(source,float(result.get("resolved_damage",0.0)),bool(huntsman_basic_result.get("wizened",false)))
 		if HuntsmanSystem.has_talent(source,"huntsman_l12_3") and float(source.huntsman_runtime.inner_beast_remaining)>0.0 and float(result.get("resolved_damage",0.0))>0.0:
@@ -366,7 +372,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	finalize_damage_events(source,target,result,source_action,damage_type,origin,source_is_summon,originating_effect_id,trigger_chain,before_ratio,retribution_bonus)
 	return result
 
-func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="")->Dictionary:
+func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="",action_tags:Array=[],resolution_overrides:Dictionary={})->Dictionary:
 	if bool(target.get("spirit_form",false)):return {"raw_amount":amount,"effective_amount":0.0,"overhealing":maxf(0.0,amount),"critical":false}
 	var incoming_multiplier:=1.0
 	for hero in heroes:
@@ -375,8 +381,11 @@ func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action
 	if str(source.get("combat_id",""))!=str(target.get("combat_id","")):
 		for rogue in heroes:
 			if str(rogue.get("class",""))=="Rogue" and RogueSystem.has_talent(rogue,"rogue_l21_3") and rogue.get("rogue_runtime",{}).get("garrotes",[]).any(func(instance):return str(instance.get("target_id",""))==str(target.get("combat_id","")) and float(instance.get("remaining_duration",0.0))>0.0):incoming_multiplier=minf(incoming_multiplier,float(RogueData.VALUES.strangle_external_multiplier))
-	var result:=CombatSystem.resolve_healing(source,target,{"amount":amount,"source_action":source_action,"incoming_multiplier":incoming_multiplier})
-	var context:={"source_action":source_action,"action_tags":[source_action,"healing"],"origin":origin,"originating_effect_id":originating_effect_id};var events:=CombatSystem.event_bundle_for_healing(source,target,result,context);combat_events.append_array(events)
+	var healing_request:={"amount":amount,"source_action":source_action,"incoming_multiplier":incoming_multiplier};healing_request.merge(resolution_overrides,true)
+	var result:=CombatSystem.resolve_healing(source,target,healing_request)
+	var resolved_tags:Array=[source_action,"healing"]
+	for tag in action_tags:if tag not in resolved_tags:resolved_tags.append(tag)
+	var context:={"source_action":source_action,"action_tags":resolved_tags,"origin":origin,"originating_effect_id":originating_effect_id};var events:=CombatSystem.event_bundle_for_healing(source,target,result,context);combat_events.append_array(events)
 	for event in events:
 		if event.event_type=="overhealing_done" or float(event.get("effective_amount",0.0))>0.0 and event.event_type in ["direct_healing_done","periodic_healing_done","critical_result"]:apply_passive_trigger(source,event,target)
 	var source_index:int=int(source.get("battle_index",-1))
@@ -425,8 +434,10 @@ func update_item_runtime(hero:Dictionary,delta:float)->void:
 		hero.borrowed_time_timer=float(hero.get("borrowed_time_timer",0.0))+delta
 		if hero.borrowed_time_timer>=8.0:hero.borrowed_time_timer=0.0;hero.borrowed_time_armed=true;item_feedback("Borrowed Time Ready",hero.pos,Color("b8d5ff"))
 	if hero_has_passive(hero,"twin_incantation"):
+		var druids:=heroes.filter(func(unit):return str(unit.get("class",""))=="Druid")
+		var q_recharge_rate:=DruidSystem.cooldown_rate_from_innervate(hero,druids,0)
 		for charge_index in range(hero.q_charge_timers.size()-1,-1,-1):
-			hero.q_charge_timers[charge_index]=float(hero.q_charge_timers[charge_index])-delta
+			hero.q_charge_timers[charge_index]=float(hero.q_charge_timers[charge_index])-delta*q_recharge_rate
 			if hero.q_charge_timers[charge_index]<=0.0:hero.q_charge_timers.remove_at(charge_index);hero.q_charges=mini(2,int(hero.q_charges)+1)
 		hero.ability_cds[0]=0.0 if int(hero.q_charges)>0 else (float(hero.q_charge_timers[0]) if not hero.q_charge_timers.is_empty() else 0.0)
 	for repeat_index in range(hero.get("pending_repeats",[]).size()-1,-1,-1):

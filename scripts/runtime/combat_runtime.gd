@@ -74,6 +74,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_protector_runtime(delta)
 	update_sentinel_runtime(delta)
 	update_huntsman_runtime(delta)
+	update_druid_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 
@@ -88,11 +89,13 @@ func update_combat_heroes(delta:float) -> bool:
 			elif str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty() and slot==1 and WarlockSystem.has_talent(h,"warlock_l12_1") and not h.get("active_channel",{}).is_empty():cooldown_rate=2.0
 			elif str(h.get("class",""))=="Priest" and not h.get("priest_runtime",{}).is_empty() and slot==2 and PriestSystem.has_talent(h,"priest_l21_2") and int(h.priest_runtime.push_stacks)>=int(PriestData.VALUES.push_max):cooldown_rate=float(PriestData.VALUES.push_e_rate)
 			elif str(h.get("class",""))=="Shaman" and slot==0:cooldown_rate=0.0
+			if slot<3:cooldown_rate*=DruidSystem.cooldown_rate_from_innervate(h,heroes.filter(func(unit):return str(unit.get("class",""))=="Druid"),slot)
 			h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta*cooldown_rate)
 		if str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty():h.ability_cds[4]=float(h.warlock_runtime.life_tap_lockout)
 		if str(h.get("class",""))=="Templar" and not h.get("templar_runtime",{}).is_empty():h.ability_cds[4]=float(h.templar_runtime.trait_cooldown)
 		if str(h.get("class",""))=="Sentinel" and not h.get("sentinel_runtime",{}).is_empty():h.ability_cds[4]=float(h.sentinel_runtime.trueshot_cooldown) if SentinelSystem.has_talent(h,"sentinel_l30_2") and float(h.sentinel_runtime.d_cooldown)>0.0 else float(h.sentinel_runtime.d_cooldown)
 		if str(h.get("class",""))=="Huntsman" and not h.get("huntsman_runtime",{}).is_empty():h.basic_attack_interval=float(h.base_basic_action_interval)*HuntsmanSystem.basic_attack_interval_multiplier(h)
+		if str(h.get("class",""))=="Druid" and not h.get("druid_runtime",{}).is_empty():var d_ui:=AbilitySlotSystem.ui_state(h.druid_runtime.d_slot);h.ability_cds[4]=float(d_ui.recharge) if int(d_ui.charges)<=0 else 0.0
 		if h.hp>0:update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):

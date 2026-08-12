@@ -41,6 +41,8 @@ static func run()->Array:
 	TestSupport.check(errors,int(seal.protector_runtime.smite_slot.current_charges)==2 and AbilitySlotSystem.spend(seal.protector_runtime.smite_slot) and AbilitySlotSystem.spend(seal.protector_runtime.smite_slot) and not AbilitySlotSystem.can_activate(seal.protector_runtime.smite_slot),"Seal of El'druin should begin with and permit exactly two immediate Smite casts.")
 	AbilitySlotSystem.update(seal.protector_runtime.smite_slot,float(ProtectorData.VALUES.e_cooldown))
 	TestSupport.check(errors,int(seal.protector_runtime.smite_slot.current_charges)==1,"Seal of El'druin should recover charges sequentially.")
+	var innervated:=unit();AbilitySlotSystem.spend(innervated.protector_runtime.smite_slot);var smite_before:float=float(innervated.protector_runtime.smite_slot.timers[0]);ProtectorSystem.update(innervated,2.0,1.5)
+	TestSupport.check(errors,is_equal_approx(float(innervated.protector_runtime.smite_slot.timers[0]),smite_before-3.0),"External cooldown recovery should accelerate Protector's internal Smite charge slot.")
 
 	var enemy:={"threat":{0:700.0,1:1400.0,2:500.0,3:1400.0}}
 	var purge:=ProtectorSystem.clear_highest_other_ally_threat(enemy,0,[0,1,2,3])

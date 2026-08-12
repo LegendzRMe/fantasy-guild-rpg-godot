@@ -101,7 +101,8 @@ func update_slayer_runtime(delta:float)->void:
 	for hero in heroes:
 		if str(hero.get("class",""))!="Slayer" or hero.get("slayer_runtime",{}).is_empty():continue
 		hero.slayer_runtime.unending_thirst_shield=named_shield_amount(hero,"slayer_unending_thirst")
-		var update:=SlayerSystem.update(hero,delta);hero.basic_attack_interval=SlayerSystem.attack_interval(hero);hero.ability_cds[1]=float(hero.slayer_runtime.w_slot.timers[0]) if not hero.slayer_runtime.w_slot.timers.is_empty() else 0.0
+		var druids:=heroes.filter(func(unit):return str(unit.get("class",""))=="Druid")
+		var update:=SlayerSystem.update(hero,delta,DruidSystem.cooldown_rate_from_innervate(hero,druids,1));hero.basic_attack_interval=SlayerSystem.attack_interval(hero);hero.ability_cds[1]=float(hero.slayer_runtime.w_slot.timers[0]) if not hero.slayer_runtime.w_slot.timers.is_empty() else 0.0
 		if float(update.thirst_decay)>0.0:reduce_named_shield(hero,"slayer_unending_thirst",float(update.thirst_decay))
 		if bool(update.immolation_tick):
 			for target in enemies:

@@ -72,6 +72,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Protector":ProtectorSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Sentinel":SentinelSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Huntsman":HuntsmanSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
+		elif str(heroes[-1].get("class",""))=="Druid":DruidSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -275,6 +276,31 @@ func start_huntsman_testing_zone() -> void:
 		if fixture.type=="Boss":enemies[-1].control_profile={"slow_multiplier":.5,"stun_multiplier":.25,"displacement":false}
 	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,10000.0);enemy.max_hp=enemy.hp
 	for hero in heroes:if str(hero.get("class",""))=="Huntsman":hero.huntsman_runtime.telemetry_enabled=true
+	queue_redraw()
+
+func start_druid_testing_zone() -> void:
+	var test_party:Array=testing_party_for_class("Druid")
+	if test_party.is_empty():flash("Druid fixture unavailable.");show_combat_hall();return
+	# Four testing heroes make every Regrowth/targeting interaction directly observable.
+	var support:Array=[]
+	for index in state.heroes.size():
+		if index in test_party:continue
+		if str(state.heroes[index].get("class","")) in ["Guardian","Cleric","Priest"]:support.append(index)
+		if support.size()>=3:break
+	start_battle(0,-1,[test_party[0]]+support);testing_zone_active=true;testing_zone_mode="druid_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	for hero in heroes:
+		if str(hero.get("class",""))=="Druid":hero.druid_runtime.telemetry_enabled=true
+	# Standard cluster, immediate-only categories, stealth, and authored Boss immunity.
+	for position in [Vector2(520,145),Vector2(610,145),Vector2(565,225),Vector2(655,225),Vector2(700,175)]:spawn_enemy(position,"Dummy");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["target_category"]="standard"
+	spawn_enemy(Vector2(805,150),"Brute");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["target_category"]="elite"
+	spawn_enemy(Vector2(925,210),"Boss");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["control_profile"]={"root_multiplier":0.0,"silence_multiplier":0.25};enemies[-1]["target_category"]="boss"
+	spawn_enemy(Vector2(1040,360),"Dummy");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["target_category"]="summon";StealthDetectionSystem.set_stealth_source(enemies[-1],"druid_range_stealth",true)
+	spawn_enemy(Vector2(850,510),"Dummy");enemies[-1]["passive_test_enemy"]=true;enemies[-1]["target_category"]="temporary_combat"
+	for enemy in enemies:enemy.rewarded=true;enemy.hp=5000.0;enemy.max_hp=5000.0;enemy["seconds_since_damage"]=TESTING_DUMMY_REGEN_DELAY;enemy["respawn_timer"]=0.0
+	# Wound allies to distinct thresholds and seed controls for Nature's Cure.
+	var ratios:=[1.0,0.8,0.5,0.25]
+	for index in mini(heroes.size(),ratios.size()):heroes[index].hp=float(heroes[index].max_hp)*float(ratios[index])
+	if heroes.size()>1:for control in ["stun","root","slow","silence","fear"]:CombatSystem.apply_control(heroes[1],control,30.0,0.25)
 	queue_redraw()
 
 func selected_party_indices() -> Array:

@@ -42,6 +42,7 @@ func assign_hero_ally(hero_index:int,ally_index:int)->void:
 	ensure_combat_runtime_fields(heroes[hero_index],"hero:%d"%hero_index,"player");ensure_combat_runtime_fields(heroes[ally_index],"hero:%d"%ally_index,"player")
 	CombatRulesV1.assign_target(heroes[hero_index],str(heroes[ally_index].combat_id),"ally")
 	heroes[hero_index].heal_target=ally_index;heroes[hero_index].target=-1;heroes[hero_index].dest=heroes[hero_index].pos
+	if str(heroes[hero_index].get("class",""))=="Druid" and not heroes[hero_index].get("druid_runtime",{}).is_empty():DruidSystem.designate_basic_healing_target(heroes[hero_index],heroes[ally_index])
 
 func clear_hero_command(hero:Dictionary,reason:String="")->void:
 	CombatRulesV1.clear_assignment(hero,reason);hero.target=-1;hero.heal_target=-1;hero.dest=hero.pos
@@ -99,6 +100,7 @@ func update_unit_casts(unit:Dictionary,delta:float)->void:
 		if unit.active_cast.remaining<=0.0:
 			var cast:Dictionary=unit.active_cast;unit.active_cast={}
 			var cast_slot:int=int(cast.get("slot",-1));if cast_slot>=0:unit.ability_cds[cast_slot]=float(cast.get("full_cooldown",0.0))
+			if str(cast.get("completion_tag",""))=="druid_astral" and not unit.get("druid_runtime",{}).is_empty():unit.druid_runtime["astral_ready"]=true
 			if float(cast.get("channel_duration",0.0))>0.0:unit.command_state=CombatRulesV1.CommandState.CHANNEL;unit.active_channel={"slot":cast.slot,"remaining":cast.channel_duration,"duration":cast.channel_duration,"requires_line_of_sight":cast.requires_line_of_sight,"target_id":cast.target_id}
 			else:CombatRulesV1.restore_preserved_command(unit,target_is_valid_for(unit,unit_by_combat_id(str(unit.get("preserved_target_id",""))),str(unit.get("preserved_target_kind",""))))
 	elif not unit.get("active_channel",{}).is_empty():
