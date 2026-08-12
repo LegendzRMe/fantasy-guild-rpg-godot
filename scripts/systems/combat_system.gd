@@ -77,7 +77,7 @@ static func calculate_final_stats(definition:Dictionary,level:int=1,equipped_ite
 		"weapon_proficiencies":definition.get("weapon_proficiencies",[]).duplicate(),
 		"behavior_flags":definition.get("behavior_flags",[]).duplicate(),
 		"combat_tags":definition.get("combat_tags",[]).duplicate(),
-		"basic_action_speed":0.0,"ability_power_percent":float(definition.get("ability_power_percent",0.0)),"damage_multiplier":1.0,"healing_multiplier":1.0,"damage_taken_multiplier":1.0,"healing_taken_multiplier":1.0
+		"basic_action_speed":0.0,"ability_power_percent":float(definition.get("ability_power_percent",0.0)),"damage_multiplier":1.0,"healing_multiplier":1.0,"healing_over_time_multiplier":1.0,"damage_taken_multiplier":1.0,"healing_taken_multiplier":1.0
 	}
 	var multiplier_values:Dictionary={}
 	for source in _modifier_sources(equipped_items,buffs,debuffs):

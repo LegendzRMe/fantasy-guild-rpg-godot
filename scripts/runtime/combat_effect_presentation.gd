@@ -159,6 +159,16 @@ func draw_combat_effect(fx:Dictionary)->void:
 			var leap_pos:Vector2=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));draw_line(fx.from,leap_pos,Color(col,alpha*.35),10);draw_circle(leap_pos,15+progress*18,Color(col,alpha*.18));draw_arc(leap_pos,20+progress*20,0,TAU,28,col,4)
 		"huntsman_inner_beast":
 			var beast_radius:=float(fx.get("radius",62.0));draw_circle(fx.from,beast_radius,Color(col,alpha*.10));draw_arc(fx.from,beast_radius*(.55+.45*progress),0,TAU,40,col,6)
+		"druid_regrowth","druid_regrowth_tick","druid_basic_hot_tick","druid_lifebloom","druid_moonfire_heal","druid_swiftness","druid_communion","druid_innervate":
+			var leaf_pos:=Vector2(fx.from).lerp(Vector2(fx.to),clampf(progress,0.0,1.0));draw_line(fx.from,leaf_pos,Color(col,alpha*.48),4);draw_circle(leaf_pos,8,Color("91e883",alpha*.42));draw_arc(fx.to,20+progress*22,0,TAU,28,col,4)
+		"druid_moonfire","druid_twilight":
+			var lunar_radius:=float(fx.get("radius",52.0));draw_circle(fx.to,lunar_radius,Color(col,alpha*.09));draw_arc(fx.to,lunar_radius*clampf(.35+progress,0.0,1.0),0,TAU,52,col,6);draw_arc(fx.to,lunar_radius*.58,-PI*.65,PI*.65,30,Color("e9f4ff",alpha),4)
+		"druid_roots":
+			var root_radius:=float(fx.get("radius",34.0));draw_circle(fx.to,root_radius,Color("4f7e43",alpha*.14));draw_arc(fx.to,root_radius*(.4+.6*progress),0,TAU,36,col,5);for root_index in 6:var root_dir:=Vector2.RIGHT.rotated(TAU*float(root_index)/6.0);draw_line(fx.to+root_dir*8,fx.to+root_dir*root_radius,Color("6e9e52",alpha),3)
+		"druid_tranquility","druid_wild_growth":
+			var nature_radius:=float(fx.get("radius",75.0));draw_circle(fx.from,nature_radius,Color(col,alpha*.07));draw_arc(fx.from,nature_radius,progress*TAU,progress*TAU+PI*1.6,52,col,5);draw_arc(fx.from,nature_radius*.68,-progress*TAU,-progress*TAU+PI*1.35,44,Color("c7ffc0",alpha),3)
+		"druid_treant","druid_treant_attack":
+			draw_line(fx.from,fx.to,Color("75a95f",alpha*.58),6);draw_circle(fx.to,14+progress*18,Color(col,alpha*.18));draw_arc(fx.to,18+progress*20,0,TAU,28,col,4)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":

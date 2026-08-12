@@ -40,6 +40,47 @@ func load_huntsman_test_build(hero:Dictionary,build_index:int)->void:
 	hero.level=level;hero.power=HuntsmanData.scaled(float(HuntsmanData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=HuntsmanData.scaled(float(HuntsmanData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.range=float(HuntsmanData.SPACE.human_basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);HuntsmanSystem.initialize_runtime(hero,true,"testing:hunt")
 	hero.huntsman_runtime.cocktail_quest_stacks=int(build.get("quest_stacks",0));hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
 
+func load_druid_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=DruidData.TEST_BUILDS[clampi(build_index,0,DruidData.TEST_BUILDS.size()-1)];var level:int=int(build.level)
+	hero.level=level;hero.power=DruidData.scaled(float(DruidData.VALUES.basic_attack_damage),level);hero.base_power=hero.power;hero.max_hp=DruidData.scaled(float(DruidData.VALUES.health),level);hero.hp=hero.max_hp;hero.basic_action_amount=hero.power;hero.damage=hero.power;hero.range=float(DruidData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);DruidSystem.initialize_runtime(hero,true,"testing:druid");hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func handle_druid_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="druid_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Druid":hero=candidate;break
+	if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_5:
+		var build_index:=int(event.keycode-KEY_1);load_druid_test_build(hero,build_index);flash("Druid build: %s"%str(DruidData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.ctrl_pressed:return false
+	match event.keycode:
+		KEY_1,KEY_2,KEY_3,KEY_4:
+			var index:=int(event.keycode-KEY_1)
+			if index<heroes.size():DruidSystem.apply_regrowth(hero,heroes[index],true);flash("Regrowth applied to ally %d"%(index+1))
+		KEY_C:hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.druid_runtime.d_slot=AbilitySlotSystem.create(2 if DruidSystem.has_talent(hero,"druid_l12_3") else 1,float(DruidData.VALUES.innervate_cooldown),AbilitySlotSystem.RechargeMode.INDEPENDENT);flash("Druid cooldowns and Innervate charges reset")
+		KEY_Q:
+			if hero.druid_runtime.regrowths.is_empty():DruidSystem.apply_regrowth(hero,hero,false)
+			for tick in DruidSystem.bonus_regrowth_ticks(hero):druid_resolve_regrowth_tick(hero,tick,true)
+			flash("Regrowth bonus tick triggered")
+		KEY_X:hero.druid_runtime.regrowths.clear();hero.druid_runtime.mini_hots.clear();flash("Druid HoTs cleared")
+		KEY_M:
+			var target:Dictionary=heroes[1] if heroes.size()>1 else hero;DruidSystem.designate_basic_healing_target(hero,target);DruidSystem.note_basic_attack(hero,enemies[0] if not enemies.is_empty() else {},{"resolved_damage":60.0},heroes);flash("Basic healing target and one mini-HoT staged")
+		KEY_O:
+			var target:Dictionary=heroes[1] if heroes.size()>1 else hero;DruidSystem.designate_basic_healing_target(hero,target);for ignored in 4:DruidSystem.note_basic_attack(hero,enemies[0] if not enemies.is_empty() else {},{"resolved_damage":60.0},heroes);flash("Four overlapping mini-HoTs staged")
+		KEY_G:hero.healing_multiplier=1.20 if is_equal_approx(float(hero.get("healing_multiplier",1.0)),1.0) else 1.0;flash("Generic healing multiplier: %.2f"%float(hero.healing_multiplier))
+		KEY_T:hero.healing_over_time_multiplier=1.20 if is_equal_approx(float(hero.get("healing_over_time_multiplier",1.0)),1.0) else 1.0;flash("Generic HoT multiplier: %.2f"%float(hero.healing_over_time_multiplier))
+		KEY_H:hero.hp=float(hero.max_hp)*(.20 if DruidSystem.health_ratio(hero)>.75 else .80);flash("Druid Health: %.0f%%"%(DruidSystem.health_ratio(hero)*100.0))
+		KEY_S:
+			if heroes.size()>1:for control in ["stun","root","slow","silence","fear"]:CombatSystem.apply_control(heroes[1],control,30.0,.25);flash("All Nature's Cure control fixtures applied")
+		KEY_V:hero.druid_runtime.vengeful_quest_stacks=10;flash("Vengeful quest stacks: 10")
+		KEY_P:hero.druid_runtime.treants.append(DruidSystem.create_treant(hero,hero.pos+Vector2(80,0)));flash("Treant summoned")
+		KEY_R:DruidSystem.refresh_all_regrowths(hero);flash("Twilight refresh triggered")
+		KEY_A:hero.druid_runtime.tranquility_remaining=float(DruidData.VALUES.tranquility_duration);hero.druid_runtime.tranquility_tick=0.0;flash("Tranquility active")
+		KEY_L:hero.druid_runtime.lunar_shower_stacks=3;hero.druid_runtime.lunar_shower_remaining=6.0;flash("Lunar Shower: +60%")
+		KEY_N:
+			if heroes.size()>1:DruidSystem.apply_regrowth(hero,heroes[1],false);var result:=DruidSystem.cast_innervate(hero,heroes[1]);if float(result.get("communion",0.0))>0.0:druid_heal(hero,heroes[1],float(result.communion),"basic_ability","Nature's Communion","druid_nature_communion",["healing"])
+			flash("Nature's Communion staged")
+		_:return false
+	queue_redraw();return true
+
 func handle_huntsman_range_shortcut(event:InputEventKey)->bool:
 	if not testing_zone_active or testing_zone_mode!="huntsman_range":return false
 	var hero=null
@@ -428,11 +469,12 @@ func finish_hero_drag()->void:
 	if tutorial_active and not tutorial_drag_release_is_valid():reject_tutorial_action();queue_redraw();return
 	if tutorial_active:tutorial_record_valid_action()
 	if drag_target_type=="enemy":assign_hero_enemy(selected,drag_target_index);heroes[selected].suppress_auto_target=false
-	elif drag_target_type=="ally" and heroes[selected]["class"]=="Cleric":assign_hero_ally(selected,drag_target_index)
+	elif drag_target_type=="ally" and heroes[selected]["class"] in ["Cleric","Druid"]:assign_hero_ally(selected,drag_target_index)
 	else:issue_hero_move(heroes[selected],Vector2(clamp(drag_cursor.x,55.0,1225.0),clamp(drag_cursor.y,70.0,570.0)));heroes[selected].suppress_auto_target=true;focused_enemy_index=-1
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_druid_range_shortcut(event):return true
 	if handle_huntsman_range_shortcut(event):return true
 	if handle_sentinel_range_shortcut(event):return true
 	if handle_protector_range_shortcut(event):return true
