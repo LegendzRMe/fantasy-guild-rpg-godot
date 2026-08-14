@@ -237,6 +237,11 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	var warrior_heroic_ready:bool=warrior_primary and float(source.warrior_runtime.heroic_strike_cooldown)<=0.0
 	var warrior_primary_shield_before:float=float(target.get("shield",0.0)) if warrior_primary else 0.0
 	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
+	if hostile and str(target.get("class",""))=="Paladin" and float(target.get("paladin_runtime",{}).get("ardent_remaining",0.0))>0.0:
+		var converted:=maxf(0.0,amount)*PaladinSystem.ardent_conversion(target);var self_result:=deal_healing(target,target,converted,"heroic","Ardent Defender","paladin_ardent",["healing"])
+		if PaladinSystem.has_talent(target,"paladin_l27_r1"):
+			for ally in player_healable_units():if ally!=target and float(ally.get("hp",0.0))>0.0 and Vector2(ally.pos).distance_to(Vector2(target.pos))<=PaladinSystem.vindication_radius(target):deal_healing(target,ally,converted,"heroic","Word of Glory","paladin_word",["healing","secondary"])
+		PaladinSystem.add(target,"self_healing",float(self_result.effective_amount));return {"raw_amount":maxf(0.0,amount),"resolved_damage":0.0,"health_damage":0.0,"shield_damage":0.0,"armor_prevented":0.0,"protected_prevented":maxf(0.0,amount),"defeated":false,"critical":false,"immune":true,"evaded":false,"overkill":0.0,"shield_absorptions":[]}
 	var beastmaster_owner=beastmaster_owner_for(target)
 	var bond_redirect:bool=originating_effect_id=="beastmaster_bond_redirect" or "beastmaster_bond_redirect" in trigger_chain
 	if hostile and source_action=="basic_attack" and not bond_redirect and beastmaster_owner!=null:BeastmasterSystem.apply_primal(beastmaster_owner,source,target)
@@ -268,6 +273,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	for active_effect in source.get("active_effects",[]):
 		if float(active_effect.get("remaining_duration",0.0))>0.0:active_damage_multiplier=maxf(active_damage_multiplier,float(active_effect.get("damage_multiplier",1.0)))
 	var resolved_amount:=amount*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
+	if str(source.get("class",""))=="Paladin" and not source.get("paladin_runtime",{}).is_empty():resolved_amount*=PaladinSystem.judgment_multiplier(source,str(target.get("combat_id","")))
 	if str(source.get("class",""))=="Monk" and source_action!="percentage_health" and not source.get("monk_runtime",{}).is_empty():
 		var monk_controlled:=MonkSystem.controlled_multiplier(source,target);resolved_amount*=monk_controlled
 		if monk_controlled>1.0:MonkSystem.telemetry_add(source,"controlled_damage",resolved_amount-amount)
@@ -494,7 +500,7 @@ func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action
 	if str(source.get("combat_id",""))!=str(target.get("combat_id","")):
 		for rogue in heroes:
 			if str(rogue.get("class",""))=="Rogue" and RogueSystem.has_talent(rogue,"rogue_l21_3") and rogue.get("rogue_runtime",{}).get("garrotes",[]).any(func(instance):return str(instance.get("target_id",""))==str(target.get("combat_id","")) and float(instance.get("remaining_duration",0.0))>0.0):incoming_multiplier=minf(incoming_multiplier,float(RogueData.VALUES.strangle_external_multiplier))
-	var healing_request:={"amount":amount,"source_action":source_action,"incoming_multiplier":incoming_multiplier};healing_request.merge(resolution_overrides,true)
+	var healing_request:={"amount":amount,"source_action":source_action,"incoming_multiplier":incoming_multiplier,"outgoing_multiplier":float(source.get("healing_multiplier",1.0))*HealingDoneModifierSystem.multiplier(source)};healing_request.merge(resolution_overrides,true)
 	var result:=CombatSystem.resolve_healing(source,target,healing_request)
 	var resolved_tags:Array=[source_action,"healing"]
 	for tag in action_tags:if tag not in resolved_tags:resolved_tags.append(tag)

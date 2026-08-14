@@ -96,6 +96,8 @@ func start_beastmaster_testing_zone() -> void:
 
 func start_monk_testing_zone() -> void:
 	pass
+func start_paladin_testing_zone() -> void:
+	pass
 
 
 func show_zone_map(_zone: int) -> void:

@@ -1,0 +1,43 @@
+extends RefCounted
+const PaladinData=preload("res://scripts/data/paladin_data.gd")
+const PaladinSystem=preload("res://scripts/systems/paladin_system.gd")
+const ChargedCastSystem=preload("res://scripts/systems/charged_cast_system.gd")
+const HealingDoneModifierSystem=preload("res://scripts/systems/healing_done_modifier_system.gd")
+const CombatGeometry=preload("res://scripts/combat/combat_geometry.gd")
+const TestSupport=preload("res://tests/test_support.gd")
+
+static func hero(talents:Dictionary={},heroic:String="paladin_l15_r1",level:int=1)->Dictionary:
+	var unit:={"class":"Paladin","combat_id":"hero:paladin","combat_affiliation":"player","combat_team":"player","level":level,"pos":Vector2.ZERO,"hp":PaladinData.scaled(float(PaladinData.VALUES.health),level),"max_hp":PaladinData.scaled(float(PaladinData.VALUES.health),level),"selected_talents":talents,"selected_heroic_id":heroic,"ability_cds":[0.0,0.0,0.0,0.0,0.0],"active_effects":[]}
+	PaladinSystem.initialize_runtime(unit,true);return unit
+
+static func run()->Array:
+	var errors:Array=[];var base:=hero();var definition:=PaladinData.CLASS_DEFINITION
+	TestSupport.check(errors,str(definition.primary_role)=="Support" and not bool(definition.uses_mana) and is_equal_approx(float(definition.threat_modifier),1.0),"Paladin should be a resource-free Support with 1.0 Threat.")
+	TestSupport.check(errors,is_equal_approx(float(definition.base_health),2678.0) and is_equal_approx(float(definition.base_power),155.0) and is_equal_approx(float(definition.basic_action_interval),1.3),"Paladin chassis should match source build 2.55.17.97771.")
+	TestSupport.check(errors,PaladinSystem.start_charge(base,0,Vector2.RIGHT) and is_equal_approx(PaladinSystem.charge_movement_multiplier(base),.75),"A baseline charge should start ready and impose the 25% movement penalty.")
+	PaladinSystem.advance(base,.75);var partial:=PaladinSystem.commit_charge(base);TestSupport.check(errors,bool(partial.cast) and not bool(partial.maximum_charge) and is_equal_approx(float(PaladinSystem.q_values(base,false,0).healing),96.0) and is_equal_approx(float(base.ability_cds[0]),6.0),"A partial Q release should use its minimum endpoint and start cooldown on commit.")
+	base.ability_cds[0]=0.0;PaladinSystem.start_charge(base,0,Vector2.RIGHT);PaladinSystem.advance(base,1.5);TestSupport.check(errors,bool(base.paladin_runtime.charge.active) and bool(base.paladin_runtime.charge.maximum_charge),"Maximum charge should remain armed until explicit release.")
+	var maximum:=PaladinSystem.commit_charge(base);TestSupport.check(errors,bool(maximum.maximum_charge) and is_equal_approx(float(PaladinSystem.q_values(base,true,0).damage),160.0),"A maximum Q release should use its maximum endpoint.")
+	for ratio in [.25,.50,.75]:
+		var staged:=hero();PaladinSystem.start_charge(staged,2,Vector2.RIGHT,"confirm","mobile");PaladinSystem.advance(staged,1.5*ratio);TestSupport.check(errors,is_equal_approx(ChargedCastSystem.percentage(staged.paladin_runtime.charge),ratio) and str(staged.paladin_runtime.charge.device)=="mobile" and str(staged.paladin_runtime.charge.input_mode)=="confirm","Charged casts should retain deterministic 25/50/75 percent progress and mobile Confirm metadata.")
+	var interrupted:=hero();interrupted.ability_cds[4]=10.0;PaladinSystem.start_charge(interrupted,1,Vector2.RIGHT);TestSupport.check(errors,not PaladinSystem.external_interrupt(interrupted,"root") and bool(interrupted.paladin_runtime.charge.active) and PaladinSystem.external_interrupt(interrupted,"stun") and is_equal_approx(float(interrupted.ability_cds[4]),7.0),"Root should not interrupt charge; Stun should cancel it and reduce D cooldown by 3 seconds.")
+	for ignored in ["slow","blind"]:
+		var continuing:=hero();PaladinSystem.start_charge(continuing,0,Vector2.ZERO);TestSupport.check(errors,not PaladinSystem.external_interrupt(continuing,ignored) and bool(continuing.paladin_runtime.charge.active),"%s should not interrupt a charged cast."%ignored.capitalize())
+	for disabling in ["silence","fear","forced_displacement"]:
+		var cancelled:=hero();cancelled.ability_cds[4]=12.0;PaladinSystem.start_charge(cancelled,0,Vector2.ZERO);TestSupport.check(errors,PaladinSystem.external_interrupt(cancelled,disabling) and is_equal_approx(float(cancelled.ability_cds[4]),9.0),"%s should interrupt charge and reduce D cooldown."%disabling.capitalize())
+	var manual:=hero();manual.ability_cds[4]=8.0;PaladinSystem.start_charge(manual,0,Vector2.ZERO);TestSupport.check(errors,PaladinSystem.manual_cancel(manual) and is_equal_approx(float(manual.ability_cds[4]),8.0),"Manual cancellation should not reduce D cooldown.")
+	var purpose:=hero({"tier_8":"paladin_l30_3"});TestSupport.check(errors,PaladinSystem.activate_divine_purpose(purpose) and PaladinSystem.start_charge(purpose,2,Vector2.RIGHT) and bool(purpose.paladin_runtime.charge.maximum_charge),"Divine Purpose should make the next basic cast immediately maximum charged.")
+	var karabor:=hero({"tier_1":"paladin_l9_1"});TestSupport.check(errors,is_equal_approx(PaladinSystem.vindication_radius(karabor),float(PaladinData.SPACE.vindication_radius)*1.15) and is_equal_approx(float(PaladinSystem.q_values(karabor,true,1).healing),536.5) and is_equal_approx(float(PaladinSystem.q_values(karabor,true,2).healing),703.0),"Light of Karabor should expand radius and apply its exact one/many-enemy heal multipliers.")
+	var momentum:=hero({"tier_4":"paladin_l18_1"});TestSupport.check(errors,is_equal_approx(PaladinSystem.charge_movement_multiplier(momentum),1.05),"Righteous Momentum should grant 5% passive speed.");PaladinSystem.start_charge(momentum,1,Vector2.RIGHT);TestSupport.check(errors,is_equal_approx(PaladinSystem.charge_movement_multiplier(momentum),1.20),"Righteous Momentum should grant 20% movement while charging W.")
+	var avenger:=hero({"tier_4":"paladin_l18_2"});var e:=PaladinSystem.e_values(avenger,1.0,true,1);TestSupport.check(errors,is_equal_approx(float(e.damage),325.0) and bool(e.holy_avenger),"Holy Avenger should add 25% damage only to a maximum E that hits.")
+	var repentance:=hero({"tier_5":"paladin_l21_2"});var repent:=PaladinSystem.e_values(repentance,.5,false,1);TestSupport.check(errors,is_equal_approx(float(repent.slow),.85) and is_equal_approx(float(repent.slow_duration),1.75),"Repentance should improve Avenging Wrath Slow magnitude and duration.")
+	var velen:=hero({"tier_5":"paladin_l21_3"})
+	for cast_index in 4:PaladinSystem.after_basic_cast(velen,true,["enemy"])
+	TestSupport.check(errors,int(velen.paladin_runtime.velen_stacks)==3 and is_equal_approx(HealingDoneModifierSystem.multiplier(velen),1.3),"Velen's Chosen should cap at three 10% healing-done stacks.")
+	var verdict:=hero({"tier_6":"paladin_l24_1"});TestSupport.check(errors,is_equal_approx(float(PaladinSystem.w_values(verdict,true,7).armor_reduction),75.0),"Templar's Verdict should cap its shared reduction at five contacts.")
+	var favor:=hero({"tier_6":"paladin_l24_2"});favor.ability_cds[4]=10.0;PaladinSystem.after_basic_cast(favor,false,[]);TestSupport.check(errors,is_equal_approx(float(favor.ability_cds[4]),7.5),"Divine Favor should reduce D cooldown after every committed Basic Ability.")
+	var judgment:=hero({"tier_8":"paladin_l30_2"});PaladinSystem.after_basic_cast(judgment,true,["enemy"]);TestSupport.check(errors,is_equal_approx(PaladinSystem.judgment_multiplier(judgment,"enemy"),1.25) and is_equal_approx(PaladinSystem.judgment_multiplier(judgment,"other"),1.0),"Divine Wrath Judgment should be target- and owner-scoped for later damage.")
+	var ardent:=hero({},"paladin_l15_r1");TestSupport.check(errors,PaladinSystem.start_ardent(ardent) and is_equal_approx(float(ardent.ability_cds[3]),120.0) and is_equal_approx(float(ardent.paladin_runtime.ardent_remaining),3.0),"Ardent Defender should use its exact cooldown and duration.")
+	var sacred:=hero({"tier_7":"paladin_l27_r2"},"paladin_l15_r2");TestSupport.check(errors,PaladinSystem.start_sacred(sacred,Vector2.ZERO) and PaladinSystem.relocate_sacred(sacred,Vector2(50,0)) and is_equal_approx(float(sacred.paladin_runtime.sacred.remaining),7.0),"Hallowed Ground should relocate Sacred Ground and reset its duration.")
+	var ring:=CombatGeometry.create_ring_blocker("ring",Vector2.ZERO,100.0,10.0,{"owner_combat_id":"owner","crossing_exception":"inward"});TestSupport.check(errors,CombatGeometry.first_blocker(Vector2.ZERO,Vector2(150,0),[ring],"blocks_movement") == 0 and CombatGeometry.first_blocker(Vector2.ZERO,Vector2(150,0),[ring],"blocks_movement","owner")<0 and CombatGeometry.first_blocker(Vector2(150,0),Vector2.ZERO,[ring],"blocks_movement","","inward")<0,"Sacred ring should block both directions, bypass its owner, and support the explicit inward Hammer exception.")
+	return errors
