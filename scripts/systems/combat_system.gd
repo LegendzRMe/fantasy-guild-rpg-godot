@@ -2,6 +2,8 @@ extends RefCounted
 
 const StatusEffectSystem = preload("res://scripts/systems/status_effect_system.gd")
 const AbilityPowerSystem = preload("res://scripts/systems/ability_power_system.gd")
+const HealingReceivedModifierSystem = preload("res://scripts/systems/healing_received_modifier_system.gd")
+const ArmorEffectivenessSystem = preload("res://scripts/systems/armor_effectiveness_system.gd")
 
 const LEVEL_CAP := 30
 const DEFAULT_HEALTH_GROWTH := 0.03
@@ -154,7 +156,7 @@ static func resolve_damage(source:Dictionary,target:Dictionary,request:Dictionar
 	amount*=float(request.get("damage_taken_multiplier",target.get("damage_taken_multiplier",1.0)))
 	if damage_type=="physical" and str(target.get("chefs_touch_id",""))=="heavy_stomach" and float(target.get("temporary_hp",0.0))<=0.0 and not bool(target.get("chefs_touch_used",false)):amount*=0.85;target["chefs_touch_used"]=true
 	amount=maxf(0.0,amount)
-	var resolved_armor:=strongest_armor(float(request.get("base_armor_override",target.get("armor",0.0))),request.get("armor_sources",target.get("temporary_armor_sources",[])),damage_type,source_action)
+	var resolved_armor:=ArmorEffectivenessSystem.apply_positive(target,strongest_armor(float(request.get("base_armor_override",target.get("armor",0.0))),request.get("armor_sources",target.get("temporary_armor_sources",[])),damage_type,source_action))
 	var reduction:float=0.0 if damage_type=="true" else calculate_armor_reduction(resolved_armor,int(source.get("level",1)))
 	var mitigated_amount:float=amount*(1.0-reduction)
 	var available_shield:float=maxf(0.0,float(target.get("shield",0.0)));var shield_damage:float=minf(available_shield,mitigated_amount)
@@ -209,7 +211,7 @@ static func is_stunned(unit:Dictionary)->bool:
 
 static func resolve_healing(source:Dictionary,target:Dictionary,request:Dictionary,rng_roll:float=-1.0)->Dictionary:
 	var source_action:String=str(request.get("source_action","basic_ability"));var amount:float=maxf(0.0,float(request.get("amount",calculate_power_scaled_amount(source,float(request.get("power_coefficient",0.0))))))
-	amount+=float(request.get("flat_bonus",0.0));amount*=float(request.get("outgoing_multiplier",source.get("healing_multiplier",1.0)));amount*=float(request.get("incoming_multiplier",target.get("healing_taken_multiplier",1.0)))
+	amount+=float(request.get("flat_bonus",0.0));amount*=float(request.get("outgoing_multiplier",source.get("healing_multiplier",1.0)));amount*=float(request.get("incoming_multiplier",target.get("healing_taken_multiplier",1.0)))*(1.0 if bool(request.get("ignore_healing_received_modifiers",false)) else HealingReceivedModifierSystem.multiplier(target))
 	amount=maxf(0.0,amount)
 	var can_crit:bool=bool(request.get("can_crit",default_can_crit(source_action,"healing")));var roll:float=randf() if rng_roll<0 else rng_roll;var critical:bool=can_crit and roll<float(source.get("critical_chance",0.0))
 	var critical_multiplier:float=float(request.get("critical_multiplier",source.get("critical_damage",2.0)))

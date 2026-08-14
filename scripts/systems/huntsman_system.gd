@@ -1,5 +1,7 @@
 extends RefCounted
 
+const QuestProgressModifierSystem = preload("res://scripts/systems/quest_progress_modifier_system.gd")
+
 const HuntsmanData = preload("res://scripts/data/huntsman_data.gd")
 const AlternateActionSetSystem = preload("res://scripts/systems/alternate_action_set_system.gd")
 const ArmorReductionSystem = preload("res://scripts/systems/armor_reduction_system.gd")
@@ -7,6 +9,9 @@ const StealthDetectionSystem = preload("res://scripts/systems/stealth_detection_
 
 static func has_talent(unit:Dictionary, talent_id:String) -> bool:
 	return talent_id in unit.get("selected_talents", {}).values()
+
+static func quest_amount(unit:Dictionary, amount:int) -> int:
+	return QuestProgressModifierSystem.amount(unit, amount)
 
 static func ability_amount(unit:Dictionary, value:float) -> float:
 	var level := int(unit.get("level", 1))

@@ -3,6 +3,7 @@ extends RefCounted
 const ShamanData=preload("res://scripts/data/shaman_data.gd")
 const ProgressionScopeSystem=preload("res://scripts/systems/progression_scope_system.gd")
 const AbilitySlotSystem=preload("res://scripts/systems/ability_slot_system.gd")
+const QuestProgressModifierSystem=preload("res://scripts/systems/quest_progress_modifier_system.gd")
 
 static func has_talent(unit:Dictionary,id:String)->bool:return id in unit.get("selected_talents",{}).values()
 static func scaled(unit:Dictionary,value:float)->float:return ShamanData.scaled(value,int(unit.get("level",1)))
@@ -32,6 +33,7 @@ static func mastery_unlocked(unit:Dictionary,talent_id:String,goal:int)->bool:re
 
 static func add_mastery(unit:Dictionary,talent_id:String,amount:int=1)->int:
 	var runtime:Dictionary=unit.shaman_runtime;runtime.mastery[talent_id]=maxi(0,int(runtime.mastery.get(talent_id,0))+amount);return int(runtime.mastery[talent_id])
+static func quest_amount(unit:Dictionary,amount:int=1)->int:return QuestProgressModifierSystem.amount(unit,amount)
 
 static func encounter_progress(unit:Dictionary,key:String)->int:return int(unit.get("shaman_runtime",{}).get("encounter_progress",{}).get(key,0))
 static func reward_active(unit:Dictionary,key:String)->bool:return ProgressionScopeSystem.reward_active(unit.shaman_runtime,key)
@@ -102,7 +104,7 @@ static func note_basic_attack(unit:Dictionary,target_id:String,result:Dictionary
 	if windfury:
 		telemetry_add(unit,"windfury_hits");runtime.windfury_attacks=maxi(0,int(runtime.windfury_attacks)-1);output.frostwolf_stacks+=2 if has_talent(unit,"shaman_l21_1") else 1
 		if target_id not in runtime.windfury_targets:runtime.windfury_targets.append(target_id)
-		if has_talent(unit,"shaman_l9_3"):var progress:=ProgressionScopeSystem.add_encounter_progress(runtime,"maelstrom",1);add_mastery(unit,"shaman_l9_3",1);telemetry_add(unit,"maelstrom_progress");update_level9_rewards(unit,"maelstrom",progress)
+		if has_talent(unit,"shaman_l9_3"):var amount:=quest_amount(unit);var progress:=ProgressionScopeSystem.add_encounter_progress(runtime,"maelstrom",amount);add_mastery(unit,"shaman_l9_3",amount);telemetry_add(unit,"maelstrom_progress",amount);update_level9_rewards(unit,"maelstrom",progress)
 		if int(runtime.windfury_attacks)<=0:
 			output.windfury_finished=true;output.tempest_subhits=int(ShamanData.VALUES.tempest_subhits) if has_talent(unit,"shaman_l24_1") else 0
 			output.fury_recast=has_talent(unit,"shaman_l30_2") and runtime.windfury_targets.size()>=3
@@ -129,7 +131,7 @@ static func note_chain_cast(unit:Dictionary,primary_id:String,qualifying_ids:Arr
 	if source_tag=="player_chain":
 		telemetry_add(unit,"q_casts")
 		if has_talent(unit,"shaman_l9_2") and quest_count>=3:
-			var progress:=ProgressionScopeSystem.add_encounter_progress(runtime,"crash",1);add_mastery(unit,"shaman_l9_2",1);telemetry_add(unit,"crash_progress");update_level9_rewards(unit,"crash",progress)
+			var amount:=quest_amount(unit);var progress:=ProgressionScopeSystem.add_encounter_progress(runtime,"crash",amount);add_mastery(unit,"shaman_l9_2",amount);telemetry_add(unit,"crash_progress",amount);update_level9_rewards(unit,"crash",progress)
 			if reward_active(unit,"crash_2"):result.crash_bonus_stacks=2
 		if has_talent(unit,"shaman_l24_2") and primary_id!="" and primary_id!=str(runtime.thunder_last_primary):runtime.thunder_last_primary=primary_id;runtime.thunder_stacks=mini(int(ShamanData.VALUES.thunder_max),int(runtime.thunder_stacks)+1);telemetry_add(unit,"thunder_stacks")
 		result.stormcaller=has_talent(unit,"shaman_l30_1") and count>=int(ShamanData.VALUES.stormcaller_threshold)
@@ -148,14 +150,14 @@ static func q_max_charges(unit:Dictionary)->int:return 2 if reward_active(unit,"
 static func note_echo_defeat(unit:Dictionary,target_id:String)->bool:
 	if not has_talent(unit,"shaman_l9_1") or not unit.shaman_runtime.echo_assists.has(target_id):return false
 	if float(unit.shaman_runtime.echo_assists[target_id])<=0.0:return false
-	unit.shaman_runtime.echo_assists.erase(target_id);var progress:=ProgressionScopeSystem.add_encounter_progress(unit.shaman_runtime,"echo",1);add_mastery(unit,"shaman_l9_1",1);telemetry_add(unit,"echo_progress");update_level9_rewards(unit,"echo",progress);return true
+	unit.shaman_runtime.echo_assists.erase(target_id);var amount:=quest_amount(unit);var progress:=ProgressionScopeSystem.add_encounter_progress(unit.shaman_runtime,"echo",amount);add_mastery(unit,"shaman_l9_1",amount);telemetry_add(unit,"echo_progress",amount);update_level9_rewards(unit,"echo",progress);return true
 
 static func note_feral_cast(unit:Dictionary,qualifying_count:int)->void:
 	if not has_talent(unit,"shaman_l12_2"):return
 	if qualifying_count<=0:
 		if not reward_active(unit,"frostwolf_pack"):unit.shaman_runtime.encounter_progress["frostwolf_pack"]=0;telemetry_add(unit,"feral_pack_resets")
 		return
-	var progress:=ProgressionScopeSystem.add_encounter_progress(unit.shaman_runtime,"frostwolf_pack",1);telemetry_add(unit,"feral_pack_progress")
+	var amount:=quest_amount(unit);var progress:=ProgressionScopeSystem.add_encounter_progress(unit.shaman_runtime,"frostwolf_pack",amount);telemetry_add(unit,"feral_pack_progress",amount)
 	if progress>=int(ShamanData.VALUES.frostwolf_pack_goal):ProgressionScopeSystem.set_reward(unit.shaman_runtime,"frostwolf_pack")
 
 static func feral_cooldown(unit:Dictionary)->float:return float(ShamanData.VALUES.w_cooldown)*(0.5 if reward_active(unit,"frostwolf_pack") else 1.0)

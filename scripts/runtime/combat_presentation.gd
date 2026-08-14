@@ -173,6 +173,9 @@ func draw_combat_debug_overlay()->void:
 		if telemetry_entries.is_empty():lines.append("TELEMETRY  none")
 		else:
 			for entry_index in range(0,telemetry_entries.size(),2):lines.append("TEL  %s"%"  ".join(telemetry_entries.slice(entry_index,mini(entry_index+2,telemetry_entries.size()))))
+	if str(hero.get("class",""))=="Warrior" and not hero.get("warrior_runtime",{}).is_empty():
+		var warrior:Dictionary=hero.warrior_runtime;var w_state:=AbilitySlotSystem.ui_state(warrior.w_slot)
+		lines.append("SPEC %s  ROLE %s"%[WarriorSystem.specialization(hero),str(hero.effective_role)]);lines.append("BA %.1f / %.2fs  HS %.1f"%[WarriorSystem.basic_attack_amount(hero),WarriorSystem.attack_interval(hero),float(warrior.heroic_strike_cooldown)]);lines.append("PARRY %.1f  W %d/%d"%[float(warrior.parry_remaining),int(w_state.charges),int(w_state.max_charges)]);lines.append("Q MAW %d/25  HIGH %d/%d/%d"%[int(warrior.lions_maw),WarriorSystem.high_progress(hero,"high_weapon"),WarriorSystem.high_progress(hero,"high_honors"),WarriorSystem.high_progress(hero,"high_endurance")]);lines.append("R %.1f  D %.1f  BANNER %s %.1f"%[float(warrior.taunt_cooldown),float(warrior.shattering_cooldown),str(warrior.banner_type),float(warrior.banner_remaining)]);lines.append("SUMMON LIFE %.1f -> %.1f"%[float(warrior.recent_summon_lifetime_before),float(warrior.recent_summon_lifetime_after)]);lines.append("TELEMETRY %s"%str(warrior.telemetry))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])

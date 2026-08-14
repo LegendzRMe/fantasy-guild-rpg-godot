@@ -98,6 +98,7 @@ static func testing_heroes() -> Array:
 		hero_state("Lunara","Sentinel",30,16,"guild_recruit",false,0),
 		hero_state("Garran Grey","Huntsman",30,16,"guild_recruit",false,0),
 		hero_state("Malfira Greenbough","Druid",30,16,"guild_recruit",false,0),
+		hero_state("Garrick Ironward","Warrior",30,16,"guild_recruit",false,0),
 		hero_state("Aldren Vale","Guardian",4,18,"special_hero",true,1,{"signature_ability":"Oath of Cinders","story_lead":"The traitor's broken oath-seal"}),
 		hero_state("Mira Thorn","Ranger",4,18,"special_hero",true,1,{"signature_ability":"Ghostmark Volley","story_lead":"Unnatural tracks leaving Ashwood"}),
 		hero_state("Ilyra Voss","Mage",4,18,"special_hero",true,1,{"signature_ability":"Runebreak","story_lead":"The force inside the servant's runes"})
@@ -130,7 +131,7 @@ static func testing_state() -> Dictionary:
 		"dust":999,
 		"provisions":999,
 		"prestige_tokens":999,
-		"class_talent_discovery":{"guardian":30,"cleric":30,"rogue":30,"ranger":30,"mage":30,"warlock":30,"slayer":30,"priest":30,"shaman":30,"templar":30,"protector":30,"sentinel":30},
+		"class_talent_discovery":{"guardian":30,"cleric":30,"rogue":30,"ranger":30,"mage":30,"warlock":30,"slayer":30,"priest":30,"shaman":30,"templar":30,"protector":30,"sentinel":30,"huntsman":30,"druid":30,"warrior":30},
 		"vault_level":10,
 		"vault_limit":300,
 		"depot_level":10,

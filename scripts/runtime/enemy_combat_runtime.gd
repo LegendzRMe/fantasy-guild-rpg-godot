@@ -218,6 +218,8 @@ func taunt_enemy(enemy:Dictionary,hero_index:int) -> void:
 	enemy.threat=threat_table;enemy.taunt_target=hero_index;enemy.taunt_time=CHALLENGE_TAUNT_DURATION;enemy.target=hero_index
 
 func preferred_enemy_target(enemy:Dictionary)->int:
+	var forced_index:=ForcedTargetSystem.preferred(enemy)
+	if forced_index>=0 and forced_index<heroes.size() and heroes[forced_index].hp>0.0:return forced_index
 	if bool(enemy.get("ignores_tank_aggro",false)):
 		var fixate_target:int=nearest_backline_hero(enemy.pos)
 		return fixate_target if fixate_target>=0 else nearest_living_hero(enemy.pos)

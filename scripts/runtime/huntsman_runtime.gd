@@ -162,7 +162,7 @@ func update_huntsman_projectile(hero:Dictionary, projectile:Dictionary, delta:fl
 		var explosion := deal_damage(hero, target, HuntsmanSystem.ability_amount(hero, float(HuntsmanData.VALUES.cocktail_explosion)) * explosion_multiplier, "basic_ability", "physical", "Gilnean Cocktail Explosion", false, "huntsman_cocktail_explosion", [], true)
 		if float(explosion.get("resolved_damage", 0.0)) > 0.0:
 			HuntsmanSystem.add_mark_stack(hero, target);HuntsmanSystem.telemetry_add(hero, "cocktail_explosion_damage", float(explosion.resolved_damage))
-			if HuntsmanSystem.has_talent(hero, "huntsman_l18_2") and TargetCategorySystem.qualifies_quest(target): hero.huntsman_runtime.cocktail_quest_stacks = mini(15, int(hero.huntsman_runtime.cocktail_quest_stacks) + 1)
+			if HuntsmanSystem.has_talent(hero, "huntsman_l18_2") and TargetCategorySystem.qualifies_quest(target): hero.huntsman_runtime.cocktail_quest_stacks = mini(15, int(hero.huntsman_runtime.cocktail_quest_stacks) + HuntsmanSystem.quest_amount(hero, 1))
 	huntsman_visual("huntsman_cocktail_cone", primary.pos, primary.pos + Vector2(projectile.direction) * explosion_length, .45, {"radius":explosion_length})
 	return false
 

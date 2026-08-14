@@ -46,6 +46,7 @@ func refresh_item_combat_stats(hero:Dictionary)->void:
 		if str(shield_source.get("source_id",""))=="last_dawn" and float(shield_source.get("amount",0.0))>0:last_dawn_active=true;break
 	hero.power=float(hero.get("base_power",hero.get("power",0.0)))*soul_multiplier*(1.5 if last_dawn_active else 1.0)
 	hero.basic_action_amount=hero.power*float(hero.get("basic_action_power_ratio",1.0));hero.damage=hero.basic_action_amount
+	if str(hero.get("class",""))=="Warrior" and not hero.get("warrior_runtime",{}).is_empty():hero.basic_action_amount=WarriorSystem.basic_attack_amount(hero);hero.damage=hero.basic_action_amount
 	if str(hero.get("basic_action_type","attack"))=="heal":hero.basic_heal_amount=hero.basic_action_amount
 	var interval:float=float(hero.get("base_basic_action_interval",1.25))/maxf(0.1,1.0+float(hero.get("soul_furnace_stacks",0))*0.05)
 	hero.basic_attack_interval=interval;hero.basic_heal_interval=interval
@@ -179,21 +180,33 @@ func finalize_damage_events(source:Dictionary,target:Dictionary,result:Dictionar
 				for area in hero.druid_runtime.roots_areas:
 					if bool(area.get("secondary",false)) or float(area.get("remaining",0.0))<=0.0:continue
 					if Vector2(target.get("pos",Vector2.ZERO)).distance_to(Vector2(area.point))<=DruidSystem.roots_radius(hero,float(area.elapsed),false):hero.druid_runtime.roots_areas.append(DruidSystem.create_roots_area(hero,Vector2(target.pos),true));DruidSystem.telemetry_add(hero,"deep_roots_casts");break
+			if str(hero.get("class",""))=="Warrior" and not hero.get("warrior_runtime",{}).is_empty():WarriorSystem.note_enemy_defeat(hero,target,Vector2(hero.pos).distance_to(Vector2(target.get("pos",Vector2.ZERO))))
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
+	var warrior_primary:bool=str(source.get("class",""))=="Warrior" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("warrior_runtime",{}).is_empty()
+	var warrior_heroic_ready:bool=warrior_primary and float(source.warrior_runtime.heroic_strike_cooldown)<=0.0
+	var warrior_primary_shield_before:float=float(target.get("shield",0.0)) if warrior_primary else 0.0
+	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
+	if hostile and source_action=="basic_attack" and str(target.get("class",""))=="Warrior" and not target.get("warrior_runtime",{}).is_empty():
+		var parry:=WarriorSystem.note_parry_contact(target)
+		if bool(parry.prevented) and not bool(parry.shield_wall):WarriorSystem.telemetry_add(target,"parry_prevented",amount);return {"raw_amount":maxf(0.0,amount),"resolved_damage":0.0,"health_damage":0.0,"shield_damage":0.0,"armor_prevented":0.0,"protected_prevented":maxf(0.0,amount),"defeated":false,"critical":false,"immune":true,"evaded":false,"overkill":0.0,"shield_absorptions":[]}
 	if CombatSystem.is_protected(target):
 		for prevention_effect in target.get("active_effects",[]):
 			if str(prevention_effect.get("id","")) not in ["protected","invulnerable"]:continue
 			var prevention_owner=unit_by_combat_id(str(prevention_effect.get("owner_id","")))
 			if prevention_owner!=null and str(prevention_owner.get("class",""))=="Priest":PriestSystem.telemetry_add(prevention_owner,"salvation_prevented",maxf(0.0,amount))
+		if str(target.get("class",""))=="Warrior":WarriorSystem.telemetry_add(target,"protected_prevented",amount)
 		return {"raw_amount":maxf(0.0,amount),"resolved_damage":0.0,"health_damage":0.0,"shield_damage":0.0,"armor_prevented":0.0,"protected_prevented":maxf(0.0,amount),"defeated":false,"critical":false,"immune":true,"evaded":false,"overkill":0.0,"shield_absorptions":[]}
-	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
 	if EvasionSystem.should_evade(target,source_action,hostile,bool(source.get("bypass_evasion",false))):
-		var miss:=EvasionSystem.miss_result(source_action,damage_type);combat_events.append(CombatSystem.create_event("basic_attack_evaded",source,target,miss,{"source_action":source_action,"action_tags":[source_action],"origin":origin}));if str(target.get("class",""))=="Slayer":SlayerSystem.telemetry_add(target,"evaded_attacks");return miss
+		var miss:=EvasionSystem.miss_result(source_action,damage_type);combat_events.append(CombatSystem.create_event("basic_attack_evaded",source,target,miss,{"source_action":source_action,"action_tags":[source_action],"origin":origin}))
+		if str(target.get("class",""))=="Slayer":SlayerSystem.telemetry_add(target,"evaded_attacks")
+		if warrior_heroic_ready:source.warrior_runtime.heroic_strike_cooldown=float(WarriorData.VALUES.heroic_strike_cooldown);source.warrior_runtime.overpower_armed=false;WarriorSystem.telemetry_add(source,"heroic_strikes")
+		return miss
 	var active_damage_multiplier:=1.0
 	for active_effect in source.get("active_effects",[]):
 		if float(active_effect.get("remaining_duration",0.0))>0.0:active_damage_multiplier=maxf(active_damage_multiplier,float(active_effect.get("damage_multiplier",1.0)))
 	var resolved_amount:=amount*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
+	if warrior_primary:resolved_amount=WarriorSystem.basic_attack_amount(source)*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier
 	if source_action=="basic_attack":
 		for effect in source.get("active_effects",[]):resolved_amount*=float(effect.get("basic_attack_damage_multiplier",1.0))
 	if str(source.get("class",""))=="Templar" and source_action=="basic_attack" and not source.get("templar_runtime",{}).is_empty():
@@ -244,6 +257,18 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll);var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
 		if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
+	if str(source.get("class",""))=="Warrior" and not source.get("warrior_runtime",{}).is_empty():WarriorSystem.note_damage_participation(source,target,float(result.get("resolved_damage",0.0)))
+	if warrior_primary:
+		var warrior_basic:=WarriorSystem.note_primary_basic_attack(source,target,result,warrior_heroic_ready)
+		if bool(warrior_basic.get("successful",false)) and WarriorSystem.has_talent(source,"warrior_l21_3") and warrior_primary_shield_before>0.0:
+			var bonus:=WarriorSystem.shield_only_damage(target,float(result.get("amount",0.0))*float(WarriorData.VALUES.shattering_basic_shield_bonus));WarriorSystem.telemetry_add(source,"shield_damage",bonus);if float(target.get("shield",0.0))<=0.0:WarriorSystem.telemetry_add(source,"shields_broken")
+		if bool(warrior_basic.get("heroic_strike",false)):
+			var heroic_result:=deal_damage(source,target,float(warrior_basic.heroic_damage),"trait","physical","Heroic Strike",false,"warrior_heroic_strike",[],true);WarriorSystem.telemetry_add(source,"heroic_strike_damage",float(heroic_result.resolved_damage))
+			if WarriorSystem.successful(heroic_result) and WarriorSystem.has_talent(source,"warrior_l21_2"):HealingReceivedModifierSystem.apply(target,"warrior_mortal:%s"%str(source.combat_id),-float(WarriorData.VALUES.mortal_reduction),float(WarriorData.VALUES.mortal_duration),str(source.combat_id));WarriorSystem.telemetry_add(source,"mortal_applications")
+		if float(warrior_basic.get("second_wind",0.0))>0.0:
+			var second:=deal_healing(source,source,float(warrior_basic.second_wind),"trait","Second Wind","warrior_second_wind",["healing"]);WarriorSystem.telemetry_add(source,"second_wind_healing",float(second.effective_amount))
+		if bool(warrior_basic.get("victory",false)):
+			var victory:=deal_healing(source,source,float(warrior_basic.victory_heal),"trait","Victory Rush","warrior_victory",["healing"]);WarriorSystem.telemetry_add(source,"victory_healing",float(victory.effective_amount));if WarriorSystem.has_talent(source,"warrior_l9_3"):WarriorSystem.add_progress(source,"high_endurance",1);WarriorSystem.telemetry_add(source,"endurance_events")
 	if str(source.get("class",""))=="Sentinel" and source_action in ["basic_ability","heroic"] and originating_effect_id!="sentinel_e_auto" and float(result.get("resolved_damage",0.0))>0.0 and TargetCategorySystem.qualifies_immediate(target):SentinelSystem.reduce_q(source,float(SentinelData.VALUES.q_ability_cdr))
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and not source.get("rogue_runtime",{}).is_empty() and bool(source.rogue_runtime.vanish_active):RogueSystem.break_vanish(source)
 	if str(target.get("class",""))=="Rogue" and not target.get("rogue_runtime",{}).is_empty() and float(result.get("resolved_damage",0.0))>0.0 and bool(target.rogue_runtime.vanish_active) and not StealthDetectionSystem.is_unrevealable(target):RogueSystem.break_vanish(target)
@@ -398,6 +423,10 @@ func apply_unit_shield(source:Dictionary,target:Dictionary,amount:float,origin=n
 
 func update_timed_combat_effects(unit:Dictionary,delta:float)->void:
 	ArmorReductionSystem.update(unit,delta)
+	HealingReceivedModifierSystem.update(unit,delta)
+	QuestProgressModifierSystem.update(unit,delta)
+	ForcedTargetSystem.update(unit,delta)
+	SummonLifetimeSystem.update(unit,delta)
 	for armor_index in range(unit.get("temporary_armor_sources",[]).size()-1,-1,-1):
 		unit.temporary_armor_sources[armor_index].remaining=float(unit.temporary_armor_sources[armor_index].get("remaining",0.0))-delta
 		if float(unit.temporary_armor_sources[armor_index].remaining)<=0.0:unit.temporary_armor_sources.remove_at(armor_index)

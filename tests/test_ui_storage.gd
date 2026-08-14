@@ -43,7 +43,7 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,main.screen=="creation" and main.state.guild_name=="","An empty live slot should continue to guild creation.")
 	main.open_save_slot(3)
 	TestSupport.check(errors,main.screen=="hall" and main.state.guild_name=="Testing Guild","An empty testing slot should open its unlocked guild directly.")
-	TestSupport.check(errors,main.state.tutorial_complete==true and main.state.heroes.size()==18,"The testing slot should bypass the tutorial with its complete roster.")
+	TestSupport.check(errors,main.state.tutorial_complete==true and main.state.heroes.size()==19,"The testing slot should bypass the tutorial with its complete roster.")
 	await main.get_tree().process_frame
 	for room_id in ["command_table","great_hall","infirmary","front_gate","guild_storage","tavern","trading_post","workshop","combat_hall"]:
 		var testing_room:Button=main.ui.find_child("GuildRoom_%s"%room_id,true,false)

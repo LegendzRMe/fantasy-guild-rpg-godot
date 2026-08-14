@@ -53,7 +53,7 @@ func resolve_multishot_hit(hero:Dictionary,effect:Dictionary)->void:
 	if RangerSystem.has_talent(hero,"ranger_l18_2"):CombatSystem.apply_control(target,"slow",2.5,0.20)
 	if RangerSystem.has_talent(hero,"ranger_l21_1") and bool(effect.siphon_eligible) and hit.resolved_damage>0:deal_healing(hero,hero,float(hero.max_hp)*0.02,"basic_ability","Siphoning Arrow")
 	if RangerSystem.has_talent(hero,"ranger_l9_2") and RangerSystem.qualifying_target(target):
-		RangerSystem.add_hatred(hero,2);hero.ranger_runtime.w_quest_hits=int(hero.ranger_runtime.w_quest_hits)+1;hero.ranger_runtime.w_encounter_bonus=float(hero.ranger_runtime.w_encounter_bonus)+2.0
+		var progress:=RangerSystem.quest_amount(hero,1);RangerSystem.add_hatred(hero,2);hero.ranger_runtime.w_quest_hits=int(hero.ranger_runtime.w_quest_hits)+progress;hero.ranger_runtime.w_encounter_bonus=float(hero.ranger_runtime.w_encounter_bonus)+2.0*progress
 		if not bool(hero.ranger_runtime.w_quest_rewarded) and int(hero.ranger_runtime.w_quest_hits)>=20:hero.ranger_runtime.w_quest_rewarded=true;hero.ranger_runtime.w_encounter_bonus=float(hero.ranger_runtime.w_encounter_bonus)+40.0
 
 func cast_ranger_q(hero:Dictionary,point:Vector2)->bool:

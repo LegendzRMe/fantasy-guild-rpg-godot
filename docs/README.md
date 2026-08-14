@@ -19,6 +19,7 @@ Start with [`architecture.md`](architecture.md) for module ownership, dependency
 - Rogue: [`rogue_conversion_v1.md`](rogue_conversion_v1.md)
 - Slayer: [`slayer_conversion_v1.md`](slayer_conversion_v1.md)
 - Priest: [`priest_conversion_v1.md`](priest_conversion_v1.md), with provisional space values in [`priest_geometry_calibration.md`](priest_geometry_calibration.md)
+- Warrior: [`warrior_conversion_v1.md`](warrior_conversion_v1.md), full interaction audit in [`warrior_full_audit_v1.md`](warrior_full_audit_v1.md), and provisional space values in [`warrior_geometry_calibration.md`](warrior_geometry_calibration.md)
 
 Geometry calibration documents are development records for provisional combat-space values. They are not final visual specifications.
 

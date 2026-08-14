@@ -3,8 +3,10 @@ extends RefCounted
 const RangerData = preload("res://scripts/data/ranger_data.gd")
 const AbilitySlotSystem = preload("res://scripts/systems/ability_slot_system.gd")
 const PercentageHealthDamageSystem = preload("res://scripts/systems/percentage_health_damage_system.gd")
+const QuestProgressModifierSystem = preload("res://scripts/systems/quest_progress_modifier_system.gd")
 
 static func has_talent(unit:Dictionary,id:String)->bool:return id in unit.get("selected_talents",{}).values()
+static func quest_amount(unit:Dictionary,amount:int)->int:return QuestProgressModifierSystem.amount(unit,amount)
 
 static func initialize_runtime(unit:Dictionary,telemetry_enabled:bool=false)->void:
 	var rain:=AbilitySlotSystem.create(int(RangerData.VALUES.r2_charges),float(RangerData.VALUES.r2_recharge),AbilitySlotSystem.RechargeMode.SEQUENTIAL)
@@ -75,7 +77,7 @@ static func on_basic_attack_released(unit:Dictionary,target:Dictionary)->Diction
 static func on_basic_attack_resolved(unit:Dictionary,result:Dictionary,target_defeated:bool,empowered:bool)->void:
 	if float(result.get("resolved_damage",0.0))<=0.0:return
 	add_hatred(unit,1)
-	unit.ranger_runtime.basic_attack_quest=int(unit.ranger_runtime.basic_attack_quest)+1
+	unit.ranger_runtime.basic_attack_quest=int(unit.ranger_runtime.basic_attack_quest)+quest_amount(unit,1)
 	if has_talent(unit,"ranger_l9_3"):
 		unit.ranger_runtime.creed_bonus=minf(0.06,floori(int(unit.ranger_runtime.basic_attack_quest)/50.0)*0.01)
 	if has_talent(unit,"ranger_l27_r2"):telemetry_add(unit,"slot_recharge_reduced",AbilitySlotSystem.reduce_active_recharge(unit.ranger_runtime.slots.r,5.0))

@@ -5,6 +5,7 @@ const AbilitySlotSystem=preload("res://scripts/systems/ability_slot_system.gd")
 const ArmorReductionSystem=preload("res://scripts/systems/armor_reduction_system.gd")
 const StealthDetectionSystem=preload("res://scripts/systems/stealth_detection_system.gd")
 const TargetCategorySystem=preload("res://scripts/systems/combat_target_category_system.gd")
+const QuestProgressModifierSystem=preload("res://scripts/systems/quest_progress_modifier_system.gd")
 
 static func has_talent(unit:Dictionary,id:String)->bool:return id in unit.get("selected_talents",{}).values()
 static func ability_amount(unit:Dictionary,value:float)->float:
@@ -51,9 +52,9 @@ static func note_basic_attack(unit:Dictionary,target:Dictionary,resolved_damage:
 	return {"self_heal_fraction":float(SentinelData.VALUES.d_marked_self_heal if own_mark else SentinelData.VALUES.d_self_heal),"own_mark":own_mark,"auto_flare":int(runtime.basic_counter)%8==0 and int(runtime.e_quest_stacks)>=40}
 static func note_e_hit(unit:Dictionary,target:Dictionary,automatic:bool=false)->void:
 	if automatic:return
-	if TargetCategorySystem.qualifies_quest(target):unit.sentinel_runtime.e_quest_stacks=mini(84,int(unit.sentinel_runtime.e_quest_stacks)+1);unit.sentinel_runtime.e_recent_hits[str(target.combat_id)]=float(SentinelData.VALUES.e_death_window);telemetry_add(unit,"e_quest_stacks")
+	if TargetCategorySystem.qualifies_quest(target):var progress:=QuestProgressModifierSystem.amount(unit,1);unit.sentinel_runtime.e_quest_stacks=mini(84,int(unit.sentinel_runtime.e_quest_stacks)+progress);unit.sentinel_runtime.e_recent_hits[str(target.combat_id)]=float(SentinelData.VALUES.e_death_window);telemetry_add(unit,"e_quest_stacks",progress)
 static func note_defeat(unit:Dictionary,target:Dictionary)->void:
-	var id:=str(target.get("combat_id",""));if float(unit.get("sentinel_runtime",{}).get("e_recent_hits",{}).get(id,0.0))>0.0:unit.sentinel_runtime.e_quest_stacks=mini(84,int(unit.sentinel_runtime.e_quest_stacks)+1);telemetry_add(unit,"e_quest_stacks")
+	var id:=str(target.get("combat_id",""));if float(unit.get("sentinel_runtime",{}).get("e_recent_hits",{}).get(id,0.0))>0.0:var progress:=QuestProgressModifierSystem.amount(unit,1);unit.sentinel_runtime.e_quest_stacks=mini(84,int(unit.sentinel_runtime.e_quest_stacks)+progress);telemetry_add(unit,"e_quest_stacks",progress)
 static func update(unit:Dictionary,delta:float,q_rate:float=1.0,w_rate:float=1.0)->Dictionary:
 	var runtime:Dictionary=unit.get("sentinel_runtime",{});if runtime.is_empty():return {}
 	var before:=int(runtime.q_slot.current_charges);AbilitySlotSystem.update(runtime.q_slot,delta,q_rate);AbilitySlotSystem.update(runtime.w_slot,delta,w_rate);var refilled:bool=before<int(runtime.q_slot.max_charges) and int(runtime.q_slot.current_charges)==int(runtime.q_slot.max_charges)
