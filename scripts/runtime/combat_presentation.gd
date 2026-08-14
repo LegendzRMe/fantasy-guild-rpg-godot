@@ -182,6 +182,9 @@ func draw_combat_debug_overlay()->void:
 	if str(hero.get("class",""))=="Beastmaster" and not hero.get("beastmaster_runtime",{}).is_empty():
 		var beast:Dictionary=hero.beastmaster_runtime;var misha:Dictionary=beast.misha;var q_state:=AbilitySlotSystem.ui_state(beast.q_slot)
 		lines.append("LEVEL %d  HP %.0f/%.0f  BA %.1f/%.2f"%[int(hero.level),float(hero.hp),float(hero.max_hp),float(hero.damage),float(hero.basic_attack_interval)]);lines.append("MISHA %s %.0f/%.0f  RESPAWN %.1f"%["ALIVE" if BeastmasterSystem.misha_alive(hero) else "DEAD",float(misha.hp),float(misha.max_hp),float(beast.misha_respawn_remaining)]);lines.append("COMMAND %s  TARGET %s"%[str(misha.command_mode),str(misha.target_id)]);lines.append("BLOCK BM/M %d/%d  Q %d/%d %.1f"%[BlockChargeSystem.charges(hero),BlockChargeSystem.charges(misha),int(q_state.charges),int(q_state.max_charges),float(q_state.recharge)]);lines.append("LESSER %d %s  GREATER %d %s  E %.1f"%[beast.lesser_beasts.size(),str(beast.lesser_beasts.map(func(unit):return "%.0f/%.1f"%[float(unit.hp),float(unit.health_decay_rate)])),beast.greater_beasts.size(),str(beast.greater_beasts.map(func(unit):return "%.0f/%.1f"%[float(unit.hp),float(unit.health_decay_rate)])),float(hero.ability_cds[2])]);lines.append("FURY %d/225 %s  HUNTED %s"%[int(beast.fury),"DONE" if bool(beast.fury_complete) else "",str(beast.hunted)]);lines.append("HAWK %.1f  DIRE %d  THRILL %.1f  PRIMAL %s"%[float(beast.hawk_remaining),int(beast.dire_stacks),float(beast.thrill_remaining),str(enemies.filter(func(unit):return unit.get("active_effects",[]).any(func(effect):return str(effect.get("source_id","")).begins_with("beastmaster_primal:"))).map(func(unit):return str(unit.combat_id)))]);lines.append("BESTIAL %.1f  BOARS %s  APEX %.0f/%s/%d"%[float(beast.bestial_remaining),str(beast.boar_targets),float(beast.apex_health),str(beast.apex_target),int(beast.apex_stacks)]);lines.append("PACK %s  WILDFIRE %d  REDIRECT %s"%[str(beast.pack_commander_target),BeastmasterSystem.disposable_beasts(hero).size() if BeastmasterSystem.has_talent(hero,"beastmaster_l30_3") else 0,str(beast.last_redirect)]);lines.append("TELEMETRY %s"%str(beast.telemetry))
+	if str(hero.get("class",""))=="Monk" and not hero.get("monk_runtime",{}).is_empty():
+		var monk:Dictionary=hero.monk_runtime;var monk_q:=MonkSystem.q_state(hero);var ally_state:="NONE" if monk.ally.is_empty() else "%s %.0f/%.0f %.1fs"%[str(monk.ally.ally_kind).to_upper(),float(monk.ally.hp),float(monk.ally.max_hp),float(monk.ally.remaining_duration)]
+		lines.append("Q %d/%d  %.1f  W/E %.1f/%.1f"%[int(monk_q.charges),int(monk_q.max_charges),float(monk_q.recharge),float(monk.breath_cooldown),float(monk.reach_cooldown)]);lines.append("REACH %.1f  THIRD %d  SPEED %.1f"%[float(monk.reach_remaining),int(monk.third_counter),float(monk.trait_speed_remaining)]);lines.append("INSIGHT %d/100 %s"%[int(monk.insight_progress),"DONE" if bool(monk.insight_complete) else ""]);lines.append("ALLY %s  D %.1f  AURA %s"%[ally_state,float(monk.ally_cooldown),str(monk.ally_aura_recipients)]);lines.append("PALM %s  SEVEN %s  ECHOES %d"%[str(monk.palm),str(monk.seven),monk.echoes.size()]);lines.append("STORM %.1f  EPIPHANY %.1f"%[float(monk.storm_icd),float(monk.epiphany_icd)]);lines.append("TELEMETRY %s"%str(monk.telemetry))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])
@@ -298,6 +301,10 @@ func draw_combat_summons() -> void:
 			draw_circle(beast_pos,24 if category=="misha" else 18,Color(color,.22));draw_circle(beast_pos,15 if category=="misha" else 11,color);health_bar(beast_pos+Vector2(-24,-33),48,ratio,color)
 			if float(beast.get("fresh_remaining",0.0))>0.0:draw_arc(beast_pos,28,0,TAU,32,Color("f6dc7a"),3)
 			if category=="greater" and BeastmasterSystem.has_talent(beastmaster,"beastmaster_l18_3"):draw_arc(beast_pos,float(BeastmasterData.SPACE.greater_rally),0,TAU,48,Color(color,.22),2)
+	for monk in heroes:
+		if str(monk.get("class",""))!="Monk" or monk.get("monk_runtime",{}).get("ally",{}).is_empty():continue
+		var ally:Dictionary=monk.monk_runtime.ally;var ally_pos:=Vector2(ally.pos);var ally_color:=Color("e7d8a2") if str(ally.ally_kind)=="spirit" else Color("a98b68") if str(ally.ally_kind)=="earth" else Color("a8e5ed")
+		draw_circle(ally_pos,float(MonkData.SPACE.ally_radius),Color(ally_color,.18));draw_circle(ally_pos,14,ally_color);draw_arc(ally_pos,float(MonkData.SPACE.ally_aura_radius),0,TAU,48,Color(ally_color,.18),2);health_bar(ally_pos+Vector2(-22,-30),44,clampf(float(ally.hp)/maxf(1.0,float(ally.max_hp)),0.0,1.0),ally_color)
 
 func draw_combat_heroes() -> void:
 	for i in heroes.size():
@@ -414,8 +421,9 @@ func draw_ability_bar_hud()->void:
 	if tutorial_should_show_ability_bar():
 		var active=heroes[selected];var keys=["Q","W","E","R","D"];var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
 		var visible_slots:Array=[0,4]
+		if active["class"]=="Monk":visible_slots=[0,1,2,4]
 		for ability_slot in [1,2,3]:
-			if TalentSystem.ability_is_unlocked(hero_level,ability_slot) and (ability_slot!=3 or str(active.get("selected_heroic_id",""))!=""):visible_slots.insert(visible_slots.size()-1,ability_slot)
+			if ability_slot not in visible_slots and TalentSystem.ability_is_unlocked(hero_level,ability_slot) and (ability_slot!=3 or str(active.get("selected_heroic_id",""))!=""):visible_slots.insert(visible_slots.size()-1,ability_slot)
 		for slot in visible_slots:
 			var center=Vector2(484+slot*78,674);var action_name:String=str(ABILITIES[active["class"]][slot]) if slot<4 else "Stoneform" if active["class"]=="Guardian" and GuardianSystem.has_talent(active,"guardian_l24_2") else str(TRAITS[active["class"]])
 			if slot<3 and selected<battle_hero_indices.size():
@@ -441,6 +449,8 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Druid":action_name=str(DruidData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Death Knight":action_name=str(DeathKnightData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Beastmaster":action_name=str(BeastmasterData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Monk":action_name=str(MonkData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==4 and active["class"]=="Monk":action_name=("%s Ally"%MonkSystem.ally_kind(active).capitalize()) if MonkSystem.ally_kind(active)!="" else "Unassigned"
 			elif slot==2 and active["class"]=="Death Knight" and bool(active.get("death_knight_runtime",{}).get("tempest",{}).get("active",false)):action_name="Turn Off"
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"

@@ -212,6 +212,24 @@ func combine_redirected_damage(primary:Dictionary,redirected:Dictionary)->Dictio
 	result["defeated"]=bool(primary.get("defeated",false));result["redirected_damage"]=float(redirected.get("resolved_damage",0.0));result["redirected_target_defeated"]=bool(redirected.get("defeated",false));result["shield_absorptions"]=primary.get("shield_absorptions",[])+redirected.get("shield_absorptions",[])
 	return result
 
+func resolve_monk_trait_shared(hero:Dictionary,target:Dictionary,result:Dictionary)->void:
+	var proc:=MonkSystem.note_basic_attack(hero,result)
+	if not bool(proc.get("triggered",false)):return
+	if float(proc.get("healing",0.0))>0.0:
+		var candidates:=player_healable_units().filter(func(ally):return float(ally.get("hp",0.0))>0.0 and Vector2(ally.pos).distance_to(Vector2(hero.pos))<=float(MonkData.SPACE.trait_radius))
+		candidates.sort_custom(func(a,b):var ar:=float(a.hp)/maxf(1.0,float(a.max_hp));var br:=float(b.hp)/maxf(1.0,float(b.max_hp));return str(a.combat_id)<str(b.combat_id) if is_equal_approx(ar,br) else ar<br)
+		if not candidates.is_empty():var healed:=deal_healing(hero,candidates[0],float(proc.healing),"trait","Transcendence","monk_transcendence",["healing"]);MonkSystem.telemetry_add(hero,"transcendence_healing",float(healed.effective_amount))
+	if float(proc.get("bonus_damage",0.0))>0.0 and float(target.get("hp",0.0))>0.0:
+		var bonus:=deal_damage(hero,target,float(proc.bonus_damage),"trait","physical","Iron Fists",false,"monk_iron_fists",[],false);MonkSystem.telemetry_add(hero,"iron_damage",float(bonus.resolved_damage))
+
+func resolve_monk_palm_shared(target:Dictionary)->float:
+	for monk in heroes:
+		if str(monk.get("class",""))!="Monk" or monk.get("monk_runtime",{}).is_empty():continue
+		var amount:=MonkSystem.consume_palm_for(monk,str(target.get("combat_id","")))
+		if amount>0.0:
+			var actual:=minf(amount,maxf(0.0,float(target.max_hp)-float(target.hp)));target.hp=float(target.hp)+actual;return actual
+	return 0.0
+
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var warrior_primary:bool=str(source.get("class",""))=="Warrior" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("warrior_runtime",{}).is_empty()
 	var death_knight_primary:bool=str(source.get("class",""))=="Death Knight" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("death_knight_runtime",{}).is_empty()
@@ -250,6 +268,9 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	for active_effect in source.get("active_effects",[]):
 		if float(active_effect.get("remaining_duration",0.0))>0.0:active_damage_multiplier=maxf(active_damage_multiplier,float(active_effect.get("damage_multiplier",1.0)))
 	var resolved_amount:=amount*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
+	if str(source.get("class",""))=="Monk" and source_action!="percentage_health" and not source.get("monk_runtime",{}).is_empty():
+		var monk_controlled:=MonkSystem.controlled_multiplier(source,target);resolved_amount*=monk_controlled
+		if monk_controlled>1.0:MonkSystem.telemetry_add(source,"controlled_damage",resolved_amount-amount)
 	if warrior_primary:resolved_amount=WarriorSystem.basic_attack_amount(source)*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier
 	if death_knight_primary:resolved_amount=DeathKnightSystem.basic_attack_amount(source)*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier
 	if source_action=="basic_attack":
@@ -302,6 +323,9 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll);var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
 		if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
+	if bool(result.get("defeated",false)) and str(target.get("combat_affiliation",target.get("combat_team","")))=="player":
+		var palm_restored:float=resolve_monk_palm_shared(target)
+		if palm_restored>0.0:result.defeated=false;result.overkill=0.0
 	if death_knight_primary:
 		DeathKnightSystem.note_primary_basic_attack(source,result)
 		if bool(death_knight_frost_plan.get("triggered",false)):
@@ -337,6 +361,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(source.get("class",""))=="Beastmaster" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("beastmaster_runtime",{}).is_empty():
 		var beastmaster_proc:=BeastmasterSystem.note_primary_attack(source,"beastmaster",str(target.get("combat_id","")),result)
 		if float(beastmaster_proc.get("hunted_bonus",0.0))>0.0:deal_damage(source,target,float(beastmaster_proc.hunted_bonus),"trait","physical","Hunted",false,"beastmaster_hunted_beastmaster",[],false)
+	if str(source.get("class",""))=="Monk" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("monk_runtime",{}).is_empty():resolve_monk_trait_shared(source,target,result)
 	if str(source.get("class",""))=="Druid" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("druid_runtime",{}).is_empty():DruidSystem.note_basic_attack(source,target,result,heroes)
 	if not huntsman_basic_result.is_empty():
 		HuntsmanSystem.resolve_basic_attack(source,float(result.get("resolved_damage",0.0)),bool(huntsman_basic_result.get("wizened",false)))

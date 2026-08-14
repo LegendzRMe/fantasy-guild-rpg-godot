@@ -169,6 +169,16 @@ func draw_combat_effect(fx:Dictionary)->void:
 			var nature_radius:=float(fx.get("radius",75.0));draw_circle(fx.from,nature_radius,Color(col,alpha*.07));draw_arc(fx.from,nature_radius,progress*TAU,progress*TAU+PI*1.6,52,col,5);draw_arc(fx.from,nature_radius*.68,-progress*TAU,-progress*TAU+PI*1.35,44,Color("c7ffc0",alpha),3)
 		"druid_treant","druid_treant_attack":
 			draw_line(fx.from,fx.to,Color("75a95f",alpha*.58),6);draw_circle(fx.to,14+progress*18,Color(col,alpha*.18));draw_arc(fx.to,18+progress*20,0,TAU,28,col,4)
+		"monk_dash_ally","monk_dash_enemy":
+			var monk_pos:Vector2=fx.from.lerp(fx.to,clampf(progress,0.0,1.0));draw_line(fx.from,monk_pos,Color(col,alpha*.38),10);draw_arc(monk_pos,16,progress*TAU,progress*TAU+PI*1.5,24,col,5)
+		"monk_breath":
+			var breath_radius:=float(fx.get("radius",100.0));draw_circle(fx.from,breath_radius,Color(col,alpha*.07));draw_arc(fx.from,breath_radius*clampf(progress*1.7,.1,1.0),0,TAU,52,col,5)
+		"monk_palm","monk_palm_trigger":
+			draw_circle(fx.to,28+progress*30,Color(col,alpha*.14));draw_arc(fx.to,32+progress*26,0,TAU,36,col,6);draw_line(fx.to+Vector2(-12,0),fx.to+Vector2(12,0),Color.WHITE,4);draw_line(fx.to+Vector2(0,-12),fx.to+Vector2(0,12),Color.WHITE,4)
+		"monk_seven_strike":
+			draw_line(fx.from,fx.to,Color(col,alpha*.6),5);draw_arc(fx.to,12+progress*20,0,TAU,24,Color.WHITE,4)
+		"monk_ally_spirit","monk_ally_earth","monk_ally_air":
+			var ally_radius:=float(fx.get("radius",120.0));draw_circle(fx.from,ally_radius,Color(col,alpha*.06));draw_arc(fx.from,ally_radius,0,TAU,48,col,4)
 		"slash":
 			draw_line(fx.to+Vector2(-22,-18),fx.to+Vector2(22,18),col,7);draw_line(fx.to+Vector2(-16,22),fx.to+Vector2(18,-16),Color.WHITE,3)
 		"hit":
@@ -187,7 +197,7 @@ func draw_role_icon(pos:Vector2,hero_class:String,ink:Color=Color("101827"))->vo
 	if hero_class in ["Guardian","Templar","Protector"]:
 		var shield=PackedVector2Array([pos+Vector2(-11,-13),pos+Vector2(11,-13),pos+Vector2(9,5),pos+Vector2(0,15),pos+Vector2(-9,5)])
 		draw_colored_polygon(shield,ink);draw_polyline(shield+PackedVector2Array([shield[0]]),Color.WHITE,2)
-	elif hero_class in ["Cleric","Priest"]:
+	elif hero_class in ["Cleric","Priest","Monk"]:
 		draw_rect(Rect2(pos+Vector2(-5,-15),Vector2(10,30)),ink);draw_rect(Rect2(pos+Vector2(-15,-5),Vector2(30,10)),ink)
 	elif hero_class=="Mage":
 		draw_line(pos+Vector2(-11,13),pos+Vector2(8,-8),ink,5);draw_circle(pos+Vector2(11,-11),6,ink);draw_circle(pos+Vector2(11,-11),2,Color.WHITE)
