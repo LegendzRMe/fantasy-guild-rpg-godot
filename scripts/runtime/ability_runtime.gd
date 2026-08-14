@@ -1,4 +1,4 @@
-extends "res://scripts/runtime/paladin_runtime.gd"
+extends "res://scripts/runtime/crusader_runtime.gd"
 
 func clamped_cast_point(hero:Dictionary,point:Vector2,range_limit:float)->Vector2:
 	if range_limit<=0:return hero.pos
@@ -20,9 +20,10 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 	var beastmaster_trait_input:bool=str(h.get("class",""))=="Beastmaster" and slot==4
 	var monk_trait_input:bool=str(h.get("class",""))=="Monk" and slot==4
 	var paladin_trait_input:bool=str(h.get("class",""))=="Paladin" and slot==4
-	if not protector_trait_input and not sentinel_trait_input and not druid_trait_input and not warrior_trait_input and not death_knight_trait_input and not beastmaster_trait_input and not monk_trait_input and not paladin_trait_input and not TalentSystem.ability_is_unlocked(int(state.heroes[battle_hero_indices[selected]].level),slot):return
+	var crusader_trait_input:bool=str(h.get("class",""))=="Crusader" and slot==4
+	if not protector_trait_input and not sentinel_trait_input and not druid_trait_input and not warrior_trait_input and not death_knight_trait_input and not beastmaster_trait_input and not monk_trait_input and not paladin_trait_input and not crusader_trait_input and not TalentSystem.ability_is_unlocked(int(state.heroes[battle_hero_indices[selected]].level),slot):return
 	var ability_enemy_target:int=combat_enemy_target()
-	if slot>=4 and h["class"] not in ["Protector","Sentinel","Druid","Warrior","Death Knight","Beastmaster","Monk","Paladin"]:return
+	if slot>=4 and h["class"] not in ["Protector","Sentinel","Druid","Warrior","Death Knight","Beastmaster","Monk","Paladin","Crusader"]:return
 	if h.hp<=0:return
 	if not item_repeat:
 		if h["class"]=="Protector" and slot==0 and not h.get("protector_runtime",{}).get("q_sequence",{}).is_empty():pass
@@ -35,6 +36,7 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 		elif h["class"]=="Beastmaster" and slot==4 and beastmaster_trait_input:pass
 		elif h["class"]=="Monk" and slot==4 and monk_trait_input:pass
 		elif h["class"]=="Paladin" and slot==4 and paladin_trait_input:pass
+		elif h["class"]=="Crusader" and slot==4 and crusader_trait_input:pass
 		elif h["class"]=="Monk" and slot in [1,2]:return
 		elif h["class"]=="Monk" and slot==0:
 			if not AbilitySlotSystem.can_activate(h.monk_runtime.q_slot):return
@@ -111,6 +113,9 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 		return
 	if h["class"]=="Paladin":
 		cast_paladin_ability(slot,cast_position)
+		return
+	if h["class"]=="Crusader":
+		cast_crusader_ability(slot,cast_position)
 		return
 	var ability_range=float(ABILITY_RANGES[h["class"]][slot])
 	var resolved_point=clamped_cast_point(h,cast_position,ability_range) if ability_range>0 else h.pos

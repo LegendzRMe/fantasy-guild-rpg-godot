@@ -102,6 +102,7 @@ func active_movement_multiplier(unit:Dictionary)->float:
 	if str(unit.get("class",""))=="Beastmaster" and float(unit.get("beastmaster_runtime",{}).get("thrill_remaining",0.0))>0.0:multiplier*=1.0+float(BeastmasterData.VALUES.thrill_speed)
 	if str(unit.get("class",""))=="Monk" and float(unit.get("monk_runtime",{}).get("trait_speed_remaining",0.0))>0.0:multiplier*=1.0+float(MonkData.VALUES.trait_speed)
 	if str(unit.get("class",""))=="Paladin" and not unit.get("paladin_runtime",{}).is_empty():multiplier*=PaladinSystem.charge_movement_multiplier(unit)
+	if str(unit.get("class",""))=="Crusader" and not unit.get("crusader_runtime",{}).is_empty():multiplier*=CrusaderSystem.movement_multiplier(unit)
 	if str(unit.get("beast_category",""))=="misha":
 		var beastmaster=unit_by_combat_id(str(unit.get("owner_id","")))
 		if beastmaster!=null and float(beastmaster.get("beastmaster_runtime",{}).get("thrill_remaining",0.0))>0.0:multiplier*=1.0+float(BeastmasterData.VALUES.thrill_speed)
@@ -208,6 +209,7 @@ func release_basic_action(unit:Dictionary)->void:
 	else:
 		var damage_result:Dictionary=call("deal_damage",unit,target,float(unit.get("damage",0.0)),"basic_attack",str(unit.get("basic_attack_damage_type","physical")),"basic_attack");apply_hit_nudge(unit,target);call("add_effect","slash",unit.pos,target.pos,"-%d"%int(damage_result.resolved_damage),CLASSES.get(str(unit.get("class","Guardian")),{"color":C_TEXT}).color)
 		if str(unit.get("class",""))=="Paladin" and not unit.get("paladin_runtime",{}).is_empty():call("resolve_paladin_basic_attack",unit,target,damage_result)
+		if str(unit.get("class",""))=="Crusader" and not unit.get("crusader_runtime",{}).is_empty():call("resolve_crusader_basic_attack",unit,target,damage_result)
 
 func idle_defense_target(hero:Dictionary):
 	var preferred=null;var closest=null;var closest_distance:=CombatRulesV1.IDLE_MELEE_DEFENSE_RADIUS
@@ -235,12 +237,14 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 	if bool(hero.get("spirit_form",false)):
 		if int(hero.get("command_state",CombatRulesV1.CommandState.IDLE))==CombatRulesV1.CommandState.MOVE:
 			var spirit_before:Vector2=hero.pos
-			hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*active_movement_multiplier(hero)*delta,42.0,combat_blockers,str(hero.get("combat_id","")))
+			var movement_blockers:Array=[] if str(hero.get("class",""))=="Crusader" and not hero.get("crusader_runtime",{}).get("falling",{}).is_empty() else combat_blockers
+			hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*active_movement_multiplier(hero)*delta,42.0,movement_blockers,str(hero.get("combat_id","")))
 			hero.dest=hero.move_destination
 			if hero.pos.distance_to(hero.move_destination)<=4.0:hero.command_state=CombatRulesV1.CommandState.IDLE;hero.dest=hero.pos
 			elif hero.pos!=spirit_before:hero.facing_direction=spirit_before.direction_to(hero.pos)
 		return
 	if str(hero.get("class",""))=="Warlock" and float(hero.get("warlock_runtime",{}).get("banished_remaining",0.0))>0.0:return
+	var crusader_airborne:bool=str(hero.get("class",""))=="Crusader" and not hero.get("crusader_runtime",{}).get("falling",{}).is_empty()
 	var fear_effects:Array=hero.get("active_effects",[]).filter(func(effect):return str(effect.get("control_type",""))=="fear" and float(effect.get("remaining_duration",0.0))>0.0)
 	if not fear_effects.is_empty():
 		var origin:=Vector2(hero.get("fear_origin",hero.pos-hero.facing_direction));var away:=origin.direction_to(hero.pos)
@@ -248,7 +252,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 		hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.pos+away*100.0,float(hero.movement_speed)*delta,42.0,combat_blockers,str(hero.get("combat_id","")));return
 	update_unit_casts(hero,delta)
 	if int(hero.command_state) in [CombatRulesV1.CommandState.CAST,CombatRulesV1.CommandState.CHANNEL]:return
-	var phase_event:=CombatRulesV1.advance_basic_action(hero,delta,battle_time)
+	var phase_event:="" if crusader_airborne else CombatRulesV1.advance_basic_action(hero,delta,battle_time)
 	if phase_event=="release":release_basic_action(hero)
 	if bool(hero.get("independent",false)) and int(hero.command_state)==CombatRulesV1.CommandState.IDLE:
 		var automatic_enemy_index:int=-1;var automatic_distance:float=INF
@@ -256,7 +260,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 			if enemies[enemy_index].hp>0 and hero.pos.distance_to(enemies[enemy_index].pos)<automatic_distance:automatic_enemy_index=enemy_index;automatic_distance=hero.pos.distance_to(enemies[enemy_index].pos)
 		if automatic_enemy_index>=0:assign_hero_enemy(int(hero.get("battle_index",heroes.find(hero))),automatic_enemy_index)
 	if int(hero.command_state)==CombatRulesV1.CommandState.MOVE:
-		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers,str(hero.get("combat_id","")));hero.dest=hero.move_destination
+		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);var movement_blockers:Array=[] if str(hero.get("class",""))=="Crusader" and not hero.get("crusader_runtime",{}).get("falling",{}).is_empty() else combat_blockers;hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,movement_blockers,str(hero.get("combat_id","")));hero.dest=hero.move_destination
 		if hero.pos.distance_to(hero.move_destination)<=4.0:hero.command_state=CombatRulesV1.CommandState.IDLE;hero.dest=hero.pos
 		elif hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"movement path blocked")
 		else:hero.path_failure_timer=0.0;hero.facing_direction=before.direction_to(hero.pos)

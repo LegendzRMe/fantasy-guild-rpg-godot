@@ -187,6 +187,10 @@ func draw_combat_debug_overlay()->void:
 	if str(hero.get("class",""))=="Monk" and not hero.get("monk_runtime",{}).is_empty():
 		var monk:Dictionary=hero.monk_runtime;var monk_q:=MonkSystem.q_state(hero);var ally_state:="NONE" if monk.ally.is_empty() else "%s %.0f/%.0f %.1fs"%[str(monk.ally.ally_kind).to_upper(),float(monk.ally.hp),float(monk.ally.max_hp),float(monk.ally.remaining_duration)]
 		lines.append("Q %d/%d  %.1f  W/E %.1f/%.1f"%[int(monk_q.charges),int(monk_q.max_charges),float(monk_q.recharge),float(monk.breath_cooldown),float(monk.reach_cooldown)]);lines.append("REACH %.1f  THIRD %d  SPEED %.1f"%[float(monk.reach_remaining),int(monk.third_counter),float(monk.trait_speed_remaining)]);lines.append("INSIGHT %d/100 %s"%[int(monk.insight_progress),"DONE" if bool(monk.insight_complete) else ""]);lines.append("ALLY %s  D %.1f  AURA %s"%[ally_state,float(monk.ally_cooldown),str(monk.ally_aura_recipients)]);lines.append("PALM %s  SEVEN %s  ECHOES %d"%[str(monk.palm),str(monk.seven),monk.echoes.size()]);lines.append("STORM %.1f  EPIPHANY %.1f"%[float(monk.storm_icd),float(monk.epiphany_icd)]);lines.append("TELEMETRY %s"%str(monk.telemetry))
+	if str(hero.get("class",""))=="Crusader" and not hero.get("crusader_runtime",{}).is_empty():
+		var crusader:Dictionary=hero.crusader_runtime;var glare:=AbilitySlotSystem.ui_state(crusader.e_slot)
+		lines.append("HEROIC %s  R %.1f"%[str(CrusaderData.WORKING_NAMES.get(str(hero.selected_heroic_id),hero.selected_heroic_id)),float(hero.ability_cds[3])])
+		lines.append("LEVEL %d  HP %.0f/%.0f  BA %.1f/%.2f  THREAT x%.1f"%[int(hero.level),float(hero.hp),float(hero.max_hp),float(hero.damage),float(hero.basic_attack_interval),float(hero.threat_modifier)]);lines.append("Q/W/E/D %.1f/%.1f/%.1f/%.1f"%[float(hero.ability_cds[0]),float(hero.ability_cds[1]),float(hero.ability_cds[2]),float(hero.ability_cds[4])]);lines.append("W PREP %s  E %d/%d %.1f"%[str(crusader.condemn),int(glare.charges),int(glare.max_charges),float(glare.recharge)]);lines.append("IRON %s %.0f/%.0f %.1fs UNSTOP %s"%["ON" if bool(crusader.iron_skin.active) else "OFF",float(crusader.iron_skin.current),float(crusader.iron_skin.maximum),float(crusader.iron_skin.remaining),StatusEffectSystem.is_unstoppable(hero)]);lines.append("FORTRESS %d  LAWS %.1f  SUBDUE %s"%[int(crusader.fortress_stacks),float(crusader.laws.remaining),str(crusader.subdue_complete)]);lines.append("MARKS %d  CONDEMNED %s  SINS %s"%[crusader.eternal_marks.size(),str(crusader.condemned),str(crusader.sins)]);lines.append("FURY %d/%.1f  AUTH %s  MIT %.0f%%"%[int(crusader.holy_fury_stacks),float(crusader.holy_fury_remaining),str(crusader.authority),IncomingDamageReductionSystem.strongest(hero)*100.0]);lines.append("LIGHT %.1f  INDEST %.1f  FALLING %s"%[float(crusader.light_icd),float(crusader.indestructible_icd),str(crusader.falling)]);lines.append("TALENTS %s"%str(hero.get("selected_talents",{}).values()));lines.append("TELEMETRY %s"%str(crusader.telemetry))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])
@@ -333,6 +337,10 @@ func draw_combat_heroes() -> void:
 			if HuntsmanSystem.is_worgen(h):draw_colored_polygon(PackedVector2Array([h.pos+Vector2(-28,-35),h.pos+Vector2(-17,-61),h.pos+Vector2(-4,-37)]),Color(CLASSES.Huntsman.color,.82));draw_colored_polygon(PackedVector2Array([h.pos+Vector2(28,-35),h.pos+Vector2(17,-61),h.pos+Vector2(4,-37)]),Color(CLASSES.Huntsman.color,.82))
 			else:draw_arc(h.pos,54,-PI*.85,-PI*.15,18,Color("d8c29d"),4)
 			if float(h.huntsman_runtime.inner_beast_remaining)>0.0:draw_arc(h.pos,58,battle_time*2.5,battle_time*2.5+PI*1.55,36,Color(CLASSES.Huntsman.color,.85),4)
+		if not victory_sequence and str(h.get("class",""))=="Crusader" and not h.get("crusader_runtime",{}).is_empty():
+			if bool(h.crusader_runtime.iron_skin.active):var ratio:=float(h.crusader_runtime.iron_skin.current)/maxf(1.0,float(h.crusader_runtime.iron_skin.maximum));draw_arc(h.pos,59,-PI/2.0,-PI/2.0+TAU*ratio,40,Color("ffe39a"),5)
+			if not h.crusader_runtime.condemn.is_empty():var buildup:=1.0-float(h.crusader_runtime.condemn.remaining)/float(CrusaderData.VALUES.w_delay);draw_circle(h.pos,float(CrusaderData.SPACE.condemn_radius),Color(CLASSES.Crusader.color,.035+.06*buildup));draw_arc(h.pos,float(CrusaderData.SPACE.condemn_radius),0,TAU,64,Color(CLASSES.Crusader.color,.5+.4*buildup),2.0+3.0*buildup)
+			if not h.crusader_runtime.falling.is_empty():draw_circle(h.pos,float(CrusaderData.SPACE.falling_radius),Color(CLASSES.Crusader.color,.10));draw_arc(h.pos,float(CrusaderData.SPACE.falling_radius),0,TAU,48,Color("fff2b0"),4)
 		if not victory_sequence:draw_hero_channel_bar(h)
 		if not victory_sequence and str(h.get("class",""))=="Rogue" and not h.get("rogue_runtime",{}).is_empty():
 			var point_count:int=ComboPointSystem.current(h);var point_max:int=ComboPointSystem.maximum(h);var pip_start:float=float(h.pos.x)-(point_max-1)*7.0
@@ -368,6 +376,11 @@ func draw_combat_input_preview() -> void:
 				draw_arc(aiming_hero.pos,float(PaladinData.SPACE.hammer_reach),facing.angle()-float(PaladinData.SPACE.hammer_half_angle),facing.angle()+float(PaladinData.SPACE.hammer_half_angle),24,preview_color,2.0+charge_ratio*3.0)
 			elif aimed_ability_slot==2:
 				var leap_range:=lerpf(float(PaladinData.SPACE.avenging_min),float(PaladinData.SPACE.avenging_max),charge_ratio);var direction:=Vector2(aiming_hero.pos).direction_to(aim_point);var landing:=Vector2(aiming_hero.pos)+direction*leap_range;draw_dashed_line(aiming_hero.pos,landing,preview_color,10,6);draw_circle(landing,float(PaladinData.SPACE.avenging_radius),Color(preview_color,.10));draw_arc(landing,float(PaladinData.SPACE.avenging_radius),0,TAU,48,preview_color,3)
+		if str(aiming_hero.get("class",""))=="Crusader":
+			var facing:=Vector2(aiming_hero.pos).direction_to(aim_point);if facing==Vector2.ZERO:facing=Vector2(aiming_hero.facing_direction)
+			if aimed_ability_slot==0:draw_arc(aiming_hero.pos,float(CrusaderData.SPACE.punish_radius),facing.angle()-float(CrusaderData.SPACE.punish_half_angle),facing.angle()+float(CrusaderData.SPACE.punish_half_angle),36,Color(CLASSES.Crusader.color,.8),3)
+			elif aimed_ability_slot==2:draw_arc(aiming_hero.pos,float(CrusaderData.SPACE.glare_range),facing.angle()-float(CrusaderData.SPACE.glare_half_angle),facing.angle()+float(CrusaderData.SPACE.glare_half_angle),30,Color("fff2b0"),3)
+			elif aimed_ability_slot==3:draw_circle(aim_point,float(CrusaderData.SPACE.falling_radius),Color(CLASSES.Crusader.color,.10));draw_arc(aim_point,float(CrusaderData.SPACE.falling_radius),0,TAU,48,Color("fff2b0"),3)
 		if range_limit>0:draw_circle(aiming_hero.pos,range_limit,Color(C_GOLD,.035));draw_arc(aiming_hero.pos,range_limit,0,TAU,64,Color(C_GOLD,.55),2)
 		if aimed_ability_category=="ground":
 			var ground_radius:=MageSystem.flamestrike_radius(aiming_hero,MageSystem.trait_is_armed(aiming_hero)) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==0 else float(MageData.SPACE.pyro_splash_radius) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==3 else 30.0
@@ -462,6 +475,7 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Monk":action_name=str(MonkData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==4 and active["class"]=="Monk":action_name=("%s Ally"%MonkSystem.ally_kind(active).capitalize()) if MonkSystem.ally_kind(active)!="" else "Unassigned"
 			elif slot==3 and active["class"]=="Paladin":action_name=str(PaladinData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Crusader":action_name=str(CrusaderData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==2 and active["class"]=="Death Knight" and bool(active.get("death_knight_runtime",{}).get("tempest",{}).get("active",false)):action_name="Turn Off"
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"
@@ -482,13 +496,15 @@ func draw_ability_bar_hud()->void:
 			var sentinel_trait_active:bool=slot==4 and str(active.get("class",""))=="Sentinel" and float(active.get("sentinel_runtime",{}).get("mark_remaining",0.0))>0.0
 			var huntsman_trait_active:bool=slot==4 and str(active.get("class",""))=="Huntsman" and HuntsmanSystem.is_worgen(active)
 			var paladin_purpose_primed:bool=slot==4 and str(active.get("class",""))=="Paladin" and bool(active.get("paladin_runtime",{}).get("divine_purpose_primed",false))
-			var highlighted_state:bool=cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active or protector_trait_active or sentinel_trait_active or huntsman_trait_active or paladin_purpose_primed
+			var crusader_iron_active:bool=slot==4 and str(active.get("class",""))=="Crusader" and bool(active.get("crusader_runtime",{}).get("iron_skin",{}).get("active",false))
+			var highlighted_state:bool=cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active or protector_trait_active or sentinel_trait_active or huntsman_trait_active or paladin_purpose_primed or crusader_iron_active
 			if highlighted_state:
 				var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 				draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
 			draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
 			if active["class"]=="Paladin" and slot in [0,1,2] and not active.get("paladin_runtime",{}).is_empty() and bool(active.paladin_runtime.charge.active) and int(active.paladin_runtime.charge.slot)==slot:
 				var charge_ratio:=ChargedCastSystem.percentage(active.paladin_runtime.charge);draw_octagon_vertical_fill(center,34,charge_ratio,Color("f4ce62",.72));draw_string(ThemeDB.fallback_font,center+Vector2(-23,-19),"MAX" if charge_ratio>=1.0 else "%d%%"%int(charge_ratio*100.0),HORIZONTAL_ALIGNMENT_CENTER,46,10,Color.WHITE)
+			if active["class"]=="Crusader" and slot==2 and not active.get("crusader_runtime",{}).is_empty():var glare:=AbilitySlotSystem.ui_state(active.crusader_runtime.e_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[glare.charges,glare.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 			if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
 			if frostwolf_ratio>0.0:draw_octagon_vertical_fill(center,34,frostwolf_ratio,Color(CLASSES["Shaman"].color,.68))
 			if not warlock_trait_state.is_empty() and not warlock_darkness_armed:

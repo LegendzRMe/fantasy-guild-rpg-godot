@@ -165,7 +165,7 @@ func finalize_damage_events(source:Dictionary,target:Dictionary,result:Dictionar
 		if event.event_type=="damage_taken":apply_passive_trigger(target,event,target)
 		elif event.event_type in ["basic_attack_hit","direct_damage_dealt","periodic_damage_dealt","critical_result"]:apply_passive_trigger(source,event,target)
 	var enemy_index:int=enemies.find(target);var source_index:int=int(source.get("battle_index",-1))
-	if enemy_index>=0 and source_index>=0:add_damage_threat(target,source_index,float(result.get("resolved_damage",0.0)))
+	if enemy_index>=0 and source_index>=0:add_damage_threat(target,source_index,float(result.get("resolved_damage",0.0)),source_action)
 	if enemy_index>=0:templar_redirect_threat(source,target,float(result.get("resolved_damage",0.0)))
 	var living_enemy_count:int=enemies.filter(func(enemy):return enemy.hp>0 and not bool(enemy.get("ignores_tank_aggro",false))).size()
 	for absorption in result.get("shield_absorptions",[]):
@@ -323,12 +323,16 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	var before_ratio:float=float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))
 	var damage_request:=build_damage_request(target,resolved_amount,source_action,damage_type,can_crit_override,hostile)
 	var previews_mage_barrier:bool=str(target.get("class",""))=="Mage" and not target.get("mage_runtime",{}).is_empty() and str(source.get("combat_team",""))!=str(target.get("combat_team",""))
+	var previews_crusader_indestructible:bool=hostile and str(target.get("class",""))=="Crusader" and not target.get("crusader_runtime",{}).is_empty() and CrusaderSystem.has_talent(target,"crusader_l30_1") and float(target.crusader_runtime.indestructible_icd)<=0.0
 	var resolution_roll:=-1.0
-	if previews_mage_barrier:
+	if previews_mage_barrier or previews_crusader_indestructible:
 		resolution_roll=randf()
-		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll);var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
-		if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
-	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
+		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll)
+		if previews_mage_barrier:
+			var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
+			if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
+		if previews_crusader_indestructible and CrusaderSystem.try_indestructible(target,bool(preview.get("defeated",false))):apply_unit_shield(target,target,float(target.max_hp)*float(CrusaderData.VALUES.indestructible_fraction),"Indestructible","crusader_indestructible:%s"%str(target.combat_id),INF,float(CrusaderData.VALUES.indestructible_duration));damage_request.amount=0.0
+	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier or previews_crusader_indestructible else CombatSystem.resolve_damage(source,target,damage_request)
 	if bool(result.get("defeated",false)) and str(target.get("combat_affiliation",target.get("combat_team","")))=="player":
 		var palm_restored:float=resolve_monk_palm_shared(target)
 		if palm_restored>0.0:result.defeated=false;result.overkill=0.0
@@ -368,6 +372,13 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var beastmaster_proc:=BeastmasterSystem.note_primary_attack(source,"beastmaster",str(target.get("combat_id","")),result)
 		if float(beastmaster_proc.get("hunted_bonus",0.0))>0.0:deal_damage(source,target,float(beastmaster_proc.hunted_bonus),"trait","physical","Hunted",false,"beastmaster_hunted_beastmaster",[],false)
 	if str(source.get("class",""))=="Monk" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("monk_runtime",{}).is_empty():resolve_monk_trait_shared(source,target,result)
+	if str(target.get("class",""))=="Crusader" and not target.get("crusader_runtime",{}).is_empty():
+		var shrinking:Array=target.get("active_effects",[]).filter(func(effect):return str(effect.get("source_id",""))=="crusader_shrinking:%s"%str(target.combat_id))
+		if hostile and not shrinking.is_empty():var prevented:=resolved_amount*float(shrinking[0].get("amount",0.0));CrusaderSystem.add(target,"shrinking_mitigation",prevented);CrusaderSystem.add(target,"damage_prevented",prevented)
+		for absorption in result.get("shield_absorptions",[]):
+			var absorbed:=float(absorption.get("amount",0.0));CrusaderSystem.add(target,"shield_absorbed",absorbed)
+			if str(absorption.get("source_id",""))=="crusader_indestructible:%s"%str(target.combat_id):CrusaderSystem.add(target,"indestructible_absorbed",absorbed)
+		call("crusader_sync_iron",target)
 	if str(source.get("class",""))=="Druid" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("druid_runtime",{}).is_empty():DruidSystem.note_basic_attack(source,target,result,heroes)
 	if not huntsman_basic_result.is_empty():
 		HuntsmanSystem.resolve_basic_attack(source,float(result.get("resolved_damage",0.0)),bool(huntsman_basic_result.get("wizened",false)))
@@ -581,9 +592,10 @@ func add_enemy_threat(enemy:Dictionary,hero_index:int,amount:float) -> void:
 	threat_table[hero_index]=float(threat_table.get(hero_index,0.0))+amount
 	enemy.threat=threat_table
 
-func add_damage_threat(enemy:Dictionary,hero_index:int,damage_dealt:float) -> void:
-	if damage_dealt<=0:return
-	add_enemy_threat(enemy,hero_index,damage_dealt*CombatSystem.DAMAGE_THREAT_RATIO*float(heroes[hero_index].get("threat_modifier",1.0)))
+func add_damage_threat(enemy:Dictionary,hero_index:int,damage_dealt:float,source_action:String="") -> void:
+	if damage_dealt<=0 or hero_index<0 or hero_index>=heroes.size():return
+	var source:Dictionary=heroes[hero_index];var multiplier:=CrusaderSystem.authority_multiplier(source,str(enemy.get("combat_id",""))) if str(source.get("class",""))=="Crusader" and not source.get("crusader_runtime",{}).is_empty() else 1.0;var normal:=damage_dealt*CombatSystem.DAMAGE_THREAT_RATIO*float(source.get("threat_modifier",1.0));add_enemy_threat(enemy,hero_index,normal*multiplier)
+	if str(source.get("class",""))=="Crusader":CrusaderSystem.add(source,"normal_threat",normal);if source_action=="basic_ability" and int(source.crusader_runtime.latest_contacts.values().max())>=2:CrusaderSystem.add(source,"multi_target_threat",normal*multiplier);if multiplier>1.0:CrusaderSystem.add(source,"authority_bonus_threat",normal*(multiplier-1.0))
 
 func add_healing_threat(healer_index:int,effective_healing:float) -> void:
 	if effective_healing<=0:return

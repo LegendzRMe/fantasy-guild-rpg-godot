@@ -542,6 +542,9 @@ func begin_trait()->void:
 	elif str(hero.get("class",""))=="Paladin":
 		use_ability(4,hero.pos)
 		queue_redraw()
+	elif str(hero.get("class",""))=="Crusader":
+		use_ability(4,hero.pos)
+		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false

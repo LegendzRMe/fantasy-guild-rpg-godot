@@ -26,7 +26,7 @@ static func is_blinded(unit:Dictionary)->bool:
 	return has_effect(unit, "blind")
 
 static func is_unstoppable(unit:Dictionary)->bool:
-	return has_effect(unit, "unstoppable")
+	return unit.get("active_effects", []).any(func(effect):return (str(effect.get("id", "")) == "unstoppable" or str(effect.get("effect_family", "")) == "unstoppable") and float(effect.get("remaining_duration", 0.0)) > 0.0)
 
 static func is_protected(unit:Dictionary)->bool:
 	return has_effect(unit, "protected") or has_effect(unit, "invulnerable")
@@ -73,6 +73,15 @@ static func apply_unstoppable(unit:Dictionary,duration:float)->Dictionary:
 		"id":"unstoppable", "remaining_duration":maxf(0.0, duration)
 	})
 	return {"applied":duration > 0.0, "duration":maxf(0.0, duration), "removed":removed}
+
+static func apply_source_unstoppable(unit:Dictionary,source_id:String,duration:float)->Dictionary:
+	var removed:=remove_removable_controls(unit);var effect_id:="unstoppable:%s"%source_id
+	unit["active_effects"]=unit.get("active_effects",[]).filter(func(effect):return str(effect.get("id",""))!=effect_id)
+	unit.active_effects.append({"id":effect_id,"effect_family":"unstoppable","source_id":source_id,"remaining_duration":maxf(0.0,duration)})
+	return {"applied":duration>0.0,"duration":maxf(0.0,duration),"removed":removed}
+
+static func remove_source_unstoppable(unit:Dictionary,source_id:String)->void:
+	unit["active_effects"]=unit.get("active_effects",[]).filter(func(effect):return not (str(effect.get("effect_family",""))=="unstoppable" and str(effect.get("source_id",""))==source_id))
 
 static func strongest_refresh(active_effects:Array,effect:Dictionary)->Array:
 	var next := active_effects.duplicate(true)
