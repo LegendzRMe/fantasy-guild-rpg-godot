@@ -347,6 +347,7 @@ func draw_combat_input_preview() -> void:
 		var preview_pos=drag_cursor
 		if drag_target_type=="enemy" and drag_target_index>=0 and drag_target_index<enemies.size():preview_pos=enemies[drag_target_index].pos
 		elif drag_target_type=="ally" and drag_target_index>=0 and drag_target_index<heroes.size():preview_pos=heroes[drag_target_index].pos
+		elif drag_target_type=="ally_companion" and drag_target_index>=0 and drag_target_index<heroes.size():preview_pos=heroes[drag_target_index].beastmaster_runtime.misha.pos
 		draw_circle(preview_pos,42,Color(preview_color,.14));draw_arc(preview_pos,42,0,TAU,40,preview_color,4)
 	if ability_aiming and selected<heroes.size():
 		var aiming_hero=heroes[selected];var range_limit=float(ABILITY_RANGES[aiming_hero["class"]][aimed_ability_slot]);var aim_point=clamped_cast_point(aiming_hero,ability_aim_point,range_limit) if range_limit>0 else aiming_hero.pos

@@ -76,6 +76,12 @@ func assign_hero_ally(hero_index:int,ally_index:int)->void:
 	heroes[hero_index].heal_target=ally_index;heroes[hero_index].target=-1;heroes[hero_index].dest=heroes[hero_index].pos
 	if str(heroes[hero_index].get("class",""))=="Druid" and not heroes[hero_index].get("druid_runtime",{}).is_empty():DruidSystem.designate_basic_healing_target(heroes[hero_index],heroes[ally_index])
 
+func assign_hero_ally_unit(hero_index:int,ally:Dictionary)->void:
+	if hero_index<0 or hero_index>=heroes.size() or ally.is_empty() or not BeastmasterSystem.ordinary_heal_eligible(ally) or float(ally.get("hp",0.0))<=0.0:return
+	ensure_combat_runtime_fields(heroes[hero_index],"hero:%d"%hero_index,"player")
+	CombatRulesV1.assign_target(heroes[hero_index],str(ally.get("combat_id","")),"ally");heroes[hero_index].heal_target=-1;heroes[hero_index].target=-1;heroes[hero_index].dest=heroes[hero_index].pos
+	if str(heroes[hero_index].get("class",""))=="Druid" and not heroes[hero_index].get("druid_runtime",{}).is_empty():DruidSystem.designate_basic_healing_target(heroes[hero_index],ally)
+
 func clear_hero_command(hero:Dictionary,reason:String="")->void:
 	CombatRulesV1.clear_assignment(hero,reason);hero.target=-1;hero.heal_target=-1;hero.dest=hero.pos
 

@@ -66,10 +66,12 @@ func cast_beastmaster_ability(slot:int,point:Vector2,_item_repeat:bool=false)->b
 	return false
 
 func beastmaster_attack(hero:Dictionary,beast:Dictionary,target:Dictionary,kind:String)->void:
+	var attack_speed_reduction:=clampf(CombatSystem.control_amount(beast,"attack_speed"),0.0,.9)
+	if CombatSystem.is_blinded(beast):beast.attack_cooldown=float(beast.attack_interval)/maxf(.1,1.0-attack_speed_reduction);beastmaster_visual("beastmaster_%s_miss"%kind,beast.pos,target.pos,.2);return
 	var amount:=float(beast.damage)
 	if kind=="misha":var base_amount:=amount;amount*=BeastmasterSystem.misha_damage_multiplier(hero,str(target.combat_id));BeastmasterSystem.telemetry_add(hero,"bestial_damage",maxf(0.0,amount-base_amount) if float(hero.beastmaster_runtime.bestial_remaining)>0.0 else 0.0)
 	elif kind=="lesser":amount*=BeastmasterSystem.chain_multiplier(hero,beast)
-	var result:=deal_damage(hero,target,amount,"basic_attack","physical","Misha Basic Attack" if kind=="misha" else "%s Beast Basic Attack"%kind.capitalize(),true,"beastmaster_%s_attack"%kind,[],false);beast.attack_cooldown=float(beast.attack_interval);var proc:=BeastmasterSystem.note_primary_attack(hero,kind,str(target.combat_id),result)
+	var result:=deal_damage(hero,target,amount,"basic_attack","physical","Misha Basic Attack" if kind=="misha" else "%s Beast Basic Attack"%kind.capitalize(),true,"beastmaster_%s_attack"%kind,[],false);beast.attack_cooldown=float(beast.attack_interval)/maxf(.1,1.0-attack_speed_reduction);var proc:=BeastmasterSystem.note_primary_attack(hero,kind,str(target.combat_id),result)
 	if float(proc.get("hunted_bonus",0.0))>0.0:deal_damage(hero,target,float(proc.hunted_bonus),"trait","physical","Hunted",true,"beastmaster_hunted_%s"%kind,[],false)
 	if kind=="misha":BeastmasterSystem.spirit_bond_heal(hero,float(result.resolved_damage))
 	else:BeastmasterSystem.telemetry_add(hero,"%s_attacks"%kind);BeastmasterSystem.telemetry_add(hero,"%s_damage"%kind,float(result.resolved_damage))
@@ -77,17 +79,22 @@ func beastmaster_attack(hero:Dictionary,beast:Dictionary,target:Dictionary,kind:
 
 func update_beast_ai(hero:Dictionary,beast:Dictionary,kind:String,delta:float)->void:
 	if float(beast.hp)<=0.0:return
+	if CombatSystem.is_stunned(beast):return
+	if CombatSystem.is_feared(beast):
+		var fear_origin:=Vector2(beast.get("fear_origin",hero.pos));var away:=fear_origin.direction_to(Vector2(beast.pos));if away==Vector2.ZERO:away=Vector2.RIGHT
+		beast.pos=CombatGeometry.move_toward_safe(beast.pos,Vector2(beast.pos)+away*100.0,float(beast.movement_speed)*delta,float(beast.combat_radius),combat_blockers);return
 	var target=beastmaster_target_by_id(str(beast.get("priority_target_id",beast.get("target_id",""))))
 	var leash:=float(BeastmasterData.SPACE.misha_leash if kind=="misha" else BeastmasterData.SPACE.pack_commander_leash)
-	if Vector2(beast.pos).distance_to(Vector2(hero.pos))>leash:beast.target_id="";beast.priority_target_id="";beast.pos=CombatGeometry.move_toward_safe(beast.pos,hero.pos,float(beast.movement_speed)*delta,float(beast.combat_radius),combat_blockers);return
+	var rooted:=StatusEffectSystem.has_control(beast,"root");var slow_multiplier:=1.0-clampf(CombatSystem.control_amount(beast,"slow"),0.0,.95)
+	if Vector2(beast.pos).distance_to(Vector2(hero.pos))>leash:beast.target_id="";beast.priority_target_id="";if not rooted:beast.pos=CombatGeometry.move_toward_safe(beast.pos,hero.pos,float(beast.movement_speed)*slow_multiplier*delta,float(beast.combat_radius),combat_blockers);return
 	if target!=null and Vector2(beast.pos).distance_to(Vector2(target.pos))>float(BeastmasterData.SPACE.misha_acquisition if kind=="misha" else BeastmasterData.SPACE.beast_acquisition):beast.target_id="";beast.priority_target_id="";target=null
 	if target==null:
 		var candidates:=enemies.filter(func(enemy):return enemy.hp>0.0 and TargetCategorySystem.qualifies_immediate(enemy) and Vector2(beast.pos).distance_to(Vector2(enemy.pos))<=float(BeastmasterData.SPACE.misha_acquisition if kind=="misha" else BeastmasterData.SPACE.beast_acquisition));candidates.sort_custom(func(a,b):var ad:=Vector2(beast.pos).distance_squared_to(Vector2(a.pos));var bd:=Vector2(beast.pos).distance_squared_to(Vector2(b.pos));return str(a.combat_id)<str(b.combat_id) if is_equal_approx(ad,bd) else ad<bd);if not candidates.is_empty():target=candidates[0];beast.target_id=str(target.combat_id)
 	if target==null:
-		if kind=="misha" and Vector2(beast.pos).distance_to(Vector2(hero.pos))>float(BeastmasterData.SPACE.misha_follow):beast.pos=CombatGeometry.move_toward_safe(beast.pos,hero.pos,float(beast.movement_speed)*delta,float(beast.combat_radius),combat_blockers)
+		if kind=="misha" and not rooted and Vector2(beast.pos).distance_to(Vector2(hero.pos))>float(BeastmasterData.SPACE.misha_follow):beast.pos=CombatGeometry.move_toward_safe(beast.pos,hero.pos,float(beast.movement_speed)*slow_multiplier*delta,float(beast.combat_radius),combat_blockers)
 		return
 	var distance:=Vector2(beast.pos).distance_to(Vector2(target.pos));var attack_distance:=float(beast.range)+float(beast.combat_radius)+float(target.get("combat_radius",28.0))
-	if distance>attack_distance:beast.pos=CombatGeometry.move_toward_safe(beast.pos,target.pos,float(beast.movement_speed)*delta*(1.75 if bool(beast.get("pack_assault_pending",false)) else 1.0),float(beast.combat_radius),combat_blockers);return
+	if distance>attack_distance:if not rooted:beast.pos=CombatGeometry.move_toward_safe(beast.pos,target.pos,float(beast.movement_speed)*slow_multiplier*delta*(1.75 if bool(beast.get("pack_assault_pending",false)) else 1.0),float(beast.combat_radius),combat_blockers);return
 	if float(beast.attack_cooldown)<=0.0:beastmaster_attack(hero,beast,target,kind);beast.pack_assault_pending=false
 
 func update_beastmaster_runtime(delta:float)->void:
@@ -96,10 +103,12 @@ func update_beastmaster_runtime(delta:float)->void:
 		if float(hero.get("hp",0.0))<=0.0:
 			hero.beastmaster_runtime.misha.hp=0.0;hero.beastmaster_runtime.misha_respawn_remaining=float(BeastmasterData.VALUES.misha_respawn);hero.beastmaster_runtime.lesser_beasts=[];hero.beastmaster_runtime.greater_beasts=[];continue
 		var active_combat:=enemies.any(func(enemy):return float(enemy.get("hp",0.0))>0.0 and not bool(enemy.get("passive_test_enemy",false)));BeastmasterSystem.advance(hero,delta,active_combat);var runtime:Dictionary=hero.beastmaster_runtime
+		update_timed_combat_effects(runtime.misha,delta)
+		for controlled_beast in BeastmasterSystem.disposable_beasts(hero):update_timed_combat_effects(controlled_beast,delta)
 		if BeastmasterSystem.misha_alive(hero):
 			runtime.misha.attack_cooldown=maxf(0.0,float(runtime.misha.attack_cooldown)-delta)
 			if str(runtime.misha.command_mode)=="retreat":
-				runtime.misha.target_id="";runtime.misha.pos=CombatGeometry.move_toward_safe(runtime.misha.pos,hero.pos,float(runtime.misha.movement_speed)*(1.0+float(BeastmasterData.VALUES.misha_retreat_speed))*delta,float(runtime.misha.combat_radius),combat_blockers)
+				runtime.misha.target_id="";var stopped:=CombatSystem.is_stunned(runtime.misha) or StatusEffectSystem.has_control(runtime.misha,"root");var slow_multiplier:=1.0-clampf(CombatSystem.control_amount(runtime.misha,"slow"),0.0,.95);if not stopped:runtime.misha.pos=CombatGeometry.move_toward_safe(runtime.misha.pos,hero.pos,float(runtime.misha.movement_speed)*(1.0+float(BeastmasterData.VALUES.misha_retreat_speed))*slow_multiplier*delta,float(runtime.misha.combat_radius),combat_blockers)
 				if Vector2(runtime.misha.pos).distance_to(Vector2(hero.pos))<=float(BeastmasterData.SPACE.misha_follow):runtime.misha.command_mode="follow"
 			else:update_beast_ai(hero,runtime.misha,"misha",delta)
 		for beast in runtime.lesser_beasts:update_beast_ai(hero,beast,"lesser",delta)

@@ -520,6 +520,8 @@ func confirm_aim_at(point:Vector2)->bool:
 	if aimed_ability_category=="ally":
 		for i in heroes.size():
 			if heroes[i].hp>0 and heroes[i].pos.distance_to(point)<58:assign_hero_ally(selected,i);var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
+		for ally in player_healable_units():
+			if ally not in heroes and ally.pos.distance_to(point)<58:assign_hero_ally_unit(selected,ally);var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
 		return false
 	var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
 
@@ -565,6 +567,11 @@ func update_hero_drag(point:Vector2)->void:
 	if heroes[selected]["class"] in ["Cleric","Druid"]:
 		for hero_index in heroes.size():
 			if hero_index!=selected and heroes[hero_index].hp>0 and heroes[hero_index].pos.distance_to(drag_cursor)<42:drag_target_type="ally";drag_target_index=hero_index;break
+		if drag_target_type=="ground":
+			for owner_index in heroes.size():
+				if str(heroes[owner_index].get("class",""))!="Beastmaster" or heroes[owner_index].get("beastmaster_runtime",{}).is_empty():continue
+				var misha:Dictionary=heroes[owner_index].beastmaster_runtime.misha
+				if BeastmasterSystem.misha_alive(heroes[owner_index]) and misha.pos.distance_to(drag_cursor)<42:drag_target_type="ally_companion";drag_target_index=owner_index;break
 	if drag_target_type=="ground":
 		for enemy_index in enemies.size():
 			if enemies[enemy_index].hp>0 and enemies[enemy_index].pos.distance_to(drag_cursor)<45:drag_target_type="enemy";drag_target_index=enemy_index;break
@@ -592,6 +599,7 @@ func finish_hero_drag()->void:
 	if tutorial_active:tutorial_record_valid_action()
 	if drag_target_type=="enemy":assign_hero_enemy(selected,drag_target_index);heroes[selected].suppress_auto_target=false
 	elif drag_target_type=="ally" and heroes[selected]["class"] in ["Cleric","Druid"]:assign_hero_ally(selected,drag_target_index)
+	elif drag_target_type=="ally_companion" and heroes[selected]["class"] in ["Cleric","Druid"] and drag_target_index>=0 and drag_target_index<heroes.size():assign_hero_ally_unit(selected,heroes[drag_target_index].beastmaster_runtime.misha)
 	else:issue_hero_move(heroes[selected],Vector2(clamp(drag_cursor.x,55.0,1225.0),clamp(drag_cursor.y,70.0,570.0)));heroes[selected].suppress_auto_target=true;focused_enemy_index=-1
 	queue_redraw()
 
