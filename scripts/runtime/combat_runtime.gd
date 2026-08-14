@@ -77,6 +77,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_druid_runtime(delta)
 	update_warrior_runtime(delta)
 	update_death_knight_runtime(delta)
+	update_beastmaster_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 
@@ -99,6 +100,7 @@ func update_combat_heroes(delta:float) -> bool:
 		if str(h.get("class",""))=="Huntsman" and not h.get("huntsman_runtime",{}).is_empty():h.basic_attack_interval=float(h.base_basic_action_interval)*HuntsmanSystem.basic_attack_interval_multiplier(h)
 		if str(h.get("class",""))=="Druid" and not h.get("druid_runtime",{}).is_empty():var d_ui:=AbilitySlotSystem.ui_state(h.druid_runtime.d_slot);h.ability_cds[4]=float(d_ui.recharge) if int(d_ui.charges)<=0 else 0.0
 		if str(h.get("class",""))=="Warrior" and not h.get("warrior_runtime",{}).is_empty():h.basic_attack_interval=WarriorSystem.attack_interval(h)
+		if str(h.get("class",""))=="Beastmaster" and not h.get("beastmaster_runtime",{}).is_empty():h.basic_attack_interval=float(h.base_basic_action_interval)/(1.0+float(BeastmasterData.VALUES.hawk_speed) if float(h.beastmaster_runtime.hawk_remaining)>0.0 else 1.0)
 		if h.hp>0:h.hp=minf(float(h.max_hp),float(h.hp)+float(h.get("health_regeneration",0.0))*delta);update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):

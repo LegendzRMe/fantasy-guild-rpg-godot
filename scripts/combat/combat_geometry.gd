@@ -46,6 +46,13 @@ static func move_toward_safe(from:Vector2,to:Vector2,distance:float,radius:float
 		if valid_position(candidate,radius,blockers):return candidate
 	return from
 
+static func safe_endpoint(from:Vector2,intended:Vector2,radius:float,blockers:Array)->Vector2:
+	if valid_position(intended,radius,blockers) and first_blocker(from,intended,blockers,"blocks_movement")<0:return intended
+	for step in range(19,-1,-1):
+		var candidate:=from.lerp(intended,float(step)/20.0)
+		if valid_position(candidate,radius,blockers) and first_blocker(from,candidate,blockers,"blocks_movement")<0:return candidate
+	return from
+
 static func line_of_sight_position(from:Vector2,target:Vector2,desired_range:float,blockers:Array)->Vector2:
 	var direction:=target.direction_to(from)
 	for ring in range(0,5):

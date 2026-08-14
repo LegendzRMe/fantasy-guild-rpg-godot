@@ -21,6 +21,7 @@ Start with [`architecture.md`](architecture.md) for module ownership, dependency
 - Priest: [`priest_conversion_v1.md`](priest_conversion_v1.md), with provisional space values in [`priest_geometry_calibration.md`](priest_geometry_calibration.md)
 - Warrior: [`warrior_conversion_v1.md`](warrior_conversion_v1.md), full interaction audit in [`warrior_full_audit_v1.md`](warrior_full_audit_v1.md), and provisional space values in [`warrior_geometry_calibration.md`](warrior_geometry_calibration.md)
 - Death Knight: [`death_knight_conversion_v1.md`](death_knight_conversion_v1.md), full interaction audit in [`death_knight_full_audit_v1.md`](death_knight_full_audit_v1.md), and provisional space values in [`death_knight_geometry_calibration.md`](death_knight_geometry_calibration.md)
+- Beastmaster: [`beastmaster_conversion_v1.md`](beastmaster_conversion_v1.md), full interaction audit in [`beastmaster_full_audit_v1.md`](beastmaster_full_audit_v1.md), provisional space values in [`beastmaster_geometry_calibration.md`](beastmaster_geometry_calibration.md), shared summon rules in [`summon_foundation_v1.md`](summon_foundation_v1.md), and reusable redirection rules in [`damage_redirection_v1.md`](damage_redirection_v1.md)
 
 Geometry calibration documents are development records for provisional combat-space values. They are not final visual specifications.
 

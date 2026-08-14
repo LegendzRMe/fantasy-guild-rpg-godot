@@ -8,6 +8,7 @@ const TestUiCombat = preload("res://tests/test_ui_combat.gd")
 const TestUiDruidRuntime = preload("res://tests/test_ui_druid_runtime.gd")
 const TestUiWarriorRuntime = preload("res://tests/test_ui_warrior_runtime.gd")
 const TestUiDeathKnightRuntime = preload("res://tests/test_ui_death_knight_runtime.gd")
+const TestUiBeastmasterRuntime = preload("res://tests/test_ui_beastmaster_runtime.gd")
 const TestUiTestingTools = preload("res://tests/test_ui_testing_tools.gd")
 const TestUiCampaign = preload("res://tests/test_ui_campaign.gd")
 
@@ -21,6 +22,7 @@ static func run(main:Node) -> Array:
 	errors.append_array(await TestUiDruidRuntime.run(main))
 	errors.append_array(await TestUiWarriorRuntime.run(main))
 	errors.append_array(await TestUiDeathKnightRuntime.run(main))
+	errors.append_array(await TestUiBeastmasterRuntime.run(main))
 	errors.append_array(await TestUiTestingTools.run(main))
 	errors.append_array(await TestUiCampaign.run(main))
 	return errors

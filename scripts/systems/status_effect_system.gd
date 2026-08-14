@@ -113,7 +113,7 @@ static func apply_control(unit:Dictionary,control_type:String,duration:float,mag
 	var multiplier := float(profile.get("%s_multiplier" % control_type, profile.get("slow_multiplier", 1.0)))
 	var personal_multiplier:=float(unit.get("control_duration_multipliers",{}).get(control_type,1.0))
 	var resolved_duration := maxf(0.0, duration * multiplier * personal_multiplier)
-	var resolved_magnitude := magnitude * multiplier
+	var resolved_magnitude := magnitude * multiplier * (float(unit.get("slow_magnitude_multiplier",1.0)) if control_type=="slow" else 1.0)
 	if resolved_duration <= 0.0:
 		return {"applied":false, "resisted":true, "duration":0.0, "magnitude":0.0, "reason":"duration"}
 	unit["active_effects"] = strongest_refresh(unit.get("active_effects", []), {
@@ -136,7 +136,7 @@ static func extend_controls(unit:Dictionary,control_types:Array,multiplier:float
 
 static func apply_source_control(unit:Dictionary,source_id:String,control_type:String,duration:float,magnitude:float=0.0)->Dictionary:
 	if is_unstoppable(unit) and control_type in PREVENTED_BY_UNSTOPPABLE:return {"applied":false,"resisted":true,"duration":0.0,"magnitude":0.0,"reason":"unstoppable"}
-	var profile:=control_profile(unit);var profile_multiplier:=float(profile.get("%s_multiplier"%control_type,profile.get("slow_multiplier",1.0)));var personal_multiplier:=float(unit.get("control_duration_multipliers",{}).get(control_type,1.0));var resolved_duration:=maxf(0.0,duration*profile_multiplier*personal_multiplier);var resolved_magnitude:=magnitude*profile_multiplier
+	var profile:=control_profile(unit);var profile_multiplier:=float(profile.get("%s_multiplier"%control_type,profile.get("slow_multiplier",1.0)));var personal_multiplier:=float(unit.get("control_duration_multipliers",{}).get(control_type,1.0));var resolved_duration:=maxf(0.0,duration*profile_multiplier*personal_multiplier);var resolved_magnitude:=magnitude*profile_multiplier*(float(unit.get("slow_magnitude_multiplier",1.0)) if control_type=="slow" else 1.0)
 	if resolved_duration<=0.0:return {"applied":false,"resisted":true,"duration":0.0,"magnitude":0.0,"reason":"duration"}
 	var effect_id:="control_%s:%s"%[control_type,source_id];unit["active_effects"]=unit.get("active_effects",[]).filter(func(effect):return str(effect.get("id",""))!=effect_id);unit.active_effects.append({"id":effect_id,"source_id":source_id,"control_type":control_type,"amount":resolved_magnitude,"remaining_duration":resolved_duration})
 	return {"applied":true,"resisted":false,"duration":resolved_duration,"magnitude":resolved_magnitude,"reason":""}

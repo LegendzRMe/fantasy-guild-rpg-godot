@@ -1,4 +1,4 @@
-extends "res://scripts/runtime/death_knight_runtime.gd"
+extends "res://scripts/runtime/beastmaster_runtime.gd"
 
 func clamped_cast_point(hero:Dictionary,point:Vector2,range_limit:float)->Vector2:
 	if range_limit<=0:return hero.pos
@@ -17,9 +17,10 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 	var druid_trait_input:bool=str(h.get("class",""))=="Druid" and slot==4
 	var warrior_trait_input:bool=str(h.get("class",""))=="Warrior" and slot==4 and WarriorSystem.has_talent(h,"warrior_l21_3")
 	var death_knight_trait_input:bool=str(h.get("class",""))=="Death Knight" and slot==4
-	if not protector_trait_input and not sentinel_trait_input and not druid_trait_input and not warrior_trait_input and not death_knight_trait_input and not TalentSystem.ability_is_unlocked(int(state.heroes[battle_hero_indices[selected]].level),slot):return
+	var beastmaster_trait_input:bool=str(h.get("class",""))=="Beastmaster" and slot==4
+	if not protector_trait_input and not sentinel_trait_input and not druid_trait_input and not warrior_trait_input and not death_knight_trait_input and not beastmaster_trait_input and not TalentSystem.ability_is_unlocked(int(state.heroes[battle_hero_indices[selected]].level),slot):return
 	var ability_enemy_target:int=combat_enemy_target()
-	if slot>=4 and h["class"] not in ["Protector","Sentinel","Druid","Warrior","Death Knight"]:return
+	if slot>=4 and h["class"] not in ["Protector","Sentinel","Druid","Warrior","Death Knight","Beastmaster"]:return
 	if h.hp<=0:return
 	if not item_repeat:
 		if h["class"]=="Protector" and slot==0 and not h.get("protector_runtime",{}).get("q_sequence",{}).is_empty():pass
@@ -29,6 +30,7 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 		elif h["class"]=="Druid" and slot==4 and druid_trait_input:pass
 		elif h["class"]=="Warrior" and slot==4 and warrior_trait_input:pass
 		elif h["class"]=="Death Knight" and slot==4 and death_knight_trait_input:pass
+		elif h["class"]=="Beastmaster" and slot==4 and beastmaster_trait_input:pass
 		elif h["class"]=="Warrior" and slot==3 and WarriorSystem.specialization(h)=="warrior_l12_r3":pass
 		elif slot==0 and hero_has_passive(h,"twin_incantation"):
 			if int(h.get("q_charges",0))<=0:return
@@ -93,6 +95,9 @@ func use_ability(slot:int,cast_position:Vector2=Vector2.INF,item_repeat:bool=fal
 		return
 	if h["class"]=="Death Knight":
 		cast_death_knight_ability(slot,cast_position,item_repeat)
+		return
+	if h["class"]=="Beastmaster":
+		cast_beastmaster_ability(slot,cast_position,item_repeat)
 		return
 	var ability_range=float(ABILITY_RANGES[h["class"]][slot])
 	var resolved_point=clamped_cast_point(h,cast_position,ability_range) if ability_range>0 else h.pos

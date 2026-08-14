@@ -186,6 +186,68 @@ func huntsman_debug_target():
 	return null
 	return false
 
+func load_beastmaster_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=BeastmasterData.TEST_BUILDS[clampi(build_index,0,BeastmasterData.TEST_BUILDS.size()-1)];var level:=int(build.level)
+	hero.level=level;hero.base_power=BeastmasterData.scaled(float(BeastmasterData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.max_hp=BeastmasterData.scaled(float(BeastmasterData.VALUES.health),level);hero.hp=hero.max_hp;hero.health_regeneration=BeastmasterData.scaled(float(BeastmasterData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(BeastmasterData.VALUES.basic_attack_interval);hero.basic_attack_interval=hero.base_basic_action_interval;hero.range=float(BeastmasterData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];BeastmasterSystem.initialize_runtime(hero,true,"testing:beastmaster")
+	if int(build.get("fury",0))>=int(BeastmasterData.VALUES.fury_goal):hero.beastmaster_runtime.fury=int(BeastmasterData.VALUES.fury_goal);hero.beastmaster_runtime.fury_complete=true
+	if float(build.get("apex_seconds",0.0))>0.0:BeastmasterSystem.advance(hero,float(build.apex_seconds),true)
+
+func handle_beastmaster_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="beastmaster_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Beastmaster":hero=candidate;break
+	if hero==null:return false
+	if not event.ctrl_pressed and not event.alt_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_6:var build_index:=int(event.keycode-KEY_1);load_beastmaster_test_build(hero,build_index);flash("Beastmaster build: %s"%str(BeastmasterData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if event.ctrl_pressed:
+		match event.keycode:
+			KEY_K:BeastmasterSystem.defeat_misha(hero);flash("Misha defeated")
+			KEY_J:BeastmasterSystem.respawn_misha(hero);flash("Misha respawned")
+			KEY_T:hero.beastmaster_runtime.misha_respawn_remaining=1.0;flash("Misha respawn: 1 sec")
+			KEY_D:hero.beastmaster_runtime.misha.hp=maxf(1.0,float(hero.beastmaster_runtime.misha.hp)-float(hero.beastmaster_runtime.misha.max_hp)*.25);flash("Misha damaged")
+			KEY_H:deal_healing(hero,hero.beastmaster_runtime.misha,float(hero.beastmaster_runtime.misha.max_hp)*.25,"basic_heal","Beastmaster Range");flash("Misha healed")
+			KEY_F:cast_beastmaster_d(hero);flash("Misha focus command")
+			KEY_R:BeastmasterSystem.command_misha(hero,hero);flash("Misha retreat command")
+			KEY_L:for index in 2:hero.beastmaster_runtime.lesser_beasts.append(BeastmasterSystem.create_beast(hero,"lesser",hero.pos+Vector2(70+index*35,0)));flash("Two Lesser Beasts spawned")
+			KEY_X:for beast in BeastmasterSystem.disposable_beasts(hero):beast.hp=float(beast.max_hp)*.5;flash("Disposable Health: 50%")
+			KEY_V:for beast in BeastmasterSystem.disposable_beasts(hero):beast.health_decay_rate*=2.0;flash("Disposable decay doubled")
+			KEY_Z:BeastmasterSystem.advance(hero,10.0,true);flash("Beast decay +10 sec")
+			KEY_E:var beasts:=BeastmasterSystem.disposable_beasts(hero);var target=beastmaster_selected_enemy();if not beasts.is_empty() and target!=null:deal_damage(target,beasts[0],200.0,"basic_attack","physical","Fresh Range");flash("External Fresh packet sent")
+			KEY_Y:BeastmasterSystem.add_fury(hero,"beastmaster",1);flash("Fury +1")
+			KEY_U:hero.beastmaster_runtime.fury=224;hero.beastmaster_runtime.fury_complete=false;flash("Fury 224/225")
+			KEY_I:BeastmasterSystem.add_fury(hero,"beastmaster",225);flash("Fury completed")
+			KEY_O:var target=beastmaster_selected_enemy();if target!=null:BeastmasterSystem.apply_hunted(hero,str(target.combat_id));flash("Hunted reset")
+			KEY_B:BlockChargeSystem.grant(hero,1,2);flash("Beastmaster Block only")
+			KEY_S:CombatSystem.apply_control(hero,"slow",4.0,.4);flash("40% Slow / 4 sec applied")
+			KEY_Q:hero.beastmaster_runtime.dire_stacks=10;flash("Dire Beast: 10")
+			KEY_W:hero.beastmaster_runtime.hawk_remaining=4.0;flash("Hawk: 4 sec")
+			KEY_A:BeastmasterSystem.advance(hero,120.0,true);flash("Apex +120 sec")
+			KEY_P:var target=beastmaster_selected_enemy();if target!=null:BeastmasterSystem.pack_commander(hero,str(target.combat_id));flash("Pack Commander order")
+			_:return false
+		queue_redraw();return true
+	if event.alt_pressed:
+		match event.keycode:
+			KEY_B:BlockChargeSystem.grant(hero.beastmaster_runtime.misha,1,2);flash("Misha Block only")
+			KEY_E:hero.hp=hero.max_hp*.5;hero.beastmaster_runtime.misha.hp=hero.beastmaster_runtime.misha.max_hp*.5;flash("Bond equal Health percentages")
+			KEY_1:hero.hp=hero.max_hp;hero.beastmaster_runtime.misha.hp=hero.beastmaster_runtime.misha.max_hp*.5;flash("Bond: Misha lower")
+			KEY_2:hero.hp=hero.max_hp*.5;hero.beastmaster_runtime.misha.hp=hero.beastmaster_runtime.misha.max_hp;flash("Bond: Beastmaster lower")
+			KEY_N:var target=beastmaster_selected_enemy();if target!=null:BeastmasterSystem.note_primary_attack(hero,"beastmaster",str(target.combat_id),{"resolved_damage":100.0});flash("Beastmaster Hunted proc consumed")
+			KEY_M:var target=beastmaster_selected_enemy();if target!=null:BeastmasterSystem.note_primary_attack(hero,"misha",str(target.combat_id),{"resolved_damage":100.0});flash("Misha Hunted proc consumed")
+			KEY_W:for beast in BeastmasterSystem.disposable_beasts(hero):beast.pos=hero.pos;hero.beastmaster_runtime.wildfire_tick=0.0;flash("Wildfire sources overlapped")
+			_:return false
+		queue_redraw();return true
+	match event.keycode:
+		KEY_K:BeastmasterSystem.defeat_misha(hero);flash("Misha defeated")
+		KEY_J:BeastmasterSystem.respawn_misha(hero);flash("Misha respawned")
+		KEY_L:hero.beastmaster_runtime.lesser_beasts.append(BeastmasterSystem.create_beast(hero,"lesser",hero.pos+Vector2(90,0)));flash("Lesser Beast spawned")
+		KEY_G:hero.beastmaster_runtime.greater_beasts.append(BeastmasterSystem.create_beast(hero,"greater",hero.beastmaster_runtime.misha.pos));flash("Greater Beast spawned")
+		KEY_F:BeastmasterSystem.add_fury(hero,"beastmaster",1);flash("Fury %d/225"%int(hero.beastmaster_runtime.fury))
+		KEY_H:var target=beastmaster_selected_enemy();if target!=null:BeastmasterSystem.apply_hunted(hero,str(target.combat_id));flash("Hunted applied")
+		KEY_B:BlockChargeSystem.grant(hero,1,2);BlockChargeSystem.grant(hero.beastmaster_runtime.misha,1,2);flash("Independent Blocks granted")
+		KEY_A:BeastmasterSystem.advance(hero,10.0,true);flash("Apex +10 seconds")
+		KEY_P:var target=beastmaster_selected_enemy();if target!=null:BeastmasterSystem.pack_commander(hero,str(target.combat_id));flash("Pack Commander order")
+		KEY_C:hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.beastmaster_runtime.q_slot.current_charges=2;hero.beastmaster_runtime.q_slot.timers=[];flash("Beastmaster cooldowns reset")
+		_:return false
+	queue_redraw();return true
+
 func sentinel_range_hero():
 	for hero in heroes:
 		if str(hero.get("class",""))=="Sentinel":return hero
@@ -458,6 +520,8 @@ func confirm_aim_at(point:Vector2)->bool:
 	if aimed_ability_category=="ally":
 		for i in heroes.size():
 			if heroes[i].hp>0 and heroes[i].pos.distance_to(point)<58:assign_hero_ally(selected,i);var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
+		for ally in player_healable_units():
+			if ally not in heroes and ally.pos.distance_to(point)<58:assign_hero_ally_unit(selected,ally);var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
 		return false
 	var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
 
@@ -503,6 +567,11 @@ func update_hero_drag(point:Vector2)->void:
 	if heroes[selected]["class"] in ["Cleric","Druid"]:
 		for hero_index in heroes.size():
 			if hero_index!=selected and heroes[hero_index].hp>0 and heroes[hero_index].pos.distance_to(drag_cursor)<42:drag_target_type="ally";drag_target_index=hero_index;break
+		if drag_target_type=="ground":
+			for owner_index in heroes.size():
+				if str(heroes[owner_index].get("class",""))!="Beastmaster" or heroes[owner_index].get("beastmaster_runtime",{}).is_empty():continue
+				var misha:Dictionary=heroes[owner_index].beastmaster_runtime.misha
+				if BeastmasterSystem.misha_alive(heroes[owner_index]) and misha.pos.distance_to(drag_cursor)<42:drag_target_type="ally_companion";drag_target_index=owner_index;break
 	if drag_target_type=="ground":
 		for enemy_index in enemies.size():
 			if enemies[enemy_index].hp>0 and enemies[enemy_index].pos.distance_to(drag_cursor)<45:drag_target_type="enemy";drag_target_index=enemy_index;break
@@ -530,11 +599,13 @@ func finish_hero_drag()->void:
 	if tutorial_active:tutorial_record_valid_action()
 	if drag_target_type=="enemy":assign_hero_enemy(selected,drag_target_index);heroes[selected].suppress_auto_target=false
 	elif drag_target_type=="ally" and heroes[selected]["class"] in ["Cleric","Druid"]:assign_hero_ally(selected,drag_target_index)
+	elif drag_target_type=="ally_companion" and heroes[selected]["class"] in ["Cleric","Druid"] and drag_target_index>=0 and drag_target_index<heroes.size():assign_hero_ally_unit(selected,heroes[drag_target_index].beastmaster_runtime.misha)
 	else:issue_hero_move(heroes[selected],Vector2(clamp(drag_cursor.x,55.0,1225.0),clamp(drag_cursor.y,70.0,570.0)));heroes[selected].suppress_auto_target=true;focused_enemy_index=-1
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
 	if handle_death_knight_range_shortcut(event):return true
+	if handle_beastmaster_range_shortcut(event):return true
 	if handle_warrior_range_shortcut(event):return true
 	if handle_druid_range_shortcut(event):return true
 	if handle_huntsman_range_shortcut(event):return true

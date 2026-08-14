@@ -17,7 +17,7 @@ You can also import `project.godot` in the Godot editor and press **F6/F5**.
 - Drag-and-drop team builder with named saved teams
 - Full-screen world map and zone encounter paths
 - Multi-wave real-time combat with manual movement and targeting
-- Guardian, Cleric, Rogue, Ranger, Mage, Warlock, Slayer, and testing-only Priest, Shaman, Templar, Protector, Sentinel, Huntsman, Druid, and Warrior roles
+- Guardian, Cleric, Rogue, Ranger, Mage, Warlock, Slayer, and testing-only Priest, Shaman, Templar, Protector, Sentinel, Huntsman, Druid, Warrior, Death Knight, and Beastmaster roles
 - A data-driven, replayable Ashwood Marches campaign with seven mandatory encounters and a two-encounter optional branch
 - Narrative recruit decisions, objective battles, equipment rewards, and a permanent Special Hero choice
 - Enemy roles, boss telegraphs, and staged victory rewards
@@ -42,6 +42,8 @@ In the testing save, select **TESTING** on the world map to choose the Dummy Ran
 Warrior Range adds specialization, target-category, safe-landing, shield, summon-lifetime, Boss-control, banner, and quest fixtures; `Shift+1..6` loads representative builds and `Ctrl+C/Q/K/B/H/S` controls cooldowns, quests, banners, Health, and Shields.
 
 Death Knight Range adds weapon-progression, target-category, suppression, control-profile, Army/Ghoul, Sindragosa, mastery, and wounded-party fixtures; `Shift+1..6` loads representative builds and `Ctrl+C/F/H/M/G` controls cooldowns, weapon stacks, Health, mastery, and Army charges.
+
+Beastmaster Range adds targetable Misha/Lesser/Greater entities, Health decay, protection, Block, redirection, boss-control, hostile Basic Attack/AoE, safe-endpoint, Fury, Hunted, and long-survival Apex fixtures. `1..6` loads representative builds; unmodified `K/J/L/G/F/H/B/A/P/C` provides common lifecycle controls. `Ctrl+K/J/T/D/H/F/R/L/X/V/Z/E/Y/U/I/O/B/S/Q/W/A/P` exposes detailed Misha, decay, Fresh, Fury, Block, Slow, Dire, Hawk, Apex, and pack states; `Alt+B/E/1/2/N/M/W` exposes independent Misha Block, Bond directions/equality, Hunted consumption, and Wildfire overlap. `F3` shows independent companion state, charges, decay, quests, auras, redirection, and telemetry.
 
 The project uses original placeholder systems and artwork. Names, UI, game rules, and assets are subject to change during development.
 
