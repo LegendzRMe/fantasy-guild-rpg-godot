@@ -8,7 +8,26 @@ func unit_by_combat_id(combat_id:String):
 		if str(hero.get("combat_id",""))==combat_id:return hero
 	for enemy in enemies:
 		if str(enemy.get("combat_id",""))==combat_id:return enemy
+	for hero in heroes:
+		for summon in hero.get("death_knight_runtime",{}).get("ghouls",[]):
+			if str(summon.get("combat_id",""))==combat_id:return summon
 	return null
+
+func player_combat_summons()->Array:
+	var result:Array=[]
+	for hero in heroes:
+		for summon in hero.get("death_knight_runtime",{}).get("ghouls",[]):
+			if float(summon.get("hp",0.0))>0.0 and float(summon.get("remaining_lifetime",0.0))>0.0:result.append(summon)
+	return result
+
+func enemy_target_entity(enemy:Dictionary,hero_index:int):
+	if hero_index<0 or hero_index>=heroes.size():return null
+	var result:Dictionary=heroes[hero_index];var owner_id:=str(result.get("combat_id",""));var closest:=Vector2(enemy.pos).distance_to(Vector2(result.pos))
+	for summon in player_combat_summons():
+		if str(summon.get("owner_id",""))!=owner_id:continue
+		var distance:=Vector2(enemy.pos).distance_to(Vector2(summon.pos))
+		if distance<closest:result=summon;closest=distance
+	return result
 
 func enemy_index_by_combat_id(combat_id:String)->int:
 	for index in enemies.size():
@@ -55,6 +74,7 @@ func issue_hero_move(hero:Dictionary,destination:Vector2)->void:
 func active_movement_multiplier(unit:Dictionary)->float:
 	var multiplier:=1.0
 	if str(unit.get("class",""))=="Warrior" and float(unit.get("warrior_runtime",{}).get("twin_move_remaining",0.0))>0.0:multiplier*=1.0+float(WarriorData.VALUES.frenzy_move if WarriorSystem.has_talent(unit,"warrior_l27_r3") else WarriorData.VALUES.twin_move)
+	if str(unit.get("class",""))=="Death Knight" and DeathKnightSystem.has_talent(unit,"death_knight_l9_2") and bool(unit.get("death_knight_runtime",{}).get("tempest",{}).get("active",false)) and float(unit.death_knight_runtime.tempest.active_duration)>=float(DeathKnightData.VALUES.borean_delay):multiplier*=1.0+float(DeathKnightData.VALUES.borean_move)
 	if str(unit.get("class",""))=="Huntsman" and not unit.get("huntsman_runtime",{}).is_empty():multiplier*=HuntsmanSystem.movement_multiplier(unit)
 	if str(unit.get("class",""))=="Shaman" and int(unit.get("shaman_runtime",{}).get("windfury_attacks",0))>0:multiplier*=ShamanSystem.windfury_movement_multiplier(unit)
 	if str(unit.get("class",""))=="Protector" and not unit.get("protector_runtime",{}).is_empty():multiplier*=ProtectorSystem.movement_multiplier(unit)

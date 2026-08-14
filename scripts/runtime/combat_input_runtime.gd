@@ -107,6 +107,33 @@ func handle_warrior_range_shortcut(event:InputEventKey)->bool:
 		_:return false
 	queue_redraw();return true
 
+func load_death_knight_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=DeathKnightData.TEST_BUILDS[clampi(build_index,0,DeathKnightData.TEST_BUILDS.size()-1)];var level:=int(build.level);var mastery:Dictionary=hero.get("death_knight_runtime",{}).get("mastery",{}).duplicate(true)
+	if bool(build.get("mastered",false)):mastery["death_knight_l9_1"]=int(DeathKnightData.VALUES.frost_presence_mastery)
+	for unit in heroes:
+		unit.active_effects=unit.get("active_effects",[]).filter(func(effect):return not str(effect.get("source_id",effect.get("id",""))).begins_with("death_knight_"));unit.healing_received_sources=unit.get("healing_received_sources",[]).filter(func(source):return not str(source.get("source_id","")).begins_with("death_knight_"))
+	hero.level=level;hero.base_power=DeathKnightData.scaled(float(DeathKnightData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.max_hp=DeathKnightData.scaled(float(DeathKnightData.VALUES.health),level);hero.hp=hero.max_hp;hero.health_regeneration=DeathKnightData.scaled(float(DeathKnightData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(DeathKnightData.VALUES.basic_attack_interval);hero.basic_attack_interval=hero.base_basic_action_interval;hero.range=float(DeathKnightData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);DeathKnightSystem.initialize_runtime(hero,true,mastery,"testing:death_knight");hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+
+func handle_death_knight_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="death_knight_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Death Knight":hero=candidate;break
+	if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_6:
+		var build_index:=int(event.keycode-KEY_1);load_death_knight_test_build(hero,build_index);flash("Death Knight build: %s"%str(DeathKnightData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.ctrl_pressed:return false
+	match event.keycode:
+		KEY_C:hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.death_knight_runtime.frostmourne_cooldown=0.0;hero.death_knight_runtime.tempest.cooldown=0.0;hero.death_knight_runtime.army_slot.current_charges=int(DeathKnightData.VALUES.army_max_charges);hero.death_knight_runtime.army_slot.timers=[];flash("Death Knight cooldowns reset")
+		KEY_F:hero.death_knight_runtime.frostmourne_stacks=int(hero.death_knight_runtime.frostmourne_stacks)+1;flash("Frostmourne stack +1")
+		KEY_Q:DeathKnightSystem.add_frost_presence_progress(hero,["test"]);flash("Frost Presence progress +1")
+		KEY_M:hero.death_knight_runtime.mastery["death_knight_l9_1"]=50;flash("Frost Presence MASTERED")
+		KEY_E:cast_death_knight_tempest(hero);flash("Frozen Tempest toggled")
+		KEY_G:hero.death_knight_runtime.army_slot.current_charges=6;flash("Army charges: 6")
+		KEY_S:if not enemies.is_empty():CombatSystem.apply_control(enemies[0],"slow",30.0,.30);flash("Target Slowed")
+		KEY_R:if not enemies.is_empty():CombatSystem.apply_control(hero,"stun",3.0);flash("Rime Stun test")
+		KEY_B:CombatSystem.apply_blind(hero,4.0);flash("Blind attempted")
+		_:return false
+	queue_redraw();return true
+
 func handle_huntsman_range_shortcut(event:InputEventKey)->bool:
 	if not testing_zone_active or testing_zone_mode!="huntsman_range":return false
 	var hero=null
@@ -507,6 +534,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_death_knight_range_shortcut(event):return true
 	if handle_warrior_range_shortcut(event):return true
 	if handle_druid_range_shortcut(event):return true
 	if handle_huntsman_range_shortcut(event):return true

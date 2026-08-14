@@ -74,6 +74,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Huntsman":HuntsmanSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Druid":DruidSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Warrior":WarriorSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
+		elif str(heroes[-1].get("class",""))=="Death Knight":DeathKnightSystem.initialize_runtime(heroes[-1],is_testing_save(),data.get("talent_mastery",{}),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -320,6 +321,26 @@ func start_warrior_testing_zone() -> void:
 	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,10000.0);enemy.max_hp=enemy.hp
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:warrior_landing",Rect2(760,300,42,155)))
 	for hero in heroes:if str(hero.get("class",""))=="Warrior":hero.warrior_runtime.telemetry_enabled=true
+	queue_redraw()
+
+func start_death_knight_testing_zone() -> void:
+	var test_party:Array=testing_party_for_class("Death Knight")
+	if test_party.is_empty():flash("Death Knight fixture unavailable.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="death_knight_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	var fixtures:=[
+		{"position":Vector2(445,120),"type":"Raider","category":"standard"},{"position":Vector2(535,120),"type":"Brute","category":"elite"},{"position":Vector2(625,120),"type":"Archer","category":"named"},{"position":Vector2(715,120),"type":"Swift","category":"enemy_hero"},
+		{"position":Vector2(470,220),"type":"Swift","category":"summon","summon":true},{"position":Vector2(565,220),"type":"Dummy","category":"temporary_combat"},{"position":Vector2(660,220),"type":"Raider","category":"standard","control":"slow"},
+		{"position":Vector2(850,170),"type":"Boss","category":"boss","profile":{"slow_multiplier":0.5,"attack_speed_multiplier":0.5,"root_multiplier":0.25,"stun_multiplier":0.25,"blind_immune":true,"displacement":false}},
+		{"position":Vector2(965,260),"type":"Boss","category":"boss","profile":{"slow_multiplier":0.5,"attack_speed_multiplier":0.5,"root_multiplier":0.0,"stun_multiplier":0.0,"blind_immune":true,"displacement":false}},
+		{"position":Vector2(1050,500),"type":"Defense Dummy","category":"training","healing":true}
+	]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);var enemy:Dictionary=enemies[-1];enemy.passive_test_enemy=fixture.type!="Defense Dummy";enemy.target_category=str(fixture.category);enemy.summoned_unit=bool(fixture.get("summon",false));enemy.control_profile=fixture.get("profile",{}).duplicate(true);enemy["self_heal_test"]=bool(fixture.get("healing",false))
+		if enemy.summoned_unit:enemy.original_lifetime=15.0;enemy.remaining_lifetime=15.0
+		if str(fixture.get("control",""))!="":CombatSystem.apply_control(enemy,str(fixture.control),600.0,.30)
+	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,10000.0);enemy.max_hp=enemy.hp
+	for hero in heroes:if str(hero.get("class",""))=="Death Knight":hero.death_knight_runtime.telemetry_enabled=true
+	for ally in heroes:if str(ally.get("class",""))!="Death Knight":ally.hp*=0.55
 	queue_redraw()
 
 func selected_party_indices() -> Array:
