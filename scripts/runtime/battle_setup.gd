@@ -76,6 +76,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Warrior":WarriorSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Death Knight":DeathKnightSystem.initialize_runtime(heroes[-1],is_testing_save(),data.get("talent_mastery",{}),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Beastmaster":BeastmasterSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
+		elif str(heroes[-1].get("class",""))=="Monk":MonkSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -360,6 +361,25 @@ func start_beastmaster_testing_zone() -> void:
 		if str(hero.get("class",""))=="Beastmaster":hero.beastmaster_runtime.telemetry_enabled=true;hero.beastmaster_runtime.misha.hp*=0.55
 		else:hero.hp*=0.55
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:beastmaster_endpoint",Rect2(760,285,56,165)))
+	queue_redraw()
+
+func start_monk_testing_zone() -> void:
+	var test_party:Array=testing_party_for_class("Monk")
+	if test_party.is_empty():flash("Monk fixture unavailable.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="monk_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	var fixtures:=[
+		{"position":Vector2(440,115),"type":"Raider","category":"standard","control":""},{"position":Vector2(535,115),"type":"Brute","category":"elite","control":"stun"},{"position":Vector2(630,115),"type":"Archer","category":"named","control":"root"},
+		{"position":Vector2(735,115),"type":"Swift","category":"summon","control":""},{"position":Vector2(840,115),"type":"Dummy","category":"temporary_combat","control":""},{"position":Vector2(955,165),"type":"Boss","category":"boss","control":""},
+		{"position":Vector2(520,245),"type":"Raider","category":"standard","control":""},{"position":Vector2(610,245),"type":"Raider","category":"standard","control":""},{"position":Vector2(700,245),"type":"Raider","category":"standard","control":""},{"position":Vector2(1080,500),"type":"Defense Dummy","category":"training","control":""}
+	]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);var enemy:Dictionary=enemies[-1];enemy.target_category=str(fixture.category);enemy.passive_test_enemy=fixture.type!="Defense Dummy";enemy.summoned_unit=str(fixture.category)=="summon";enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,15000.0);enemy.max_hp=enemy.hp
+		if str(fixture.control)!="":CombatSystem.apply_control(enemy,str(fixture.control),600.0,1.0)
+		if fixture.type=="Boss":enemy.control_profile={"slow_multiplier":.5,"root_multiplier":.25,"stun_multiplier":.25,"displacement":false}
+	for hero in heroes:
+		if str(hero.get("class",""))=="Monk":hero.monk_runtime.telemetry_enabled=true
+		else:hero.hp*=0.55
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:monk_endpoint",Rect2(780,300,50,155)))
 	queue_redraw()
 
 func selected_party_indices() -> Array:

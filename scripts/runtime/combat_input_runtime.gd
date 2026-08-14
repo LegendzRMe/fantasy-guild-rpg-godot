@@ -192,6 +192,29 @@ func load_beastmaster_test_build(hero:Dictionary,build_index:int)->void:
 	if int(build.get("fury",0))>=int(BeastmasterData.VALUES.fury_goal):hero.beastmaster_runtime.fury=int(BeastmasterData.VALUES.fury_goal);hero.beastmaster_runtime.fury_complete=true
 	if float(build.get("apex_seconds",0.0))>0.0:BeastmasterSystem.advance(hero,float(build.apex_seconds),true)
 
+func load_monk_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=MonkData.TEST_BUILDS[clampi(build_index,0,MonkData.TEST_BUILDS.size()-1)];var level:=int(build.level)
+	hero.level=level;hero.base_power=MonkData.scaled(float(MonkData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.max_hp=MonkData.scaled(float(MonkData.VALUES.health),level);hero.hp=hero.max_hp;hero.health_regeneration=MonkData.scaled(float(MonkData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(MonkData.VALUES.basic_attack_interval);hero.basic_attack_interval=hero.base_basic_action_interval;hero.range=float(MonkData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];MonkSystem.initialize_runtime(hero,true,"testing:monk")
+
+func handle_monk_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="monk_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Monk":hero=candidate;break
+	if hero==null:return false
+	if not event.ctrl_pressed and not event.alt_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_5:
+		var build_index:=int(event.keycode-KEY_1);load_monk_test_build(hero,build_index);flash("Monk build: %s"%str(MonkData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if event.ctrl_pressed:
+		match event.keycode:
+			KEY_C:hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.monk_runtime.q_slot=AbilitySlotSystem.create(MonkSystem.q_max(hero),MonkSystem.q_recharge(hero),AbilitySlotSystem.RechargeMode.SEQUENTIAL);hero.monk_runtime.breath_cooldown=0.0;hero.monk_runtime.reach_cooldown=0.0;hero.monk_runtime.ally_cooldown=0.0;flash("Monk cooldowns reset")
+			KEY_I:hero.monk_runtime.insight_progress=99;hero.monk_runtime.insight_complete=false;flash("Insight 99/100")
+			KEY_P:hero.monk_runtime.insight_progress=100;hero.monk_runtime.insight_complete=true;flash("Insight complete")
+			KEY_A:var point:Vector2=Vector2(hero.pos)+Vector2(110,0);cast_monk_ally(hero,point);flash("Selected Ally placed")
+			KEY_K:if not hero.monk_runtime.ally.is_empty():hero.monk_runtime.ally.hp=0.0;flash("Selected Ally destroyed")
+			KEY_S:if heroes.size()>1:CombatSystem.apply_control(heroes[1],"stun",8.0);CombatSystem.apply_control(heroes[1],"root",8.0);flash("Ally Stunned + Rooted")
+			KEY_T:for enemy in enemies:if enemy.hp>0.0:CombatSystem.apply_control(enemy,"stun",8.0);break;flash("Enemy Stunned")
+			_:return false
+		queue_redraw();return true
+	return false
+
 func handle_beastmaster_range_shortcut(event:InputEventKey)->bool:
 	if not testing_zone_active or testing_zone_mode!="beastmaster_range":return false
 	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Beastmaster":hero=candidate;break
@@ -604,6 +627,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_monk_range_shortcut(event):return true
 	if handle_death_knight_range_shortcut(event):return true
 	if handle_beastmaster_range_shortcut(event):return true
 	if handle_warrior_range_shortcut(event):return true

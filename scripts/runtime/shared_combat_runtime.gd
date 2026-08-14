@@ -13,6 +13,7 @@ func unit_by_combat_id(combat_id:String):
 			if str(summon.get("combat_id",""))==combat_id:return summon
 		for summon in BeastmasterSystem.combat_beasts(hero) if str(hero.get("class",""))=="Beastmaster" and not hero.get("beastmaster_runtime",{}).is_empty() else []:
 			if str(summon.get("combat_id",""))==combat_id:return summon
+		if str(hero.get("class",""))=="Monk" and not hero.get("monk_runtime",{}).get("ally",{}).is_empty() and str(hero.monk_runtime.ally.get("combat_id",""))==combat_id:return hero.monk_runtime.ally
 	return null
 
 func player_combat_summons()->Array:
@@ -22,6 +23,7 @@ func player_combat_summons()->Array:
 			if float(summon.get("hp",0.0))>0.0 and float(summon.get("remaining_lifetime",0.0))>0.0:result.append(summon)
 		if str(hero.get("class",""))=="Beastmaster" and not hero.get("beastmaster_runtime",{}).is_empty():
 			for beast in BeastmasterSystem.combat_beasts(hero):if float(beast.get("hp",0.0))>0.0:result.append(beast)
+		if str(hero.get("class",""))=="Monk" and not hero.get("monk_runtime",{}).get("ally",{}).is_empty() and float(hero.monk_runtime.ally.get("hp",0.0))>0.0:result.append(hero.monk_runtime.ally)
 	return result
 
 func player_healable_units()->Array:
@@ -98,6 +100,7 @@ func active_movement_multiplier(unit:Dictionary)->float:
 	if str(unit.get("class",""))=="Shaman" and int(unit.get("shaman_runtime",{}).get("windfury_attacks",0))>0:multiplier*=ShamanSystem.windfury_movement_multiplier(unit)
 	if str(unit.get("class",""))=="Protector" and not unit.get("protector_runtime",{}).is_empty():multiplier*=ProtectorSystem.movement_multiplier(unit)
 	if str(unit.get("class",""))=="Beastmaster" and float(unit.get("beastmaster_runtime",{}).get("thrill_remaining",0.0))>0.0:multiplier*=1.0+float(BeastmasterData.VALUES.thrill_speed)
+	if str(unit.get("class",""))=="Monk" and float(unit.get("monk_runtime",{}).get("trait_speed_remaining",0.0))>0.0:multiplier*=1.0+float(MonkData.VALUES.trait_speed)
 	if str(unit.get("beast_category",""))=="misha":
 		var beastmaster=unit_by_combat_id(str(unit.get("owner_id","")))
 		if beastmaster!=null and float(beastmaster.get("beastmaster_runtime",{}).get("thrill_remaining",0.0))>0.0:multiplier*=1.0+float(BeastmasterData.VALUES.thrill_speed)
