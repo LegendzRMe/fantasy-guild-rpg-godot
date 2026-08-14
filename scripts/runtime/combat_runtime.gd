@@ -79,6 +79,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_death_knight_runtime(delta)
 	update_beastmaster_runtime(delta)
 	update_monk_runtime(delta)
+	update_paladin_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 

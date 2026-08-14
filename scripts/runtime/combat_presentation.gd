@@ -131,6 +131,8 @@ func draw_shared_combat_objects()->void:
 		if str(blocker.get("shape","rect"))=="segment":
 			draw_line(Vector2(blocker.from),Vector2(blocker.to),Color("66d8ff88"),float(blocker.thickness));draw_line(Vector2(blocker.from),Vector2(blocker.to),Color("dff8ff"),3)
 			continue
+		if str(blocker.get("shape","rect"))=="ring":
+			draw_circle(Vector2(blocker.center),float(blocker.radius),Color("f4ce62",.08));draw_arc(Vector2(blocker.center),float(blocker.radius),0,TAU,96,Color("f4ce62",.80),float(blocker.thickness));draw_arc(Vector2(blocker.center),float(blocker.radius),0,TAU,96,Color("fff4b0"),2);continue
 		var fill:=Color("73513b") if bool(blocker.get("destructible",false)) else Color("465267")
 		draw_rect(blocker.rect,fill);draw_rect(blocker.rect,C_GOLD if bool(blocker.get("destructible",false)) else C_MUTED,false,3)
 		if bool(blocker.get("destructible",false)):
@@ -358,6 +360,14 @@ func draw_combat_input_preview() -> void:
 		draw_circle(preview_pos,42,Color(preview_color,.14));draw_arc(preview_pos,42,0,TAU,40,preview_color,4)
 	if ability_aiming and selected<heroes.size():
 		var aiming_hero=heroes[selected];var range_limit=float(ABILITY_RANGES[aiming_hero["class"]][aimed_ability_slot]);var aim_point=clamped_cast_point(aiming_hero,ability_aim_point,range_limit) if range_limit>0 else aiming_hero.pos
+		if str(aiming_hero.get("class",""))=="Paladin" and not aiming_hero.get("paladin_runtime",{}).is_empty():
+			var charge_ratio:=ChargedCastSystem.percentage(aiming_hero.paladin_runtime.charge);var maximum:=charge_ratio>=1.0;var preview_color:=Color("fff0a0") if maximum else Color("f0c95f",.45+.4*charge_ratio)
+			if aimed_ability_slot==0:draw_circle(aiming_hero.pos,PaladinSystem.vindication_radius(aiming_hero),Color(preview_color,.08+.08*charge_ratio));draw_arc(aiming_hero.pos,PaladinSystem.vindication_radius(aiming_hero),0,TAU,64,preview_color,2.0+charge_ratio*3.0)
+			elif aimed_ability_slot==1:
+				var facing:=Vector2(aim_point)-Vector2(aiming_hero.pos);if facing==Vector2.ZERO:facing=Vector2(aiming_hero.facing_direction)
+				draw_arc(aiming_hero.pos,float(PaladinData.SPACE.hammer_reach),facing.angle()-float(PaladinData.SPACE.hammer_half_angle),facing.angle()+float(PaladinData.SPACE.hammer_half_angle),24,preview_color,2.0+charge_ratio*3.0)
+			elif aimed_ability_slot==2:
+				var leap_range:=lerpf(float(PaladinData.SPACE.avenging_min),float(PaladinData.SPACE.avenging_max),charge_ratio);var direction:=Vector2(aiming_hero.pos).direction_to(aim_point);var landing:=Vector2(aiming_hero.pos)+direction*leap_range;draw_dashed_line(aiming_hero.pos,landing,preview_color,10,6);draw_circle(landing,float(PaladinData.SPACE.avenging_radius),Color(preview_color,.10));draw_arc(landing,float(PaladinData.SPACE.avenging_radius),0,TAU,48,preview_color,3)
 		if range_limit>0:draw_circle(aiming_hero.pos,range_limit,Color(C_GOLD,.035));draw_arc(aiming_hero.pos,range_limit,0,TAU,64,Color(C_GOLD,.55),2)
 		if aimed_ability_category=="ground":
 			var ground_radius:=MageSystem.flamestrike_radius(aiming_hero,MageSystem.trait_is_armed(aiming_hero)) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==0 else float(MageData.SPACE.pyro_splash_radius) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==3 else 30.0
@@ -451,6 +461,7 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Beastmaster":action_name=str(BeastmasterData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Monk":action_name=str(MonkData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==4 and active["class"]=="Monk":action_name=("%s Ally"%MonkSystem.ally_kind(active).capitalize()) if MonkSystem.ally_kind(active)!="" else "Unassigned"
+			elif slot==3 and active["class"]=="Paladin":action_name=str(PaladinData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==2 and active["class"]=="Death Knight" and bool(active.get("death_knight_runtime",{}).get("tempest",{}).get("active",false)):action_name="Turn Off"
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"
@@ -470,11 +481,14 @@ func draw_ability_bar_hud()->void:
 			var protector_trait_active:bool=slot==4 and str(active.get("class",""))=="Protector" and (bool(active.get("spirit_form",false)) or not active.get("protector_runtime",{}).get("wrath",{}).is_empty())
 			var sentinel_trait_active:bool=slot==4 and str(active.get("class",""))=="Sentinel" and float(active.get("sentinel_runtime",{}).get("mark_remaining",0.0))>0.0
 			var huntsman_trait_active:bool=slot==4 and str(active.get("class",""))=="Huntsman" and HuntsmanSystem.is_worgen(active)
-			var highlighted_state:bool=cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active or protector_trait_active or sentinel_trait_active or huntsman_trait_active
+			var paladin_purpose_primed:bool=slot==4 and str(active.get("class",""))=="Paladin" and bool(active.get("paladin_runtime",{}).get("divine_purpose_primed",false))
+			var highlighted_state:bool=cleric_trait_active or ranger_hatred_full or mage_trait_armed or warlock_darkness_armed or slayer_evasion_active or frostwolf_ready or templar_trait_active or protector_trait_active or sentinel_trait_active or huntsman_trait_active or paladin_purpose_primed
 			if highlighted_state:
 				var trait_pulse:float=.5+.5*sin(battle_time*6.0);var trait_color:Color=Color(CLASSES[active["class"]].color)
 				draw_octagon(center,43+trait_pulse*2.0,Color(trait_color,.08+.08*trait_pulse),Color(trait_color,.48+.42*trait_pulse),3.0+trait_pulse*2.0)
 			draw_octagon(center,37,Color("263a57") if slot<3 else Color("59402b"),C_MUTED,3)
+			if active["class"]=="Paladin" and slot in [0,1,2] and not active.get("paladin_runtime",{}).is_empty() and bool(active.paladin_runtime.charge.active) and int(active.paladin_runtime.charge.slot)==slot:
+				var charge_ratio:=ChargedCastSystem.percentage(active.paladin_runtime.charge);draw_octagon_vertical_fill(center,34,charge_ratio,Color("f4ce62",.72));draw_string(ThemeDB.fallback_font,center+Vector2(-23,-19),"MAX" if charge_ratio>=1.0 else "%d%%"%int(charge_ratio*100.0),HORIZONTAL_ALIGNMENT_CENTER,46,10,Color.WHITE)
 			if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
 			if frostwolf_ratio>0.0:draw_octagon_vertical_fill(center,34,frostwolf_ratio,Color(CLASSES["Shaman"].color,.68))
 			if not warlock_trait_state.is_empty() and not warlock_darkness_armed:

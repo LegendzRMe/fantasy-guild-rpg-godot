@@ -465,6 +465,7 @@ func cycle_selected_enemy()->void:
 	queue_redraw()
 
 func cancel_ability_aim()->void:
+	if selected>=0 and selected<heroes.size() and str(heroes[selected].get("class",""))=="Paladin" and not heroes[selected].get("paladin_runtime",{}).is_empty():PaladinSystem.manual_cancel(heroes[selected])
 	ability_aiming=false;aimed_ability_slot=-1;aimed_ability_category="";aimed_cast_mode="";ability_button_held=false;queue_redraw()
 
 func clear_selected_combat_target()->void:
@@ -480,6 +481,11 @@ func begin_ability(slot:int,device:String="pc")->void:
 	if tutorial_active and tutorial_step==7:use_ability(0,heroes[selected].pos);return
 	var hero_level:=int(state.heroes[battle_hero_indices[selected]].level)
 	if not TalentSystem.ability_is_unlocked(hero_level,slot):return
+	if str(heroes[selected].get("class",""))=="Paladin" and slot in [0,1,2]:
+		var paladin_category:="directional" if slot>0 else "self";var configured_mode:="release" if slot==0 else str(state.casting_settings[device].get(paladin_category,"cursor"));var charge_mode:="confirm" if configured_mode=="confirm" else "release";var initial_aim:=get_global_mouse_position()
+		if configured_mode=="facing":initial_aim=Vector2(heroes[selected].pos)+Vector2(heroes[selected].facing_direction)*float(ABILITY_RANGES.Paladin[slot])
+		if not cast_paladin_ability(slot,initial_aim):return
+		heroes[selected].paladin_runtime.charge.input_mode=configured_mode;heroes[selected].paladin_runtime.charge.device=device;ability_aiming=true;aimed_ability_slot=slot;aimed_ability_category=paladin_category;aimed_cast_mode=charge_mode;aimed_from_touch=device=="mobile";ability_button_held=true;ability_aim_point=initial_aim;queue_redraw();return
 	var category=ABILITY_TARGETING[heroes[selected]["class"]][slot]
 	if heroes[selected]["class"]=="Guardian" and slot==3 and guardian_heroic_id(heroes[selected])=="guardian_l15_r2":category="enemy"
 	if heroes[selected]["class"]=="Mage" and slot==3 and str(heroes[selected].get("selected_heroic_id",""))=="mage_l15_r2":category="enemy"
@@ -533,9 +539,14 @@ func begin_trait()->void:
 	elif str(hero.get("class",""))=="Warrior":
 		use_ability(4,get_global_mouse_position())
 		queue_redraw()
+	elif str(hero.get("class",""))=="Paladin":
+		use_ability(4,hero.pos)
+		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
+	if selected>=0 and selected<heroes.size() and str(heroes[selected].get("class",""))=="Paladin" and not heroes[selected].get("paladin_runtime",{}).is_empty():
+		heroes[selected].paladin_runtime.charge.aim_point=point;ability_aiming=false;aimed_ability_slot=-1;aimed_ability_category="";aimed_cast_mode="";ability_button_held=false;var committed:=resolve_paladin_charge(heroes[selected]);queue_redraw();return committed
 	if aimed_ability_category=="enemy":
 		for i in enemies.size():
 			if enemies[i].hp>0 and enemies[i].pos.distance_to(point)<58:focused_enemy_index=i;var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true

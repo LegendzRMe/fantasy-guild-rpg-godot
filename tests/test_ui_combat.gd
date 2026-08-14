@@ -119,7 +119,7 @@ static func run(main:Node) -> Array:
 	TestSupport.check(errors,item_guardian.shield>=item_guardian.max_hp*.74 and item_guardian.power>item_guardian.base_power,"Last Dawn should create its sourced Shield and Power bonus on a half-health crossing.")
 	main.deal_damage(item_attacker,item_guardian,20.0,"basic_attack","physical","retribution_test")
 	TestSupport.check(errors,not item_guardian.retribution_charges.is_empty(),"Resolved Physical Damage should store a Retribution charge.")
-	var item_dummy:Dictionary=main.enemies[1];var nearby_item_dummy:Dictionary=main.enemies[2];item_dummy.hp=item_dummy.max_hp;nearby_item_dummy.hp=nearby_item_dummy.max_hp;item_dummy.active_effects=[];nearby_item_dummy.active_effects=[]
+	var item_dummy:Dictionary=main.enemies[1];var nearby_item_dummy:Dictionary=main.enemies[2];item_dummy.hp=item_dummy.max_hp;nearby_item_dummy.hp=nearby_item_dummy.max_hp;item_dummy.active_effects=[];nearby_item_dummy.active_effects=[];nearby_item_dummy.pos=item_dummy.pos+Vector2(50,0)
 	item_guardian.critical_chance=1.0;item_guardian.ability_cds=[4.0,4.0,4.0,4.0,0.0]
 	var original_hp_before_wake:float=item_dummy.hp;var nearby_hp_before_wake:float=nearby_item_dummy.hp
 	main.deal_damage(item_guardian,item_dummy,item_guardian.damage,"basic_attack","physical","item_attack_test")
