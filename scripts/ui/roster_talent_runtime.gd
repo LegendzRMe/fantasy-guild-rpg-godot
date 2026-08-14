@@ -32,6 +32,8 @@ func guardian_talent_name(talent_id: String) -> String:
 		return str(DruidData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 	if talent_id.begins_with("warrior_"):
 		return str(WarriorData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
+	if talent_id.begins_with("death_knight_"):
+		return str(DeathKnightData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 	return str(GuardianData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 
 
@@ -66,6 +68,8 @@ func roster_talent_description(hero_class: String, option_id: String) -> String:
 		return str(DruidData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	if hero_class == "Warrior":
 		return str(WarriorData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
+	if hero_class == "Death Knight":
+		return str(DeathKnightData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	return "Talent details are still being developed."
 
 

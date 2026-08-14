@@ -176,6 +176,9 @@ func draw_combat_debug_overlay()->void:
 	if str(hero.get("class",""))=="Warrior" and not hero.get("warrior_runtime",{}).is_empty():
 		var warrior:Dictionary=hero.warrior_runtime;var w_state:=AbilitySlotSystem.ui_state(warrior.w_slot)
 		lines.append("SPEC %s  ROLE %s"%[WarriorSystem.specialization(hero),str(hero.effective_role)]);lines.append("BA %.1f / %.2fs  HS %.1f"%[WarriorSystem.basic_attack_amount(hero),WarriorSystem.attack_interval(hero),float(warrior.heroic_strike_cooldown)]);lines.append("PARRY %.1f  W %d/%d"%[float(warrior.parry_remaining),int(w_state.charges),int(w_state.max_charges)]);lines.append("Q MAW %d/25  HIGH %d/%d/%d"%[int(warrior.lions_maw),WarriorSystem.high_progress(hero,"high_weapon"),WarriorSystem.high_progress(hero,"high_honors"),WarriorSystem.high_progress(hero,"high_endurance")]);lines.append("R %.1f  D %.1f  BANNER %s %.1f"%[float(warrior.taunt_cooldown),float(warrior.shattering_cooldown),str(warrior.banner_type),float(warrior.banner_remaining)]);lines.append("SUMMON LIFE %.1f -> %.1f"%[float(warrior.recent_summon_lifetime_before),float(warrior.recent_summon_lifetime_after)]);lines.append("TELEMETRY %s"%str(warrior.telemetry))
+	if str(hero.get("class",""))=="Death Knight" and not hero.get("death_knight_runtime",{}).is_empty():
+		var death_knight:Dictionary=hero.death_knight_runtime;var army_state:=AbilitySlotSystem.ui_state(death_knight.army_slot)
+		lines.append("BA %.1f / %.2fs  ARMOR %.1f"%[DeathKnightSystem.basic_attack_amount(hero),float(hero.basic_attack_interval),float(hero.armor)]);lines.append("FROSTMOURNE x%d  D %.1f%s"%[int(death_knight.frostmourne_stacks),float(death_knight.frostmourne_cooldown)," PRIMED" if bool(death_knight.frostmourne_primed) else ""]);lines.append("Q/W/E/R %.1f / %.1f / %.1f / %.1f"%[float(hero.ability_cds[0]),float(hero.ability_cds[1]),float(hero.ability_cds[2]),float(hero.ability_cds[3])]);lines.append("TEMPEST %s %.1fs  LOCK %s"%["ON" if bool(death_knight.tempest.active) else "OFF",float(death_knight.tempest.active_duration),str(DeathKnightSystem.locked_slots(hero))]);lines.append("SUPPRESS %s  ICY %.0f%%"%[str(death_knight.suppression.values().map(func(value):return "%.0f%%"%(float(value.stacks)*100.0))),float(death_knight.icy_talons)*100.0]);lines.append("RUNE %d/5  RIME %.0f%%"%[int(death_knight.rune_stacks),IncomingDamageReductionSystem.strongest(hero)*100.0]);lines.append("PRESENCE %d/50  MASTERY %d"%[DeathKnightSystem.frost_presence_progress(hero),DeathKnightSystem.mastery_progress(hero)]);lines.append("ARMY %d/%d  %.1f  GHOULS %d"%[int(army_state.charges),int(army_state.max_charges),float(army_state.recharge),death_knight.ghouls.size()]);lines.append("BITING %s  REMORSE %d"%[str(death_knight.biting.values()),death_knight.remorseless.size()]);lines.append("HEAL x%.2f  INCOMING x%.2f"%[HealingReceivedModifierSystem.multiplier(hero),IncomingDamageReductionSystem.multiplier(hero)]);lines.append("TELEMETRY %s"%str(death_knight.telemetry))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])
@@ -280,6 +283,11 @@ func draw_combat_summons() -> void:
 		for treant in druid.druid_runtime.treants:
 			var treant_pos:=Vector2(treant.pos);var life_ratio:=clampf(float(treant.hp)/maxf(1.0,float(treant.max_hp)),0.0,1.0)
 			draw_circle(treant_pos,21,Color("74b96b",.18));draw_circle(treant_pos,13,Color("6f5438"));draw_line(treant_pos+Vector2(-9,-8),treant_pos+Vector2(-18,-20),Color("91d477"),5);draw_line(treant_pos+Vector2(9,-8),treant_pos+Vector2(18,-20),Color("91d477"),5);health_bar(treant_pos+Vector2(-22,-31),44,life_ratio,Color("78d878"))
+	for death_knight in heroes:
+		if str(death_knight.get("class",""))!="Death Knight" or death_knight.get("death_knight_runtime",{}).is_empty():continue
+		for ghoul in death_knight.death_knight_runtime.ghouls:
+			var ghoul_pos:=Vector2(ghoul.pos);var life_ratio:=clampf(float(ghoul.remaining_lifetime)/maxf(.01,float(ghoul.original_lifetime)),0.0,1.0)
+			draw_circle(ghoul_pos,18,Color("62b5d9",.18));draw_circle(ghoul_pos,11,Color("7c92a4"));draw_line(ghoul_pos+Vector2(-8,5),ghoul_pos+Vector2(8,5),Color("d7edf8"),3);health_bar(ghoul_pos+Vector2(-20,-27),40,life_ratio,Color("75b8dc"))
 
 func draw_combat_heroes() -> void:
 	for i in heroes.size():
@@ -420,6 +428,8 @@ func draw_ability_bar_hud()->void:
 			elif active["class"]=="Huntsman" and slot==2:action_name="Disengage" if HuntsmanSystem.is_worgen(active) else "Darkflight"
 			elif slot==3 and active["class"]=="Huntsman":action_name=str(HuntsmanData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Druid":action_name=str(DruidData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Death Knight":action_name=str(DeathKnightData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==2 and active["class"]=="Death Knight" and bool(active.get("death_knight_runtime",{}).get("tempest",{}).get("active",false)):action_name="Turn Off"
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"
 			elif slot==4 and active["class"]=="Sentinel" and SentinelSystem.has_talent(active,"sentinel_l30_2") and float(active.get("sentinel_runtime",{}).get("d_cooldown",0.0))>0.0:action_name="Trueshot"
@@ -450,6 +460,7 @@ func draw_ability_bar_hud()->void:
 				if darkness_ratio>0.0:draw_octagon_vertical_fill(center,34,darkness_ratio,Color(CLASSES["Warlock"].color,.55))
 			draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
 			if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
+			if active["class"]=="Death Knight" and slot in DeathKnightSystem.locked_slots(active):draw_octagon(center,37,Color(0,0,0,.72),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-23,7),"LOCK",HORIZONTAL_ALIGNMENT_CENTER,46,12,C_TEXT)
 			if active["class"]=="Rogue" and slot==2 and ComboPointSystem.current(active)<=0:draw_octagon(center,37,Color(0,0,0,.58),C_MUTED,2)
 			if highlighted_state:draw_octagon(center,38,Color.TRANSPARENT,Color.WHITE,2)
 			if active["class"]=="Shaman" and slot==2 and int(active.get("shaman_runtime",{}).get("windfury_attacks",0))>0:draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),str(int(active.shaman_runtime.windfury_attacks)),HORIZONTAL_ALIGNMENT_CENTER,24,11,C_TEXT)
@@ -468,6 +479,8 @@ func draw_ability_bar_hud()->void:
 			if active["class"]=="Templar" and slot==3 and str(active.get("selected_heroic_id",""))=="templar_l15_r1" and not active.get("templar_runtime",{}).is_empty():draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),str(int(active.templar_runtime.r1_charges)),HORIZONTAL_ALIGNMENT_CENTER,24,11,C_TEXT)
 			if active["class"]=="Protector" and slot==2 and not active.get("protector_runtime",{}).is_empty():
 				var protector_slot:=AbilitySlotSystem.ui_state(active.protector_runtime.smite_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[protector_slot.charges,protector_slot.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+			if active["class"]=="Death Knight" and slot==3 and str(active.get("selected_heroic_id",""))=="death_knight_l15_r1" and not active.get("death_knight_runtime",{}).is_empty():
+				var death_knight_slot:=AbilitySlotSystem.ui_state(active.death_knight_runtime.army_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[death_knight_slot.charges,death_knight_slot.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 			if active["class"]=="Sentinel" and slot in [0,1] and not active.get("sentinel_runtime",{}).is_empty():
 				var sentinel_slot:=AbilitySlotSystem.ui_state(active.sentinel_runtime.q_slot if slot==0 else active.sentinel_runtime.w_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[sentinel_slot.charges,sentinel_slot.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 

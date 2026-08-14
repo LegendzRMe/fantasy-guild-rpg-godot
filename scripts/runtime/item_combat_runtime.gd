@@ -34,7 +34,7 @@ func item_feedback(text_value:String,position:Vector2,color:Color=C_GOLD)->void:
 	add_effect("cast",position,position,text_value,color)
 
 func current_damage_taken_multiplier(unit:Dictionary)->float:
-	var multiplier:float=float(unit.get("damage_taken_multiplier",1.0))
+	var multiplier:float=float(unit.get("damage_taken_multiplier",1.0))*IncomingDamageReductionSystem.multiplier(unit)
 	for effect in unit.get("active_effects",[]):
 		if effect.has("damage_taken_multiplier") and float(effect.get("remaining_duration",0.0))>0.0:multiplier*=float(effect.damage_taken_multiplier)
 	return multiplier
@@ -47,6 +47,7 @@ func refresh_item_combat_stats(hero:Dictionary)->void:
 	hero.power=float(hero.get("base_power",hero.get("power",0.0)))*soul_multiplier*(1.5 if last_dawn_active else 1.0)
 	hero.basic_action_amount=hero.power*float(hero.get("basic_action_power_ratio",1.0));hero.damage=hero.basic_action_amount
 	if str(hero.get("class",""))=="Warrior" and not hero.get("warrior_runtime",{}).is_empty():hero.basic_action_amount=WarriorSystem.basic_attack_amount(hero);hero.damage=hero.basic_action_amount
+	if str(hero.get("class",""))=="Death Knight" and not hero.get("death_knight_runtime",{}).is_empty():hero.basic_action_amount=DeathKnightSystem.basic_attack_amount(hero);hero.damage=hero.basic_action_amount
 	if str(hero.get("basic_action_type","attack"))=="heal":hero.basic_heal_amount=hero.basic_action_amount
 	var interval:float=float(hero.get("base_basic_action_interval",1.25))/maxf(0.1,1.0+float(hero.get("soul_furnace_stacks",0))*0.05)
 	hero.basic_attack_interval=interval;hero.basic_heal_interval=interval
@@ -181,9 +182,21 @@ func finalize_damage_events(source:Dictionary,target:Dictionary,result:Dictionar
 					if bool(area.get("secondary",false)) or float(area.get("remaining",0.0))<=0.0:continue
 					if Vector2(target.get("pos",Vector2.ZERO)).distance_to(Vector2(area.point))<=DruidSystem.roots_radius(hero,float(area.elapsed),false):hero.druid_runtime.roots_areas.append(DruidSystem.create_roots_area(hero,Vector2(target.pos),true));DruidSystem.telemetry_add(hero,"deep_roots_casts");break
 			if str(hero.get("class",""))=="Warrior" and not hero.get("warrior_runtime",{}).is_empty():WarriorSystem.note_enemy_defeat(hero,target,Vector2(hero.pos).distance_to(Vector2(target.get("pos",Vector2.ZERO))))
+			if str(hero.get("class",""))=="Death Knight" and not hero.get("death_knight_runtime",{}).is_empty():DeathKnightSystem.note_nearby_enemy_death(hero,Vector2(hero.pos).distance_to(Vector2(target.get("pos",Vector2.ZERO))))
+
+func deal_controlled_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,control_type:String,control_duration:float,control_magnitude:float=0.0,origin=null)->Dictionary:
+	var preview_target:Dictionary=target.duplicate(true)
+	var preview_control:=CombatSystem.apply_control(preview_target,control_type,control_duration,control_magnitude)
+	if bool(preview_control.get("applied",false)) and str(target.get("class",""))=="Death Knight" and DeathKnightSystem.has_talent(target,"death_knight_l9_3"):
+		IncomingDamageReductionSystem.apply(target,"death_knight_rime",float(DeathKnightData.VALUES.rime_reduction),float(DeathKnightData.VALUES.rime_duration))
+	var damage_result:=deal_damage(source,target,amount,source_action,damage_type,origin,false,"",[],false)
+	var control_result:=CombatSystem.apply_control(target,control_type,control_duration,control_magnitude)
+	return {"damage":damage_result,"control":control_result}
 
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var warrior_primary:bool=str(source.get("class",""))=="Warrior" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("warrior_runtime",{}).is_empty()
+	var death_knight_primary:bool=str(source.get("class",""))=="Death Knight" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("death_knight_runtime",{}).is_empty()
+	var death_knight_frost_plan:Dictionary=DeathKnightSystem.frostmourne_attack_plan(source,target) if death_knight_primary else {"triggered":false}
 	var warrior_heroic_ready:bool=warrior_primary and float(source.warrior_runtime.heroic_strike_cooldown)<=0.0
 	var warrior_primary_shield_before:float=float(target.get("shield",0.0)) if warrior_primary else 0.0
 	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
@@ -207,6 +220,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		if float(active_effect.get("remaining_duration",0.0))>0.0:active_damage_multiplier=maxf(active_damage_multiplier,float(active_effect.get("damage_multiplier",1.0)))
 	var resolved_amount:=amount*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
 	if warrior_primary:resolved_amount=WarriorSystem.basic_attack_amount(source)*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier
+	if death_knight_primary:resolved_amount=DeathKnightSystem.basic_attack_amount(source)*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier
 	if source_action=="basic_attack":
 		for effect in source.get("active_effects",[]):resolved_amount*=float(effect.get("basic_attack_damage_multiplier",1.0))
 	if str(source.get("class",""))=="Templar" and source_action=="basic_attack" and not source.get("templar_runtime",{}).is_empty():
@@ -257,6 +271,14 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll);var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
 		if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
 	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier else CombatSystem.resolve_damage(source,target,damage_request)
+	if death_knight_primary:
+		DeathKnightSystem.note_primary_basic_attack(source,result)
+		if bool(death_knight_frost_plan.get("triggered",false)):
+			var frost_result:=deal_damage(source,target,float(death_knight_frost_plan.bonus_damage),"trait","physical","Frostmourne Hungers",false,"death_knight_frostmourne",[],true);DeathKnightSystem.telemetry_add(source,"d_bonus_damage",float(frost_result.resolved_damage))
+			if float(death_knight_frost_plan.get("frost_strike",0.0))>0.0:
+				for foe in enemies:
+					if foe.hp>0.0 and TargetCategorySystem.qualifies_immediate(foe) and Vector2(foe.pos).distance_to(Vector2(target.pos))<=float(DeathKnightData.SPACE.frost_strike_radius):var strike:=deal_damage(source,foe,float(death_knight_frost_plan.frost_strike),"basic_ability","magical","Frost Strike",false,"death_knight_frost_strike",[],true);CombatSystem.apply_control(foe,"slow",float(DeathKnightData.VALUES.frost_strike_slow_duration),float(DeathKnightData.VALUES.frost_strike_slow));DeathKnightSystem.telemetry_add(source,"frost_strike_hits");DeathKnightSystem.telemetry_add(source,"frost_strike_damage",float(strike.resolved_damage))
+			DeathKnightSystem.resolve_frostmourne_attack(source,target,frost_result,float(target.get("hp",0.0))<=0.0,bool(death_knight_frost_plan.get("was_controlled",false)))
 	if str(source.get("class",""))=="Warrior" and not source.get("warrior_runtime",{}).is_empty():WarriorSystem.note_damage_participation(source,target,float(result.get("resolved_damage",0.0)))
 	if warrior_primary:
 		var warrior_basic:=WarriorSystem.note_primary_basic_attack(source,target,result,warrior_heroic_ready)

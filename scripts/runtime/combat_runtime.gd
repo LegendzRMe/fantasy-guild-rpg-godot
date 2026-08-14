@@ -76,6 +76,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_huntsman_runtime(delta)
 	update_druid_runtime(delta)
 	update_warrior_runtime(delta)
+	update_death_knight_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 
@@ -150,7 +151,8 @@ func update_combat_enemies(delta:float) -> bool:
 			finish_battle(false)
 			return true
 		var targets_objective:bool=ti==OBJECTIVE_THREAT_TARGET
-		var target_pos:Vector2=objective_actor_pos if targets_objective else heroes[ti].pos
+		var target_unit= null if targets_objective else enemy_target_entity(e,ti)
+		var target_pos:Vector2=objective_actor_pos if targets_objective else Vector2(target_unit.pos)
 		e.target=ti; var dist=e.pos.distance_to(target_pos)
 		if bool(e.get("boss",false)) and not e.summoned and e.hp<e.max_hp*.55:
 			e.summoned=true;spawn_enemy(e.pos+Vector2(-70,-60),"Swift");enemies[-1].summoned_unit=true;spawn_enemy(e.pos+Vector2(-70,60),"Raider");enemies[-1].summoned_unit=true;add_effect("cast",e.pos,e.pos,"PHASE TWO",C_RED)
@@ -163,15 +165,15 @@ func update_combat_enemies(delta:float) -> bool:
 				if e.special=="basic":
 					if targets_objective and objective_is_threat_target():
 						damage_battle_objective(float(e.damage),e.pos)
-					elif ti<heroes.size() and heroes[ti].hp>0:
-						if bool(e.get("ranged",false)) and str(e.get("basic_attack_damage_type","physical"))=="physical":spawn_basic_projectile(e,heroes[ti],float(e.damage),str(e.basic_attack_damage_type),"enemy_basic_attack")
+					elif target_unit!=null and float(target_unit.hp)>0.0:
+						if bool(e.get("ranged",false)) and str(e.get("basic_attack_damage_type","physical"))=="physical":spawn_basic_projectile(e,target_unit,float(e.damage),str(e.basic_attack_damage_type),"enemy_basic_attack")
 						else:
-							if CombatSystem.is_blinded(e):record_blind_miss(e,heroes[ti])
-							else:var basic_result:=deal_damage(e,heroes[ti],e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");heroes[ti].last_hit=3.0;apply_hit_nudge(e,heroes[ti]);add_effect("hit",e.pos,heroes[ti].pos,"-%d"%int(basic_result.resolved_damage),C_RED)
-				elif e.special=="charge":e.pos=CombatGeometry.move_toward_safe(e.pos,e.danger_pos,220.0,float(e.get("combat_radius",28.0)),combat_blockers);for hero_charge in heroes:if hero_charge.hp>0 and hero_charge.pos.distance_to(e.pos)<65:var charge_result:=deal_damage(e,hero_charge,e.damage*1.25,"basic_ability",e.basic_attack_damage_type,"boss_charge");add_effect("hit",e.pos,hero_charge.pos,"-%d"%int(charge_result.resolved_damage),C_RED)
+							if CombatSystem.is_blinded(e):record_blind_miss(e,target_unit)
+							else:var basic_result:=deal_damage(e,target_unit,e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");target_unit["last_hit"]=3.0;apply_hit_nudge(e,target_unit);add_effect("hit",e.pos,target_unit.pos,"-%d"%int(basic_result.resolved_damage),C_RED)
+				elif e.special=="charge":e.pos=CombatGeometry.move_toward_safe(e.pos,e.danger_pos,220.0,float(e.get("combat_radius",28.0)),combat_blockers);for hero_charge in heroes+player_combat_summons():if hero_charge.hp>0 and hero_charge.pos.distance_to(e.pos)<65:var charge_result:=deal_damage(e,hero_charge,e.damage*1.25,"basic_ability",e.basic_attack_damage_type,"boss_charge");add_effect("hit",e.pos,hero_charge.pos,"-%d"%int(charge_result.resolved_damage),C_RED)
 				else:
 					var impact=e.danger_pos if e.special=="danger" else e.pos; var radius=78.0 if e.special=="danger" else 115.0
-					for struck_hero in heroes:
+					for struck_hero in heroes+player_combat_summons():
 						if struck_hero.hp>0 and struck_hero.pos.distance_to(impact)<radius:var area_result:=deal_damage(e,struck_hero,e.damage*1.4,"basic_ability",e.basic_attack_damage_type,"boss_area");add_effect("hit",impact,struck_hero.pos,"-%d"%int(area_result.resolved_damage),C_RED)
 				var attack_speed_reduction:=clampf(CombatSystem.control_amount(e,"attack_speed"),0.0,0.9)
 				e.cooldown=e.basic_attack_interval*(.68 if e.enraged else 1.0)/maxf(0.1,1.0-attack_speed_reduction)

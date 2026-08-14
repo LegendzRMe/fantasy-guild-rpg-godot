@@ -41,6 +41,8 @@ In the testing save, select **TESTING** on the world map to choose the Dummy Ran
 
 Warrior Range adds specialization, target-category, safe-landing, shield, summon-lifetime, Boss-control, banner, and quest fixtures; `Shift+1..6` loads representative builds and `Ctrl+C/Q/K/B/H/S` controls cooldowns, quests, banners, Health, and Shields.
 
+Death Knight Range adds weapon-progression, target-category, suppression, control-profile, Army/Ghoul, Sindragosa, mastery, and wounded-party fixtures; `Shift+1..6` loads representative builds and `Ctrl+C/F/H/M/G` controls cooldowns, weapon stacks, Health, mastery, and Army charges.
+
 The project uses original placeholder systems and artwork. Names, UI, game rules, and assets are subject to change during development.
 
 ## Development
