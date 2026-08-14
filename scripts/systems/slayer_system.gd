@@ -5,6 +5,7 @@ const AbilitySlotSystem = preload("res://scripts/systems/ability_slot_system.gd"
 const EvasionSystem = preload("res://scripts/systems/evasion_system.gd")
 const BlockChargeSystem = preload("res://scripts/systems/block_charge_system.gd")
 const TargetCategorySystem = preload("res://scripts/systems/combat_target_category_system.gd")
+const QuestProgressModifierSystem = preload("res://scripts/systems/quest_progress_modifier_system.gd")
 
 static func has_talent(unit:Dictionary,id:String) -> bool:return id in unit.get("selected_talents",{}).values()
 static func scaled(unit:Dictionary,value:float) -> float:return SlayerData.scaled(value,int(unit.get("level",1)))
@@ -83,7 +84,7 @@ static func note_damage_participation(unit:Dictionary,target:Dictionary,amount:f
 static func process_defeat(unit:Dictionary,target:Dictionary) -> bool:
 	var target_id:=str(target.get("combat_id",""));var participated:=bool(unit.slayer_runtime.unending_hatred_participation.get(target_id,false));unit.slayer_runtime.unending_hatred_participation.erase(target_id)
 	if not has_talent(unit,"slayer_l9_3") or not participated or not TargetCategorySystem.qualifies_quest(target):return false
-	unit.slayer_runtime.unending_hatred_stacks=int(unit.slayer_runtime.unending_hatred_stacks)+1;telemetry_add(unit,"unending_hatred");return true
+	var progress:=QuestProgressModifierSystem.amount(unit,1);unit.slayer_runtime.unending_hatred_stacks=int(unit.slayer_runtime.unending_hatred_stacks)+progress;telemetry_add(unit,"unending_hatred",progress);return true
 
 static func marked_bonus(unit:Dictionary,target:Dictionary) -> bool:
 	var target_id:=str(target.get("combat_id",""));return has_talent(unit,"slayer_l24_1") and float(unit.slayer_runtime.marked_targets.get(target_id,0.0))>0.0
@@ -121,7 +122,7 @@ static func note_sweep(unit:Dictionary,targets:Array) -> void:
 	if has_talent(unit,"slayer_l21_2"):
 		var amount:=float(SlayerData.VALUES.elusive_reduction)*count;unit.ability_cds[2]=maxf(0.0,float(unit.ability_cds[2])-amount);telemetry_add(unit,"elusive_reduction",amount)
 	if has_talent(unit,"slayer_l12_3") and not bool(unit.slayer_runtime.unbound_complete):
-		var qualifying:=targets.filter(func(target):return TargetCategorySystem.qualifies_quest(target)).size();unit.slayer_runtime.unbound_progress+=qualifying;telemetry_add(unit,"unbound_progress",qualifying)
+		var qualifying:=QuestProgressModifierSystem.amount(unit,targets.filter(func(target):return TargetCategorySystem.qualifies_quest(target)).size());unit.slayer_runtime.unbound_progress+=qualifying;telemetry_add(unit,"unbound_progress",qualifying)
 		if int(unit.slayer_runtime.unbound_progress)>=int(SlayerData.VALUES.unbound_goal):unit.slayer_runtime.unbound_complete=true;unit.slayer_runtime.w_slot.max_charges=2;unit.slayer_runtime.w_slot.current_charges=mini(2,int(unit.slayer_runtime.w_slot.current_charges)+1)
 	if has_talent(unit,"slayer_l24_3"):
 		unit.slayer_runtime.blades_stacks+=targets.filter(func(target):return TargetCategorySystem.qualifies_quest(target)).size()

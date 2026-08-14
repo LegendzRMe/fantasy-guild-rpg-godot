@@ -54,6 +54,7 @@ func issue_hero_move(hero:Dictionary,destination:Vector2)->void:
 
 func active_movement_multiplier(unit:Dictionary)->float:
 	var multiplier:=1.0
+	if str(unit.get("class",""))=="Warrior" and float(unit.get("warrior_runtime",{}).get("twin_move_remaining",0.0))>0.0:multiplier*=1.0+float(WarriorData.VALUES.frenzy_move if WarriorSystem.has_talent(unit,"warrior_l27_r3") else WarriorData.VALUES.twin_move)
 	if str(unit.get("class",""))=="Huntsman" and not unit.get("huntsman_runtime",{}).is_empty():multiplier*=HuntsmanSystem.movement_multiplier(unit)
 	if str(unit.get("class",""))=="Shaman" and int(unit.get("shaman_runtime",{}).get("windfury_attacks",0))>0:multiplier*=ShamanSystem.windfury_movement_multiplier(unit)
 	if str(unit.get("class",""))=="Protector" and not unit.get("protector_runtime",{}).is_empty():multiplier*=ProtectorSystem.movement_multiplier(unit)
@@ -118,6 +119,9 @@ func record_blind_miss(source:Dictionary,target:Dictionary)->void:
 	combat_events.append_array(CombatSystem.event_bundle_for_basic_action_miss(source,target,{"damage_type":str(source.get("basic_attack_damage_type","physical")),"origin":"blind"}))
 	if str(source.get("class",""))=="Cleric" and not source.get("cleric_runtime",{}).is_empty():ClericSystem.telemetry_add(source,"blind_misses");ClericSystem.telemetry_add(source,"offensive_basic_attacks")
 	if str(source.get("class",""))=="Mage" and not source.get("mage_runtime",{}).is_empty():MageSystem.sunfire_release(source,false);MageSystem.telemetry_add(source,"basic_attacks_released");MageSystem.telemetry_add(source,"basic_attack_misses")
+	if str(source.get("class",""))=="Warrior" and not source.get("warrior_runtime",{}).is_empty():
+		WarriorSystem.telemetry_add(source,"basic_attempts")
+		if float(source.warrior_runtime.heroic_strike_cooldown)<=0.0:source.warrior_runtime.heroic_strike_cooldown=float(WarriorData.VALUES.heroic_strike_cooldown);source.warrior_runtime.overpower_armed=false;WarriorSystem.telemetry_add(source,"heroic_strikes")
 	call("add_effect","hit",source.get("pos",Vector2.ZERO),target.get("pos",Vector2.ZERO),"MISS",C_MUTED)
 
 func spawn_basic_projectile(source:Dictionary,target:Dictionary,amount:float,damage_type:String,origin:String)->void:

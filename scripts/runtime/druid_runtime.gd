@@ -25,7 +25,7 @@ func druid_resolve_regrowth_tick(hero:Dictionary,tick:Dictionary,bonus:bool=fals
 	DruidSystem.telemetry_add(hero,"verdant_ticks" if bonus else "regrowth_ticks");DruidSystem.telemetry_add(hero,"regrowth_healing",float(result.effective_amount));DruidSystem.telemetry_add(hero,"regrowth_overhealing",float(result.overhealing));druid_visual("druid_regrowth_tick",hero.pos,target.pos,.35)
 	if DruidSystem.has_talent(hero,"druid_l21_1") and float(result.overhealing)>0.0:
 		var candidates:=heroes.filter(func(ally):return ally!=target and ally.hp>0.0);candidates.sort_custom(func(left,right):var ld:float=Vector2(target.pos).distance_squared_to(Vector2(left.pos));var rd:float=Vector2(target.pos).distance_squared_to(Vector2(right.pos));return str(left.combat_id)<str(right.combat_id) if is_equal_approx(ld,rd) else ld<rd)
-		if not candidates.is_empty():druid_heal(hero,candidates[0],float(result.overhealing),"basic_ability","Nature's Swiftness","druid_natures_swiftness",["healing"],{"outgoing_multiplier":1.0,"incoming_multiplier":1.0,"can_crit":false});druid_visual("druid_swiftness",target.pos,candidates[0].pos,.35)
+		if not candidates.is_empty():druid_heal(hero,candidates[0],float(result.overhealing),"basic_ability","Nature's Swiftness","druid_natures_swiftness",["healing"],{"outgoing_multiplier":1.0,"incoming_multiplier":1.0,"ignore_healing_received_modifiers":true,"can_crit":false});druid_visual("druid_swiftness",target.pos,candidates[0].pos,.35)
 
 func druid_cast_regrowth(hero:Dictionary)->bool:
 	if float(hero.ability_cds[0])>0.0:return false

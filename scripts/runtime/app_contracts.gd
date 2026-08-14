@@ -85,6 +85,9 @@ func start_huntsman_testing_zone() -> void:
 func start_druid_testing_zone() -> void:
 	pass
 
+func start_warrior_testing_zone() -> void:
+	pass
+
 
 func show_zone_map(_zone: int) -> void:
 	pass

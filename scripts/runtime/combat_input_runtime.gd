@@ -81,6 +81,32 @@ func handle_druid_range_shortcut(event:InputEventKey)->bool:
 		_:return false
 	queue_redraw();return true
 
+func load_warrior_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=WarriorData.TEST_BUILDS[clampi(build_index,0,WarriorData.TEST_BUILDS.size()-1)];var level:=int(build.level)
+	var banner_source:="warrior_banner:%s"%str(hero.get("combat_id",""))
+	for unit in heroes:
+		unit.active_effects=unit.get("active_effects",[]).filter(func(effect):return not str(effect.get("source_id",effect.get("id",""))).begins_with("warrior_") and str(effect.get("id",""))!=banner_source);unit.temporary_armor_sources=unit.get("temporary_armor_sources",[]).filter(func(source):return not str(source.get("id",""))==banner_source);HealingReceivedModifierSystem.remove(unit,banner_source);QuestProgressModifierSystem.remove(unit,banner_source)
+	hero.level=level;hero.base_power=WarriorData.scaled(float(WarriorData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.max_hp=WarriorData.scaled(float(WarriorData.VALUES.health),level);hero.warrior_base_max_hp=hero.max_hp;hero.hp=hero.max_hp;hero.health_regeneration=WarriorData.scaled(float(WarriorData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(WarriorData.VALUES.basic_attack_interval);hero.range=float(WarriorData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);WarriorSystem.initialize_runtime(hero,true,"testing:warrior");hero.ability_cds=[0.0,0.0,0.0,0.0,0.0]
+	if bool(build.get("complete_high_king",false)):for key in ["high_weapon","high_honors","high_endurance"]:hero.warrior_runtime.encounter_progress[key]={"high_weapon":50,"high_honors":5,"high_endurance":15}[key]
+
+func handle_warrior_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="warrior_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Warrior":hero=candidate;break
+	if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_6:
+		var build_index:=int(event.keycode-KEY_1);load_warrior_test_build(hero,build_index);flash("Warrior build: %s"%str(WarriorData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if not event.ctrl_pressed:return false
+	match event.keycode:
+		KEY_C:hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.warrior_runtime.heroic_strike_cooldown=0.0;hero.warrior_runtime.taunt_cooldown=0.0;hero.warrior_runtime.shattering_cooldown=0.0;hero.warrior_runtime.w_slot=AbilitySlotSystem.create(1 if WarriorSystem.has_talent(hero,"warrior_l18_1") else 2,5.0 if WarriorSystem.has_talent(hero,"warrior_l18_1") else 10.0);flash("Warrior cooldowns reset")
+		KEY_Q:hero.warrior_runtime.lions_maw=25;flash("Lion's Maw complete")
+		KEY_K:for key in ["high_weapon","high_honors","high_endurance"]:hero.warrior_runtime.encounter_progress[key]={"high_weapon":50,"high_honors":5,"high_endurance":15}[key];flash("High King's Quest complete")
+		KEY_B:hero.warrior_runtime.banner_cooldown=0.0;flash("Banner ready")
+		KEY_H:hero.hp=float(hero.max_hp)*(.25 if float(hero.hp)/float(hero.max_hp)>.5 else .85);flash("Warrior Health: %d%%"%int(100.0*hero.hp/hero.max_hp))
+		KEY_S:
+			var target=warrior_enemy_target(hero);if target!=null:apply_unit_shield(hero,target,1800.0,"Warrior Range","warrior_range_manual");flash("Target shield applied")
+		_:return false
+	queue_redraw();return true
+
 func handle_huntsman_range_shortcut(event:InputEventKey)->bool:
 	if not testing_zone_active or testing_zone_mode!="huntsman_range":return false
 	var hero=null
@@ -392,6 +418,9 @@ func begin_trait()->void:
 	elif str(hero.get("class",""))=="Druid":
 		use_ability(4,hero.pos)
 		queue_redraw()
+	elif str(hero.get("class",""))=="Warrior":
+		use_ability(4,get_global_mouse_position())
+		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -478,6 +507,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_warrior_range_shortcut(event):return true
 	if handle_druid_range_shortcut(event):return true
 	if handle_huntsman_range_shortcut(event):return true
 	if handle_sentinel_range_shortcut(event):return true

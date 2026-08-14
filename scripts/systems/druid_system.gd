@@ -6,6 +6,7 @@ const AbilityPowerSystem=preload("res://scripts/systems/ability_power_system.gd"
 const StatusEffectSystem=preload("res://scripts/systems/status_effect_system.gd")
 const AbilitySlotSystem=preload("res://scripts/systems/ability_slot_system.gd")
 const TargetCategorySystem=preload("res://scripts/systems/combat_target_category_system.gd")
+const QuestProgressModifierSystem=preload("res://scripts/systems/quest_progress_modifier_system.gd")
 
 const REGROWTH_TAGS := ["healing_over_time","regrowth"]
 const BASIC_HOT_TAGS := ["healing_over_time","druid_basic_hot"]
@@ -185,7 +186,7 @@ static func note_root_result(unit:Dictionary,target:Dictionary,applied:bool,seco
 	telemetry_add(unit,"roots_contacts");telemetry_add(unit,"roots_success" if applied else "roots_resisted")
 	if not applied:return {"quest":false,"emerald":0.0,"verdant":false}
 	var quest:=has_talent(unit,"druid_l9_2") and TargetCategorySystem.qualifies_quest(target)
-	if quest:unit.druid_runtime.vengeful_quest_stacks=int(unit.druid_runtime.vengeful_quest_stacks)+1;telemetry_add(unit,"quest_stacks")
+	if quest:var progress:=QuestProgressModifierSystem.amount(unit,1);unit.druid_runtime.vengeful_quest_stacks=int(unit.druid_runtime.vengeful_quest_stacks)+progress;telemetry_add(unit,"quest_stacks",progress)
 	var emerald:=float(DruidData.VALUES.emerald_cdr) if has_talent(unit,"druid_l9_3") and successful_index<int(DruidData.VALUES.emerald_cap) else 0.0
 	return {"quest":quest,"emerald":emerald,"verdant":has_talent(unit,"druid_l18_2")}
 

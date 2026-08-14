@@ -2,6 +2,7 @@ extends RefCounted
 
 const GuardianData = preload("res://scripts/data/guardian_data.gd")
 const BlockChargeSystem = preload("res://scripts/systems/block_charge_system.gd")
+const QuestProgressModifierSystem = preload("res://scripts/systems/quest_progress_modifier_system.gd")
 
 static func has_talent(unit:Dictionary,talent_id:String)->bool:
 	return talent_id in unit.get("selected_talents",{}).values()
@@ -37,8 +38,8 @@ static func telemetry_append(unit:Dictionary,key:String,value)->void:
 
 static func add_quest(unit:Dictionary,amount:int,source:String,now:float)->void:
 	var runtime:Dictionary=unit.guardian_runtime
-	runtime.quest_stacks=int(runtime.quest_stacks)+amount
-	if bool(runtime.telemetry_enabled):runtime.telemetry.quest_sources[source]=int(runtime.telemetry.quest_sources.get(source,0))+amount
+	var applied:=QuestProgressModifierSystem.amount(unit,amount);runtime.quest_stacks=int(runtime.quest_stacks)+applied
+	if bool(runtime.telemetry_enabled):runtime.telemetry.quest_sources[source]=int(runtime.telemetry.quest_sources.get(source,0))+applied
 	if not runtime.quest_first_reached and runtime.quest_stacks>=int(GuardianData.VALUES.quest_first):
 		runtime.quest_first_reached=true
 		if bool(runtime.telemetry_enabled):runtime.telemetry.quest_milestones["first"]=now

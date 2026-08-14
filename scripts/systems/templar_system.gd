@@ -3,6 +3,7 @@ extends RefCounted
 const TemplarData=preload("res://scripts/data/templar_data.gd")
 const ProgressionScopeSystem=preload("res://scripts/systems/progression_scope_system.gd")
 const CombatTargetCategorySystem=preload("res://scripts/systems/combat_target_category_system.gd")
+const QuestProgressModifierSystem=preload("res://scripts/systems/quest_progress_modifier_system.gd")
 
 static func has_talent(unit:Dictionary,id:String)->bool:return id in unit.get("selected_talents",{}).values()
 static func ability_amount(unit:Dictionary,value:float)->float:
@@ -50,7 +51,7 @@ static func reduce_trait_cooldown(unit:Dictionary,amount:float)->float:
 
 static func note_successful_basic_attack(unit:Dictionary,target:Dictionary,is_w_strike:bool=false)->void:
 	reduce_trait_cooldown(unit,float(TemplarData.VALUES.trait_attack_reduction))
-	if has_talent(unit,"templar_l9_3") and CombatTargetCategorySystem.qualifies_quest(target):unit.templar_runtime.protector_stacks=int(unit.templar_runtime.protector_stacks)+1;telemetry_add(unit,"protector_stacks")
+	if has_talent(unit,"templar_l9_3") and CombatTargetCategorySystem.qualifies_quest(target):var progress:=QuestProgressModifierSystem.amount(unit,1);unit.templar_runtime.protector_stacks=int(unit.templar_runtime.protector_stacks)+progress;telemetry_add(unit,"protector_stacks",progress)
 	if has_talent(unit,"templar_l9_1") and is_w_strike:unit["templar_block"]={"charges":mini(int(TemplarData.VALUES.reactive_parry_charges),int(unit.get("templar_block",{}).get("charges",0))+1),"maximum":int(TemplarData.VALUES.reactive_parry_charges)}
 
 static func basic_attack_multiplier(unit:Dictionary)->float:return 1.0+int(unit.get("templar_runtime",{}).get("protector_stacks",0))*float(TemplarData.VALUES.protector_per_hit)

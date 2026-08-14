@@ -5,6 +5,8 @@ const STAT_ID := "ability_power_percent"
 
 static func total_percent(source:Dictionary,extra_sources:Array=[])->float:
 	var total:=float(source.get(STAT_ID,0.0))
+	for effect in source.get("active_effects",[]):
+		if float(effect.get("remaining_duration",0.0))>0.0:total+=float(effect.get(STAT_ID,0.0))
 	for entry in extra_sources:total+=float(entry.get(STAT_ID,entry.get("amount",0.0)))
 	return total
 
