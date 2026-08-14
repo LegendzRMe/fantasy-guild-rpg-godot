@@ -5,8 +5,8 @@ const TestSupport = preload("res://tests/test_support.gd")
 
 static func run() -> Array:
 	var errors:=[]
-	TestSupport.check(errors,GameData.CLASSES.keys()==["Guardian","Cleric","Rogue","Ranger","Mage","Warlock","Slayer","Priest","Shaman","Templar","Protector","Sentinel","Huntsman","Druid","Warrior","Death Knight","Beastmaster","Monk","Paladin"],"Established classes should retain their order and append Paladin after Monk.")
-	TestSupport.check(errors,GameData.ABILITIES.size()==19 and GameData.ABILITY_TARGETING.size()==19,"Every current class should retain ability and targeting definitions.")
+	TestSupport.check(errors,GameData.CLASSES.keys()==["Guardian","Cleric","Rogue","Ranger","Mage","Warlock","Slayer","Priest","Shaman","Templar","Protector","Sentinel","Huntsman","Druid","Warrior","Death Knight","Beastmaster","Monk","Paladin","Crusader"],"Established classes should retain their order and append Crusader after Paladin.")
+	TestSupport.check(errors,GameData.ABILITIES.size()==20 and GameData.ABILITY_TARGETING.size()==20,"Every current class should retain ability and targeting definitions.")
 	var class_fields:=["class_id","display_name","primary_role","basic_action_id","trait_id","q_ability_id","w_ability_id","e_ability_id","heroic_option_ids","ai_behavior_tags","talent_tier_definitions","base_health","health_growth","base_power","power_growth","base_armor","basic_action_type","basic_action_power_coefficient","basic_action_interval","basic_action_range","movement_speed","base_critical_chance","critical_damage","health_regeneration","threat_modifier","basic_action_damage_type","armor_family","armor_proficiency","weapon_proficiencies"]
 	TestSupport.check(errors,GameData.CLASSES.values().all(func(hero_class):return hero_class.has_all(class_fields)),"Every class should expose the shared combat-stat vocabulary.")
 	var enemy_fields:=["base_health","health_growth","base_power","power_growth","base_armor","basic_action_type","basic_action_power_coefficient","basic_action_interval","basic_action_range","movement_speed","base_critical_chance","critical_damage","basic_action_damage_type","behavior_flags","combat_tags"]

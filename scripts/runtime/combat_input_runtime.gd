@@ -196,6 +196,20 @@ func load_monk_test_build(hero:Dictionary,build_index:int)->void:
 	var build:Dictionary=MonkData.TEST_BUILDS[clampi(build_index,0,MonkData.TEST_BUILDS.size()-1)];var level:=int(build.level)
 	hero.level=level;hero.base_power=MonkData.scaled(float(MonkData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.max_hp=MonkData.scaled(float(MonkData.VALUES.health),level);hero.hp=hero.max_hp;hero.health_regeneration=MonkData.scaled(float(MonkData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(MonkData.VALUES.basic_attack_interval);hero.basic_attack_interval=hero.base_basic_action_interval;hero.range=float(MonkData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];MonkSystem.initialize_runtime(hero,true,"testing:monk")
 
+func load_crusader_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=CrusaderData.TEST_BUILDS[clampi(build_index,0,CrusaderData.TEST_BUILDS.size()-1)];var level:=int(build.level)
+	hero.level=level;hero.base_power=CrusaderData.scaled(float(CrusaderData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.damage=hero.base_power;hero.max_hp=CrusaderData.scaled(float(CrusaderData.VALUES.health),level);hero.hp=hero.max_hp;hero.health_regeneration=CrusaderData.scaled(float(CrusaderData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(CrusaderData.VALUES.basic_attack_interval);hero.basic_attack_interval=hero.base_basic_action_interval;hero.range=float(CrusaderData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.shield=0.0;hero.shield_sources=[];CrusaderSystem.initialize_runtime(hero,true)
+
+func handle_crusader_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="crusader_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Crusader":hero=candidate;break
+	if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_4:
+		var build_index:=int(event.keycode-KEY_1);load_crusader_test_build(hero,build_index);flash("Crusader build: %s"%str(CrusaderData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if event.ctrl_pressed and event.keycode==KEY_C:
+		hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.crusader_runtime.e_slot=AbilitySlotSystem.create(2 if CrusaderSystem.has_talent(hero,"crusader_l9_1") else 1,float(CrusaderData.VALUES.e_cooldown),AbilitySlotSystem.RechargeMode.INDEPENDENT);hero.crusader_runtime.light_icd=0.0;hero.crusader_runtime.indestructible_icd=0.0;flash("Crusader cooldowns and charges reset");queue_redraw();return true
+	return false
+
 func handle_monk_range_shortcut(event:InputEventKey)->bool:
 	if not testing_zone_active or testing_zone_mode!="monk_range":return false
 	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Monk":hero=candidate;break
@@ -542,6 +556,9 @@ func begin_trait()->void:
 	elif str(hero.get("class",""))=="Paladin":
 		use_ability(4,hero.pos)
 		queue_redraw()
+	elif str(hero.get("class",""))=="Crusader":
+		use_ability(4,hero.pos)
+		queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -638,6 +655,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_crusader_range_shortcut(event):return true
 	if handle_monk_range_shortcut(event):return true
 	if handle_death_knight_range_shortcut(event):return true
 	if handle_beastmaster_range_shortcut(event):return true
