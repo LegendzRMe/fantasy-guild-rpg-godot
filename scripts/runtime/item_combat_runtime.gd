@@ -104,7 +104,7 @@ func apply_passive_trigger(owner:Dictionary,event:Dictionary,target:Dictionary)-
 				if str(result.get("category",""))=="buff":
 					var named_effect:=result.duplicate(true);named_effect["remaining_duration"]=float(passive.get("duration",0.0));owner.active_effects=CombatSystem.apply_named_effect(owner.get("active_effects",[]),named_effect)
 
-func build_damage_request(target:Dictionary,resolved_amount:float,source_action:String,damage_type:String,can_crit_override)->Dictionary:
+func build_damage_request(target:Dictionary,resolved_amount:float,source_action:String,damage_type:String,can_crit_override,hostile:bool=true)->Dictionary:
 	var request:={"amount":resolved_amount,"source_action":source_action,"damage_type":damage_type,"damage_taken_multiplier":current_damage_taken_multiplier(target)}
 	if not target.get("armor_reduction_sources",[]).is_empty():request["base_armor_override"]=ArmorReductionSystem.effective_armor(target)
 	if str(target.get("class",""))=="Guardian" and not target.get("guardian_runtime",{}).is_empty():
@@ -145,6 +145,11 @@ func build_damage_request(target:Dictionary,resolved_amount:float,source_action:
 	elif str(target.get("class",""))=="Huntsman" and not target.get("huntsman_runtime",{}).is_empty():
 		var huntsman_block:=BlockChargeSystem.armor_source(target,float(HuntsmanData.VALUES.thick_skin_armor),"thick_skin","huntsman_block")
 		if not huntsman_block.is_empty():request["armor_sources"]=[huntsman_block]
+	else:
+		var beastmaster=beastmaster_owner_for(target)
+		if hostile and beastmaster!=null and BeastmasterSystem.has_talent(beastmaster,"beastmaster_l12_1") and (target==beastmaster or str(target.get("beast_category",""))=="misha"):
+			var beastmaster_block:=BlockChargeSystem.armor_source(target,float(BeastmasterData.VALUES.block_armor),"grizzled_fortitude","block_state",true)
+			if not beastmaster_block.is_empty():request["armor_sources"]=[beastmaster_block]
 	var shared_armor:Array=target.get("temporary_armor_sources",[]).duplicate(true)
 	if not shared_armor.is_empty():
 		var combined:Array=request.get("armor_sources",[]).duplicate(true);combined.append_array(shared_armor);request["armor_sources"]=combined
@@ -193,6 +198,20 @@ func deal_controlled_damage(source:Dictionary,target:Dictionary,amount:float,sou
 	var control_result:=CombatSystem.apply_control(target,control_type,control_duration,control_magnitude)
 	return {"damage":damage_result,"control":control_result}
 
+func beastmaster_owner_for(unit:Dictionary):
+	if str(unit.get("class",""))=="Beastmaster" and not unit.get("beastmaster_runtime",{}).is_empty():return unit
+	var owner=unit_by_combat_id(str(unit.get("owner_id","")))
+	return owner if owner!=null and str(owner.get("class",""))=="Beastmaster" and not owner.get("beastmaster_runtime",{}).is_empty() else null
+
+func beastmaster_prevented_result(amount:float)->Dictionary:
+	return {"raw_amount":maxf(0.0,amount),"resolved_damage":0.0,"health_damage":0.0,"shield_damage":0.0,"armor_prevented":0.0,"protected_prevented":maxf(0.0,amount),"defeated":false,"critical":false,"immune":true,"evaded":false,"overkill":0.0,"shield_absorptions":[]}
+
+func combine_redirected_damage(primary:Dictionary,redirected:Dictionary)->Dictionary:
+	var result:Dictionary=primary.duplicate(true)
+	for key in ["raw_amount","resolved_damage","health_damage","shield_damage","armor_prevented","protected_prevented","overkill"]:result[key]=float(primary.get(key,0.0))+float(redirected.get(key,0.0))
+	result["defeated"]=bool(primary.get("defeated",false));result["redirected_damage"]=float(redirected.get("resolved_damage",0.0));result["redirected_target_defeated"]=bool(redirected.get("defeated",false));result["shield_absorptions"]=primary.get("shield_absorptions",[])+redirected.get("shield_absorptions",[])
+	return result
+
 func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:String,damage_type:String,origin=null,source_is_summon:bool=false,originating_effect_id:String="",trigger_chain:Array=[],can_crit_override=null)->Dictionary:
 	var warrior_primary:bool=str(source.get("class",""))=="Warrior" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("warrior_runtime",{}).is_empty()
 	var death_knight_primary:bool=str(source.get("class",""))=="Death Knight" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("death_knight_runtime",{}).is_empty()
@@ -200,6 +219,18 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	var warrior_heroic_ready:bool=warrior_primary and float(source.warrior_runtime.heroic_strike_cooldown)<=0.0
 	var warrior_primary_shield_before:float=float(target.get("shield",0.0)) if warrior_primary else 0.0
 	var hostile:bool=str(source.get("combat_affiliation",source.get("combat_team","")))!=str(target.get("combat_affiliation",target.get("combat_team","")))
+	var beastmaster_owner=beastmaster_owner_for(target)
+	var bond_redirect:bool=originating_effect_id=="beastmaster_bond_redirect" or "beastmaster_bond_redirect" in trigger_chain
+	if hostile and source_action=="basic_attack" and not bond_redirect and beastmaster_owner!=null:BeastmasterSystem.apply_primal(beastmaster_owner,source,target)
+	if hostile and not bond_redirect and beastmaster_owner!=null and BeastmasterSystem.has_talent(beastmaster_owner,"beastmaster_l24_3") and (target==beastmaster_owner or str(target.get("beast_category",""))=="misha"):
+		var partner:Dictionary=beastmaster_owner.beastmaster_runtime.misha if target==beastmaster_owner else beastmaster_owner
+		var bond_plan:=DamageRedirectionSystem.protective_bond_plan(target,partner,amount,true,false)
+		if bool(bond_plan.redirected):
+			var primary_result:=deal_damage(source,target,float(bond_plan.original_amount),source_action,damage_type,origin,source_is_summon,originating_effect_id,trigger_chain+["beastmaster_bond_redirect"],can_crit_override)
+			var redirected_result:=deal_damage(source,partner,float(bond_plan.redirect_amount),source_action,damage_type,origin,source_is_summon,"beastmaster_bond_redirect",trigger_chain+["beastmaster_bond_redirect"],can_crit_override)
+			beastmaster_owner.beastmaster_runtime.last_redirect={"from":str(target.get("combat_id","")),"to":str(partner.get("combat_id","")),"raw":float(bond_plan.redirect_amount),"resolved":float(redirected_result.get("resolved_damage",0.0))};BeastmasterSystem.telemetry_add(beastmaster_owner,"protective_redirected",float(bond_plan.redirect_amount));return combine_redirected_damage(primary_result,redirected_result)
+	if hostile and beastmaster_owner!=null and str(target.get("beast_category","")) in ["lesser","greater"] and float(target.get("fresh_remaining",0.0))>0.0:
+		BeastmasterSystem.telemetry_add(beastmaster_owner,"fresh_prevented",amount);return beastmaster_prevented_result(amount)
 	if hostile and source_action=="basic_attack" and str(target.get("class",""))=="Warrior" and not target.get("warrior_runtime",{}).is_empty():
 		var parry:=WarriorSystem.note_parry_contact(target)
 		if bool(parry.prevented) and not bool(parry.shield_wall):WarriorSystem.telemetry_add(target,"parry_prevented",amount);return {"raw_amount":maxf(0.0,amount),"resolved_damage":0.0,"health_damage":0.0,"shield_damage":0.0,"armor_prevented":0.0,"protected_prevented":maxf(0.0,amount),"defeated":false,"critical":false,"immune":true,"evaded":false,"overkill":0.0,"shield_absorptions":[]}
@@ -263,7 +294,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 		if originating_effect_id!="retribution" and not source.get("retribution_charges",[]).is_empty():
 			retribution_bonus=float(source.retribution_charges.pop_front().amount)
 	var before_ratio:float=float(target.get("hp",0.0))/maxf(1.0,float(target.get("max_hp",1.0)))
-	var damage_request:=build_damage_request(target,resolved_amount,source_action,damage_type,can_crit_override)
+	var damage_request:=build_damage_request(target,resolved_amount,source_action,damage_type,can_crit_override,hostile)
 	var previews_mage_barrier:bool=str(target.get("class",""))=="Mage" and not target.get("mage_runtime",{}).is_empty() and str(source.get("combat_team",""))!=str(target.get("combat_team",""))
 	var resolution_roll:=-1.0
 	if previews_mage_barrier:
@@ -299,6 +330,13 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(target.get("class",""))=="Shaman" and not target.get("shaman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"shaman_block")
 	if str(target.get("class",""))=="Templar" and not target.get("templar_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"templar_block")
 	if str(target.get("class",""))=="Huntsman" and not target.get("huntsman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"huntsman_block")
+	if hostile and beastmaster_owner!=null and BeastmasterSystem.has_talent(beastmaster_owner,"beastmaster_l12_1") and (target==beastmaster_owner or str(target.get("beast_category",""))=="misha") and BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false))):BeastmasterSystem.telemetry_add(beastmaster_owner,"block_consumed")
+	if beastmaster_owner!=null and bool(result.get("defeated",false)):
+		if str(target.get("beast_category",""))=="misha":BeastmasterSystem.defeat_misha(beastmaster_owner)
+		elif str(target.get("beast_category","")) in ["lesser","greater"]:target["defeated_by_hostile"]=true
+	if str(source.get("class",""))=="Beastmaster" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("beastmaster_runtime",{}).is_empty():
+		var beastmaster_proc:=BeastmasterSystem.note_primary_attack(source,"beastmaster",str(target.get("combat_id","")),result)
+		if float(beastmaster_proc.get("hunted_bonus",0.0))>0.0:deal_damage(source,target,float(beastmaster_proc.hunted_bonus),"trait","physical","Hunted",false,"beastmaster_hunted_beastmaster",[],false)
 	if str(source.get("class",""))=="Druid" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("druid_runtime",{}).is_empty():DruidSystem.note_basic_attack(source,target,result,heroes)
 	if not huntsman_basic_result.is_empty():
 		HuntsmanSystem.resolve_basic_attack(source,float(result.get("resolved_damage",0.0)),bool(huntsman_basic_result.get("wizened",false)))
@@ -344,6 +382,8 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 			if str(sentinel.get("class",""))!="Sentinel" or sentinel.get("sentinel_runtime",{}).is_empty():continue
 			SentinelSystem.note_defeat(sentinel,target);var reveal:Dictionary=sentinel.sentinel_runtime.w_reveals.get(str(target.combat_id),{})
 			if not reveal.is_empty() and not bool(reveal.get("reset_used",false)):sentinel.sentinel_runtime.w_slot.current_charges=mini(int(sentinel.sentinel_runtime.w_slot.max_charges),int(sentinel.sentinel_runtime.w_slot.current_charges)+1);reveal.reset_used=true;SentinelSystem.telemetry_add(sentinel,"w_death_resets")
+		for beastmaster in heroes:
+			if str(beastmaster.get("class",""))=="Beastmaster" and str(beastmaster.get("beastmaster_runtime",{}).get("apex_target",""))==str(target.get("combat_id","")):beastmaster.beastmaster_runtime.apex_target="";beastmaster.beastmaster_runtime.apex_stacks=0
 	if str(source.get("class",""))=="Rogue" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("rogue_runtime",{}).is_empty():
 		if ComboPointSystem.successful_hit(result):
 			RogueSystem.double_strike_roll(source)
@@ -421,6 +461,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 
 func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action:String="basic_ability",origin=null,originating_effect_id:String="",action_tags:Array=[],resolution_overrides:Dictionary={})->Dictionary:
 	if bool(target.get("spirit_form",false)):return {"raw_amount":amount,"effective_amount":0.0,"overhealing":maxf(0.0,amount),"critical":false}
+	if str(target.get("beast_category","")) in ["lesser","greater"]:return {"raw_amount":amount,"effective_amount":0.0,"overhealing":maxf(0.0,amount),"critical":false,"blocked":true}
 	var incoming_multiplier:=1.0
 	for hero in heroes:
 		if str(hero.get("class",""))!="Cleric" or not ClericSystem.has_talent(hero,"cleric_l24_3"):continue
@@ -437,6 +478,8 @@ func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action
 		if event.event_type=="overhealing_done" or float(event.get("effective_amount",0.0))>0.0 and event.event_type in ["direct_healing_done","periodic_healing_done","critical_result"]:apply_passive_trigger(source,event,target)
 	var source_index:int=int(source.get("battle_index",-1))
 	if source_index>=0:add_healing_threat(source_index,float(result.get("effective_amount",0.0)))
+	var beastmaster=beastmaster_owner_for(target)
+	if beastmaster!=null and str(target.get("beast_category",""))=="misha":BeastmasterSystem.telemetry_add(beastmaster,"misha_healing",float(result.get("effective_amount",0.0)))
 	return result
 
 func apply_unit_shield(source:Dictionary,target:Dictionary,amount:float,origin=null,source_id:String="shield",cap:float=INF,duration:float=0.0)->Dictionary:

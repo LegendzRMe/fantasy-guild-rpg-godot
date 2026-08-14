@@ -75,6 +75,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Druid":DruidSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Warrior":WarriorSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Death Knight":DeathKnightSystem.initialize_runtime(heroes[-1],is_testing_save(),data.get("talent_mastery",{}),ProgressionScopeSystem.new_encounter_id("battle"))
+		elif str(heroes[-1].get("class",""))=="Beastmaster":BeastmasterSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -341,6 +342,24 @@ func start_death_knight_testing_zone() -> void:
 	for enemy in enemies:enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,10000.0);enemy.max_hp=enemy.hp
 	for hero in heroes:if str(hero.get("class",""))=="Death Knight":hero.death_knight_runtime.telemetry_enabled=true
 	for ally in heroes:if str(ally.get("class",""))!="Death Knight":ally.hp*=0.55
+	queue_redraw()
+
+func start_beastmaster_testing_zone() -> void:
+	var test_party:Array=testing_party_for_class("Beastmaster")
+	if test_party.is_empty():flash("Beastmaster fixture unavailable.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="beastmaster_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	var fixtures:=[
+		{"position":Vector2(440,115),"type":"Raider","category":"standard","passive":true},{"position":Vector2(530,115),"type":"Brute","category":"elite","passive":true},{"position":Vector2(620,115),"type":"Archer","category":"named","passive":true},{"position":Vector2(710,115),"type":"Boss","category":"boss","passive":true,"profile":{"slow_multiplier":0.5,"attack_speed_multiplier":0.5,"root_multiplier":0.25,"stun_multiplier":0.25}},
+		{"position":Vector2(470,220),"type":"Defense Dummy","category":"standard","passive":false},{"position":Vector2(570,220),"type":"Swift","category":"standard","passive":false,"slow":true},{"position":Vector2(670,220),"type":"Brute","category":"elite","passive":true,"armor":100.0},
+		{"position":Vector2(820,160),"type":"Dummy","category":"temporary_combat","passive":true},{"position":Vector2(890,160),"type":"Dummy","category":"temporary_combat","passive":true},{"position":Vector2(960,160),"type":"Dummy","category":"temporary_combat","passive":true},{"position":Vector2(1030,160),"type":"Dummy","category":"temporary_combat","passive":true},{"position":Vector2(1100,160),"type":"Dummy","category":"temporary_combat","passive":true},
+		{"position":Vector2(1000,420),"type":"Archer","category":"standard","passive":false},{"position":Vector2(1080,500),"type":"Defense Dummy","category":"standard","passive":false,"aoe":true}
+	]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);var enemy:Dictionary=enemies[-1];enemy.target_category=str(fixture.category);enemy.passive_test_enemy=bool(fixture.passive);enemy.control_profile=fixture.get("profile",{}).duplicate(true);enemy.armor=float(fixture.get("armor",0.0));enemy["slow_test_enemy"]=bool(fixture.get("slow",false));enemy["hostile_aoe_test"]=bool(fixture.get("aoe",false));enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,12000.0);enemy.max_hp=enemy.hp
+	for hero in heroes:
+		if str(hero.get("class",""))=="Beastmaster":hero.beastmaster_runtime.telemetry_enabled=true;hero.beastmaster_runtime.misha.hp*=0.55
+		else:hero.hp*=0.55
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:beastmaster_endpoint",Rect2(760,285,56,165)))
 	queue_redraw()
 
 func selected_party_indices() -> Array:

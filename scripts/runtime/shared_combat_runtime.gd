@@ -11,6 +11,8 @@ func unit_by_combat_id(combat_id:String):
 	for hero in heroes:
 		for summon in hero.get("death_knight_runtime",{}).get("ghouls",[]):
 			if str(summon.get("combat_id",""))==combat_id:return summon
+		for summon in BeastmasterSystem.combat_beasts(hero) if str(hero.get("class",""))=="Beastmaster" and not hero.get("beastmaster_runtime",{}).is_empty() else []:
+			if str(summon.get("combat_id",""))==combat_id:return summon
 	return null
 
 func player_combat_summons()->Array:
@@ -18,6 +20,17 @@ func player_combat_summons()->Array:
 	for hero in heroes:
 		for summon in hero.get("death_knight_runtime",{}).get("ghouls",[]):
 			if float(summon.get("hp",0.0))>0.0 and float(summon.get("remaining_lifetime",0.0))>0.0:result.append(summon)
+		if str(hero.get("class",""))=="Beastmaster" and not hero.get("beastmaster_runtime",{}).is_empty():
+			for beast in BeastmasterSystem.combat_beasts(hero):if float(beast.get("hp",0.0))>0.0:result.append(beast)
+	return result
+
+func player_healable_units()->Array:
+	var result:Array=[]
+	for hero in heroes:
+		if float(hero.get("hp",0.0))>0.0 and not bool(hero.get("spirit_form",false)):result.append(hero)
+		if str(hero.get("class",""))=="Beastmaster" and not hero.get("beastmaster_runtime",{}).is_empty():
+			var misha:Dictionary=hero.beastmaster_runtime.misha
+			if BeastmasterSystem.misha_alive(hero) and BeastmasterSystem.ordinary_heal_eligible(misha):result.append(misha)
 	return result
 
 func enemy_target_entity(enemy:Dictionary,hero_index:int):
@@ -78,6 +91,10 @@ func active_movement_multiplier(unit:Dictionary)->float:
 	if str(unit.get("class",""))=="Huntsman" and not unit.get("huntsman_runtime",{}).is_empty():multiplier*=HuntsmanSystem.movement_multiplier(unit)
 	if str(unit.get("class",""))=="Shaman" and int(unit.get("shaman_runtime",{}).get("windfury_attacks",0))>0:multiplier*=ShamanSystem.windfury_movement_multiplier(unit)
 	if str(unit.get("class",""))=="Protector" and not unit.get("protector_runtime",{}).is_empty():multiplier*=ProtectorSystem.movement_multiplier(unit)
+	if str(unit.get("class",""))=="Beastmaster" and float(unit.get("beastmaster_runtime",{}).get("thrill_remaining",0.0))>0.0:multiplier*=1.0+float(BeastmasterData.VALUES.thrill_speed)
+	if str(unit.get("beast_category",""))=="misha":
+		var beastmaster=unit_by_combat_id(str(unit.get("owner_id","")))
+		if beastmaster!=null and float(beastmaster.get("beastmaster_runtime",{}).get("thrill_remaining",0.0))>0.0:multiplier*=1.0+float(BeastmasterData.VALUES.thrill_speed)
 	for effect in unit.get("active_effects",[]):
 		if float(effect.get("remaining_duration",0.0))>0.0:multiplier*=float(effect.get("movement_speed_multiplier",1.0))
 	return multiplier
