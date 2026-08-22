@@ -105,6 +105,7 @@ static func testing_heroes() -> Array:
 		hero_state("Kharazim","Monk",30,17,"guild_recruit",false,0),
 		hero_state("Yrel","Paladin",30,18,"guild_recruit",false,0),
 		hero_state("Johanna","Crusader",30,18,"guild_recruit",false,0),
+		hero_state("Ettin Chieftain","Vanguard",30,19,"guild_recruit",false,0),
 		hero_state("Aldren Vale","Guardian",4,18,"special_hero",true,1,{"signature_ability":"Oath of Cinders","story_lead":"The traitor's broken oath-seal"}),
 		hero_state("Mira Thorn","Ranger",4,18,"special_hero",true,1,{"signature_ability":"Ghostmark Volley","story_lead":"Unnatural tracks leaving Ashwood"}),
 		hero_state("Ilyra Voss","Mage",4,18,"special_hero",true,1,{"signature_ability":"Runebreak","story_lead":"The force inside the servant's runes"})

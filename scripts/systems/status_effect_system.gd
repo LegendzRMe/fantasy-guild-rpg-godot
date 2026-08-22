@@ -143,6 +143,15 @@ static func extend_controls(unit:Dictionary,control_types:Array,multiplier:float
 		var before:=float(effect.remaining_duration);effect.remaining_duration=before*safe_multiplier;extended[control_type]=float(effect.remaining_duration)-before
 	return extended
 
+static func extend_control_seconds(unit:Dictionary,control_type:String,seconds:float,source_id:String="")->float:
+	var selected=null;var extension:=maxf(0.0,seconds)
+	for effect in unit.get("active_effects",[]):
+		if str(effect.get("control_type",""))!=control_type or float(effect.get("remaining_duration",0.0))<=0.0:continue
+		if source_id!="" and str(effect.get("source_id",""))!=source_id:continue
+		if selected==null or float(effect.remaining_duration)>float(selected.remaining_duration):selected=effect
+	if selected==null:return 0.0
+	selected.remaining_duration=float(selected.remaining_duration)+extension;return extension
+
 static func apply_source_control(unit:Dictionary,source_id:String,control_type:String,duration:float,magnitude:float=0.0)->Dictionary:
 	if is_unstoppable(unit) and control_type in PREVENTED_BY_UNSTOPPABLE:return {"applied":false,"resisted":true,"duration":0.0,"magnitude":0.0,"reason":"unstoppable"}
 	var profile:=control_profile(unit);var profile_multiplier:=float(profile.get("%s_multiplier"%control_type,profile.get("slow_multiplier",1.0)));var personal_multiplier:=float(unit.get("control_duration_multipliers",{}).get(control_type,1.0));var resolved_duration:=maxf(0.0,duration*profile_multiplier*personal_multiplier);var resolved_magnitude:=magnitude*profile_multiplier*(float(unit.get("slow_magnitude_multiplier",1.0)) if control_type=="slow" else 1.0)
