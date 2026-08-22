@@ -194,6 +194,15 @@ func draw_combat_debug_overlay()->void:
 	if str(hero.get("class",""))=="Vanguard" and not hero.get("vanguard_runtime",{}).is_empty():
 		var vanguard:Dictionary=hero.vanguard_runtime;var overpower:=AbilitySlotSystem.ui_state(vanguard.e_slot)
 		lines.append("HEROIC %s  R %.1f"%[str(VanguardData.WORKING_NAMES.get(str(hero.selected_heroic_id),hero.selected_heroic_id)),float(hero.ability_cds[3])]);lines.append("LEVEL %d  HP %.0f/%.0f  BA %.1f/%.2f  THREAT x%.1f"%[int(hero.level),float(hero.hp),float(hero.max_hp),float(hero.damage),float(hero.basic_attack_interval),float(hero.threat_modifier)]);lines.append("Q/W/E %.1f/%.1f/%.1f  E %d/%d LOCK %.1f"%[float(hero.ability_cds[0]),float(hero.ability_cds[1]),float(hero.ability_cds[2]),int(overpower.charges),int(overpower.max_charges),float(overpower.lockout)]);lines.append("QUEST %d/%d %s  HEALS %d  BLOCK %d"%[int(vanguard.quest.progress),int(VanguardData.VALUES.prog_requirement),"DONE" if bool(vanguard.quest.complete) else "",vanguard.healing_areas.size(),BlockChargeSystem.charges(hero)]);lines.append("PINBALL %s  ROOTS %d  AMPS %d  ECHO %d"%[str(vanguard.pinball),vanguard.delayed_roots.size(),vanguard.amps.size(),vanguard.echoes.size()]);lines.append("WINDUP %s  MOSH %s  LIGHTNING %s"%[str(vanguard.heroic_windup),str(vanguard.mosh),str(vanguard.lightning)]);lines.append("ENCORE %s  DEATH METAL %s ICD %.1f"%[str(vanguard.encore_marks),str(vanguard.death_metal),float(vanguard.death_metal_icd)]);lines.append("TALENTS %s"%str(hero.get("selected_talents",{}).values()));lines.append("TELEMETRY %s"%str(vanguard.telemetry))
+	if str(hero.get("class",""))=="Vitalist" and not hero.get("vitalist_runtime",{}).is_empty():
+		var vitalist:Dictionary=hero.vitalist_runtime;var d_ui:=VitalistSystem.d_ui(hero);var r_ui:=VitalistSystem.r_ui(hero)
+		lines.append("HEROIC %s  R %.1f  R CHARGES %d/%d"%[str(VitalistData.WORKING_NAMES.get(str(hero.selected_heroic_id),hero.selected_heroic_id)),float(hero.ability_cds[3]),int(r_ui.charges),int(r_ui.max_charges)])
+		lines.append("LEVEL %d  HP %.0f/%.0f  BA %.1f / %.2f sec  RANGE %.0f"%[int(hero.level),float(hero.hp),float(hero.max_hp),float(hero.damage),float(hero.basic_attack_interval),float(hero.range)])
+		lines.append("Q/W/E %.1f/%.1f/%.1f  D %d/%d RECHARGE %.1f LOCK %.1f RATE x%.1f"%[float(hero.ability_cds[0]),float(hero.ability_cds[1]),float(hero.ability_cds[2]),int(d_ui.charges),int(d_ui.max_charges),float(d_ui.recharge),float(d_ui.intercast),VitalistSystem.d_recharge_rate(hero)])
+		lines.append("Q ACTIVE %d  W ACTIVE %d  SNAPSHOT Q%d/W%d"%[vitalist.q_infections.size(),vitalist.w_infections.size(),int(vitalist.latest_snapshot.q),int(vitalist.latest_snapshot.w)])
+		lines.append("Q INSTANCES %s"%str(vitalist.q_infections));lines.append("W INSTANCES %s"%str(vitalist.w_infections))
+		lines.append("ARM %s  CONTACTS %d  LONG PITCH %.1f"%[str(vitalist.arm),int(vitalist.arm.get("contacts",0)),float(vitalist.long_pitch_remaining)])
+		lines.append("QUEST %d/%d %s  TALENTS %s"%[int(vitalist.quest.progress),int(VitalistData.VALUES.fetid_quest),"DONE" if bool(vitalist.quest.complete) else "",str(hero.get("selected_talents",{}).values())]);lines.append("TELEMETRY %s"%str(vitalist.telemetry))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])
@@ -347,6 +356,10 @@ func draw_combat_heroes() -> void:
 		if not victory_sequence and str(h.get("class",""))=="Vanguard" and not h.get("vanguard_runtime",{}).is_empty():
 			if not h.vanguard_runtime.mosh.is_empty():draw_circle(h.pos,float(VanguardData.SPACE.mosh_radius),Color(CLASSES.Vanguard.color,.10));draw_arc(h.pos,float(VanguardData.SPACE.mosh_radius),0,TAU,48,Color("ff7777"),4)
 			if not h.vanguard_runtime.lightning.is_empty():var facing:=Vector2(h.get("facing_direction",Vector2.RIGHT));draw_arc(h.pos,float(VanguardData.SPACE.lightning_range),facing.angle()-float(VanguardData.SPACE.lightning_half_angle),facing.angle()+float(VanguardData.SPACE.lightning_half_angle),36,Color("ffb45f"),4)
+		if not victory_sequence and str(h.get("class",""))=="Vitalist" and not h.get("vitalist_runtime",{}).is_empty():
+			if not h.vitalist_runtime.arm.is_empty():draw_circle(h.vitalist_runtime.arm.position,float(VitalistData.SPACE.e_radius),Color(CLASSES.Vitalist.color,.10));draw_arc(h.vitalist_runtime.arm.position,float(VitalistData.SPACE.e_radius),0,TAU,48,Color("72df91"),4)
+			for q in h.vitalist_runtime.q_infections:var target=unit_by_combat_id(str(q.target_id));if target!=null:draw_arc(target.pos,31,0,TAU,24,Color("70ef8a"),3)
+			for target_id in h.vitalist_runtime.w_infections.keys():var target=unit_by_combat_id(str(target_id));if target!=null:draw_arc(target.pos,29,0,TAU,24,Color("b469d5"),3)
 		if not victory_sequence:draw_hero_channel_bar(h)
 		if not victory_sequence and str(h.get("class",""))=="Rogue" and not h.get("rogue_runtime",{}).is_empty():
 			var point_count:int=ComboPointSystem.current(h);var point_max:int=ComboPointSystem.maximum(h);var pip_start:float=float(h.pos.x)-(point_max-1)*7.0
@@ -391,6 +404,11 @@ func draw_combat_input_preview() -> void:
 			var facing:=Vector2(aiming_hero.pos).direction_to(aim_point);if facing==Vector2.ZERO:facing=Vector2(aiming_hero.facing_direction)
 			if aimed_ability_slot==0:draw_dashed_line(aiming_hero.pos,aiming_hero.pos+facing*float(VanguardData.SPACE.q_range),Color(CLASSES.Vanguard.color,.85),12,6)
 			elif aimed_ability_slot==2:draw_circle(aiming_hero.pos,float(VanguardData.SPACE.e_range),Color(CLASSES.Vanguard.color,.08));draw_arc(aiming_hero.pos,float(VanguardData.SPACE.e_range),0,TAU,36,Color(CLASSES.Vanguard.color,.75),3)
+		if str(aiming_hero.get("class",""))=="Vitalist":
+			var facing:=Vector2(aiming_hero.pos).direction_to(aim_point) if Vector2(aiming_hero.pos)!=aim_point else Vector2(aiming_hero.get("facing_direction",Vector2.RIGHT))
+			if aimed_ability_slot==1:draw_dashed_line(aiming_hero.pos,aiming_hero.pos+facing*float(VitalistData.SPACE.w_range)*(1.5 if VitalistSystem.has_talent(aiming_hero,"vitalist_l18_1") else 1.0),Color(CLASSES.Vitalist.color,.85),12,6)
+			elif aimed_ability_slot==2:draw_circle(aim_point,float(VitalistData.SPACE.e_radius),Color(CLASSES.Vitalist.color,.10));draw_arc(aim_point,float(VitalistData.SPACE.e_radius),0,TAU,36,Color(CLASSES.Vitalist.color,.8),3)
+			elif aimed_ability_slot==3:draw_dashed_line(aiming_hero.pos,aiming_hero.pos+facing*float(VitalistData.SPACE.shove_range),Color(CLASSES.Vitalist.color,.85),12,6)
 		if range_limit>0:draw_circle(aiming_hero.pos,range_limit,Color(C_GOLD,.035));draw_arc(aiming_hero.pos,range_limit,0,TAU,64,Color(C_GOLD,.55),2)
 		if aimed_ability_category=="ground":
 			var ground_radius:=MageSystem.flamestrike_radius(aiming_hero,MageSystem.trait_is_armed(aiming_hero)) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==0 else float(MageData.SPACE.pyro_splash_radius) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==3 else 30.0
@@ -487,6 +505,7 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Paladin":action_name=str(PaladinData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Crusader":action_name=str(CrusaderData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Vanguard":action_name=str(VanguardData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Vitalist":action_name=str(VitalistData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==2 and active["class"]=="Death Knight" and bool(active.get("death_knight_runtime",{}).get("tempest",{}).get("active",false)):action_name="Turn Off"
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"
@@ -517,6 +536,7 @@ func draw_ability_bar_hud()->void:
 				var charge_ratio:=ChargedCastSystem.percentage(active.paladin_runtime.charge);draw_octagon_vertical_fill(center,34,charge_ratio,Color("f4ce62",.72));draw_string(ThemeDB.fallback_font,center+Vector2(-23,-19),"MAX" if charge_ratio>=1.0 else "%d%%"%int(charge_ratio*100.0),HORIZONTAL_ALIGNMENT_CENTER,46,10,Color.WHITE)
 			if active["class"]=="Crusader" and slot==2 and not active.get("crusader_runtime",{}).is_empty():var glare:=AbilitySlotSystem.ui_state(active.crusader_runtime.e_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[glare.charges,glare.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 			if active["class"]=="Vanguard" and slot==2 and not active.get("vanguard_runtime",{}).is_empty():var overpower:=AbilitySlotSystem.ui_state(active.vanguard_runtime.e_slot);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[overpower.charges,overpower.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
+			if active["class"]=="Vitalist" and slot==4 and not active.get("vitalist_runtime",{}).is_empty():var bio:=VitalistSystem.d_ui(active);draw_string(ThemeDB.fallback_font,center+Vector2(18,-20),"%d/%d"%[bio.charges,bio.max_charges],HORIZONTAL_ALIGNMENT_CENTER,34,10,C_TEXT)
 			if hatred_ratio>0.0:draw_octagon_vertical_fill(center,34,hatred_ratio,Color(CLASSES["Ranger"].color,.68))
 			if frostwolf_ratio>0.0:draw_octagon_vertical_fill(center,34,frostwolf_ratio,Color(CLASSES["Shaman"].color,.68))
 			if not warlock_trait_state.is_empty() and not warlock_darkness_armed:

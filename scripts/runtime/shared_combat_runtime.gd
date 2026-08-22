@@ -93,6 +93,7 @@ func issue_hero_move(hero:Dictionary,destination:Vector2)->void:
 		if not hero.vanguard_runtime.lightning.is_empty():var facing:=Vector2(hero.pos).direction_to(destination);if facing!=Vector2.ZERO:hero.facing_direction=facing.normalized();return
 		if not hero.vanguard_runtime.mosh.is_empty():VanguardSystem.interrupt_mosh(hero)
 		if not hero.vanguard_runtime.heroic_windup.is_empty():hero.vanguard_runtime.heroic_windup={};hero.ability_cds[3]=CombatRulesV1.HEROIC_INTERRUPT_COOLDOWN
+	if str(hero.get("class",""))=="Vitalist" and not hero.get("vitalist_runtime",{}).get("shove",{}).is_empty():return
 	if not (str(hero.get("class",""))=="Ranger" and float(hero.get("ranger_runtime",{}).get("strafe_remaining",0.0))>0.0):interrupt_unit_action(hero,"movement")
 	CombatRulesV1.issue_move(hero,destination);hero.target=-1;hero.heal_target=-1
 
@@ -232,6 +233,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 	ensure_combat_runtime_fields(hero,"hero:%d"%int(hero.get("battle_index",heroes.find(hero))),"player")
 	var has_true_control:bool=hero.get("active_effects",[]).any(func(effect):return str(effect.get("control_type","")) in ["stun","root","silence","fear"] and float(effect.get("remaining_duration",0.0))>0.0)
 	if has_true_control and str(hero.get("class",""))=="Vanguard" and not hero.get("vanguard_runtime",{}).is_empty():VanguardSystem.interrupt_mosh(hero)
+	if has_true_control and str(hero.get("class",""))=="Vitalist" and not hero.get("vitalist_runtime",{}).is_empty():VitalistSystem.interrupt_arm(hero);hero.vitalist_runtime.shove={};hero.command_state=CombatRulesV1.CommandState.IDLE
 	if has_true_control and (not hero.get("active_cast",{}).is_empty() or not hero.get("active_channel",{}).is_empty() or bool(hero.get("cleric_runtime",{}).get("jug_active",false))):interrupt_unit_action(hero,"crowd control")
 	if hero.hp<=0.0:
 		if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() and not PriestSystem.spirit_active(hero):PriestSystem.enter_spirit(hero);clear_hero_command(hero,"spirit form");return
@@ -252,6 +254,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 		return
 	if str(hero.get("class",""))=="Warlock" and float(hero.get("warlock_runtime",{}).get("banished_remaining",0.0))>0.0:return
 	if str(hero.get("class",""))=="Vanguard" and not hero.get("vanguard_runtime",{}).is_empty() and (not hero.vanguard_runtime.heroic_windup.is_empty() or not hero.vanguard_runtime.mosh.is_empty() or not hero.vanguard_runtime.lightning.is_empty()):return
+	if str(hero.get("class",""))=="Vitalist" and (not hero.get("vitalist_runtime",{}).get("arm",{}).is_empty() or not hero.get("vitalist_runtime",{}).get("shove",{}).is_empty()):return
 	var crusader_airborne:bool=str(hero.get("class",""))=="Crusader" and not hero.get("crusader_runtime",{}).get("falling",{}).is_empty()
 	var fear_effects:Array=hero.get("active_effects",[]).filter(func(effect):return str(effect.get("control_type",""))=="fear" and float(effect.get("remaining_duration",0.0))>0.0)
 	if not fear_effects.is_empty():

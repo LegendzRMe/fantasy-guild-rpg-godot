@@ -204,6 +204,21 @@ func load_vanguard_test_build(hero:Dictionary,build_index:int)->void:
 	var build:Dictionary=VanguardData.TEST_BUILDS[clampi(build_index,0,VanguardData.TEST_BUILDS.size()-1)];var level:=int(build.level)
 	hero.level=level;hero.base_power=VanguardData.scaled(float(VanguardData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.damage=hero.base_power;hero.max_hp=VanguardData.scaled(float(VanguardData.VALUES.health),level);hero.hp=hero.max_hp;hero.health_regeneration=VanguardData.scaled(float(VanguardData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(VanguardData.VALUES.basic_attack_interval);hero.basic_attack_interval=hero.base_basic_action_interval;hero.range=float(VanguardData.SPACE.basic_range);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.active_effects=[];hero.temporary_armor_sources=[];VanguardSystem.initialize_runtime(hero,true,"testing:vanguard")
 
+func load_vitalist_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=VitalistData.TEST_BUILDS[clampi(build_index,0,VitalistData.TEST_BUILDS.size()-1)];var level:=int(build.level)
+	hero.level=level;hero.base_power=VitalistData.scaled(float(VitalistData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.damage=hero.base_power;hero.max_hp=VitalistData.scaled(float(VitalistData.VALUES.health),level);hero.hp=hero.max_hp;hero.health_regeneration=VitalistData.scaled(float(VitalistData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(VitalistData.VALUES.basic_attack_interval);hero.basic_attack_interval=hero.base_basic_action_interval;hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.active_effects=[];hero.temporary_armor_sources=[];VitalistSystem.initialize_runtime(hero,true,"testing:vitalist")
+
+func handle_vitalist_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="vitalist_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Vitalist":hero=candidate;break
+	if hero==null:return false
+	if event.shift_pressed and event.keycode>=KEY_1 and event.keycode<=KEY_4:
+		var build_index:=int(event.keycode-KEY_1);load_vitalist_test_build(hero,build_index);flash("Vitalist build: %s"%str(VitalistData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if event.ctrl_pressed and event.keycode==KEY_C:
+		var build_index:=0;for i in VitalistData.TEST_BUILDS.size():if str(VitalistData.TEST_BUILDS[i].heroic)==str(hero.selected_heroic_id) and VitalistData.TEST_BUILDS[i].talents==hero.selected_talents:build_index=i;break
+		load_vitalist_test_build(hero,build_index);flash("Vitalist cooldowns, infections, and charges reset");queue_redraw();return true
+	return false
+
 func handle_vanguard_range_shortcut(event:InputEventKey)->bool:
 	if not testing_zone_active or testing_zone_mode!="vanguard_range":return false
 	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Vanguard":hero=candidate;break
@@ -669,6 +684,7 @@ func finish_hero_drag()->void:
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
+	if handle_vitalist_range_shortcut(event):return true
 	if handle_vanguard_range_shortcut(event):return true
 	if handle_crusader_range_shortcut(event):return true
 	if handle_monk_range_shortcut(event):return true

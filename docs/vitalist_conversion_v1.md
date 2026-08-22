@@ -1,0 +1,45 @@
+# Vitalist conversion V1
+
+## Identity and source audit
+
+Vitalist is the resource-free, melee infection/detonation Healer. It deliberately has no Mana, Energy, repeating basic heal, or extra action-bar button. Its Level-1 chassis is Stukov's current normalized live chassis: 1,835 Health, 3.8242 regeneration, 261 Basic Attack damage, 1.5-second Basic Attack interval, 1.5 source-unit melee range, 0.6875 combat radius, and 4.8398 movement speed. Flat Health, regeneration, damage, healing, and project Armor values scale by `1.04^(level - 1)`.
+
+The audit used HeroesToolChest `heroes-data2` build `2.55.17.97771` (`herodata_97771.json` plus English game strings), the newest normalized live package available during implementation. Blizzard's June 15 and September 27, 2021 live balance notes were used to cross-check Reactive Ballistospores and later Stukov changes. The normalized live data reports Q 10-second cooldown, 222 total healing over 4.5 seconds, and 0.75-second spread cadence; W 10-second cooldown, 20 initial damage, 3-second 5%-to-50% Slow, and 88 expiry damage; D 16-second cooldown, 435 Q burst healing, 100 W detonation damage, and 70% Slow for 2 seconds; E 10-second cooldown and 136 damage per second; Flailing Swipe 60-second cooldown, three 48-damage swipes over 1.75 seconds; and Massive Shove 20-second cooldown, 190 damage, and 0.5-second end Stun.
+
+Sources: [HeroesToolChest release data](https://github.com/HeroesToolChest/heroes-data2/tree/main/heroesdata/2.55.17.97771), [June 15, 2021 balance notes](https://news.blizzard.com/en-us/article/23685039/heroes-of-the-storm-balance-patch-notes-june-15-2021), and [September 27, 2021 balance notes](https://news.blizzard.com/en-gb/article/23725472/heroes-of-the-storm-balance-patch-notes-september-27-2021).
+
+## Core mechanics
+
+Healing Pathogen creates source-owned infections with an owner ID, original cast ID, recipient, remaining duration, shared per-cast spread history, shared once-only talent state, and per-E extension history. Each baseline original cast can infect an eligible party recipient once. Virulent Reaction raises that limit to two only while the recipient is inside this Vitalist's current Arm; Universal Carrier removes the limit only for the casting Vitalist. Multiple Vitalists therefore cannot detonate, preserve, or mutate one another's infections.
+
+Weighted Pustule is a source-owned hostile infection with a three-second ramping source-aware Slow. Its normal expiry deals 88 base damage. Bio-Kill Switch instead snapshots only the caster's current Q/W infections, heals Q recipients for 435, damages W recipients for 100, applies its detonation Slow, and removes the snapshot infections. Reactive Ballistospores applies up to five nearby W infections before that snapshot. Poppin' Pustules resolves AoE damage and Slow from the snapshot, queues unique recipients, then creates replacement W infections only after all current detonation work is complete. Generated replacement infections do not count as manual W casts or Fetid Touch quest hits.
+
+Lurking Arm is an indefinite placed channel with full 136-per-second PvE damage and profile-aware Silence. The source's non-Hero damage penalty is intentionally removed. Movement, Basic Attack, Q, W, and R are locked; D remains available. Bio-Explosion Switch adds only the selected-R exception and leaves the Arm active. Stun, Root, Silence, or Fear interrupts the Arm through the shared control path.
+
+Flailing Swipe performs three successively larger frontal displacement arcs over 1.75 seconds. Controlled Chaos converts it to three sequential 25-second charges, each producing one maximum-range swipe. Massive Shove captures one target, then advances it frame-by-frame using audited velocity until a blocker or authored encounter boundary is reached. Combat radius, safe endpoints, displacement profiles, channel action lock, and hostile interruption are honored. Damage still resolves when displacement is immune; Push Comes to Shove only earns collision effects after actual displacement.
+
+## Talents and ordering
+
+- Guild 9: Fetid Touch permanently converts the Basic Attack to ranged, applies 20% Slow, deals 35% less damage, and completes its encounter-scoped 15-qualifying-manual-W quest for a five-second W cooldown reduction. Low Blow doubles each E tick only if the target is below 50% at that tick. Reactive Ballistospores dynamically doubles D recharge below 50% and performs its pre-snapshot W application automatically.
+- Guild 12: One Good Spread reduces Q cooldown by two seconds once per original cast at three unique recipients. Biotic Armor uses strongest-active source-aware Universal Armor: 10 while Q persists, 50 for 2.5 seconds after D, then 10 can resume. Vigorous Reuptake applies one 30% D-heal multiplier when the snapshot contains at least three Q infections.
+- Guild 18: The Long Pitch adds 50% W range and doubles Q/W/E/D recharge for four seconds after a 2+ W snapshot; R is excluded. Growing Infestation adds 2.5 seconds once per infected recipient per E cast. Targeted Excision triggers on exactly one Q regardless of W count, resets it to 4.5 seconds, preserves it, and assigns seven seconds to that spent D charge.
+- Guild 21: It Hungers adds 30% E cast range and resets E once after eight capped damage contacts in that channel. Virulent Reaction permits exactly two same-cast infections on an ally inside E. Poppin' Pustules uses post-resolution replacements and cannot recurse into the current D.
+- Guild 24: Superstrain listens to successful shared Stun/Root application serials and heals an infected ally once per new event for 300 base Health. Universal Carrier reduces only ordinary Q HoT by 25%. Pox Populi preserves every snapshotted Q and adds three seconds without a cap.
+- Guild 27: Controlled Chaos and Push Comes to Shove only function with their matching Heroics. Push applies 50% Slow for four seconds on terrain/boundary collision and removes 15 seconds from R only when actual shove duration is greater than 1.25 seconds.
+- Guild 30: Top Off multiplies ordinary Q HoT by 1.30 above, not at, 60% Health. Bio-Explosion Switch only scopes the R-during-E exception. Perfect Strain provides two sequential D charges with a separate two-second recast lockout.
+
+Cross-talent ordering is explicit: Targeted Excision resets the retained Q before Pox adds three seconds (7.5 seconds total); the spent Perfect Strain charge retains Targeted's seven-second base; Reactive and Long Pitch modify only the active sequential D timer through additive project recharge-rate modifiers; Growing plus Pox is uncapped; Universal Carrier plus Virulent retains their recipient-specific limits; and ordinary Top Off is applied after Universal Carrier's 25% HoT reduction. Biotic's temporary 50 Armor wins over its 10 Armor rather than adding to 60.
+
+## PvE, presentation, and verification
+
+Immediate enemy effects use the project's standard five-contact cap and normal target categories. Quest progress uses `CombatTargetCategorySystem`, so disposable summons cannot farm Fetid Touch. Bosses take full E damage but Slow, Silence, and displacement remain profile-driven. Healing uses the common healing pipeline and records effective healing and overhealing.
+
+Testing → Vitalist Range supplies party spread/wounded allies, grouped standard enemies, elite/named/Boss targets, control-profile fixtures, blockers, a terrain lane, and the authored encounter boundary. Build cycling and reset shortcuts cover baseline, persistent-Pathogen, aggressive-detonation, and Arm-channel configurations. F3 exposes chassis, cooldowns, Q owner/cast/history/duration, W/Slow duration, D snapshot/charges/lockout/rate, E state/contact count, quest and relevant talent states, Heroic state, and telemetry.
+
+Automated coverage includes data/chassis, ownership, spreading, expiry state transitions, D snapshots, all talent tiers, charge/recharge and ordering combinations, live combat damage/healing/control/action locks, Testing Range fixtures, save/UI registration, startup, parser, texture, export-pack, UTF-8, and whitespace regression checks for the complete existing class stack.
+
+## Deliberate deviations and uncertainty
+
+The brief's explicit project reworks replace source Mana, Reactive's separate active button, Growing Infestation expansion, Targeted Excision's source effect, Virulent Reaction's enemy Root, Poppin' Pustules behavior, Pox Populi behavior, and Bio-Explosion Switch behavior. The E non-Hero penalty is removed. Massive Shove ends at the authored playable boundary as terrain. No PvP-only Hero gate survives conversion.
+
+Raw normalized data does not expose every usable cast footprint in one stable scalar. Q cast range, spread radius, projectile width, Reactive radius, E range/radius, swipe arc widths, shove acquisition, and Poppin radius are centralized calibration values in `VitalistData.SPACE`; see `vitalist_geometry_calibration.md`. The project models the source's continuous shove as deterministic per-frame swept displacement against its collision representation. No manual playtest is claimed; verification is automated and headless.

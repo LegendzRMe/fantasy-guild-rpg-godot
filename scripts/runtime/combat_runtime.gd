@@ -82,6 +82,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_paladin_runtime(delta)
 	update_crusader_runtime(delta)
 	update_vanguard_runtime(delta)
+	update_vitalist_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	sync_crusader_runtime_states()
@@ -96,6 +97,7 @@ func update_combat_heroes(delta:float) -> bool:
 			elif str(h.get("class",""))=="Ranger" and not h.get("ranger_runtime",{}).is_empty() and slot==1 and RangerSystem.has_talent(h,"ranger_l24_1") and int(h.ranger_runtime.hatred)>=int(RangerData.VALUES.hatred_max):cooldown_rate=1.5
 			elif str(h.get("class",""))=="Warlock" and not h.get("warlock_runtime",{}).is_empty() and slot==1 and WarlockSystem.has_talent(h,"warlock_l12_1") and not h.get("active_channel",{}).is_empty():cooldown_rate=2.0
 			elif str(h.get("class",""))=="Priest" and not h.get("priest_runtime",{}).is_empty() and slot==2 and PriestSystem.has_talent(h,"priest_l21_2") and int(h.priest_runtime.push_stacks)>=int(PriestData.VALUES.push_max):cooldown_rate=float(PriestData.VALUES.push_e_rate)
+			elif str(h.get("class",""))=="Vitalist" and not h.get("vitalist_runtime",{}).is_empty() and slot<3 and float(h.vitalist_runtime.long_pitch_remaining)>0.0:cooldown_rate=1.0+float(VitalistData.VALUES.long_pitch_rate)
 			elif str(h.get("class",""))=="Shaman" and slot==0:cooldown_rate=0.0
 			if slot<3:cooldown_rate*=DruidSystem.cooldown_rate_from_innervate(h,heroes.filter(func(unit):return str(unit.get("class",""))=="Druid"),slot)
 			h.ability_cds[slot]=max(0,h.ability_cds[slot]-delta*cooldown_rate)
@@ -109,6 +111,7 @@ func update_combat_heroes(delta:float) -> bool:
 		if str(h.get("class",""))=="Monk" and not h.get("monk_runtime",{}).is_empty():h.ability_cds[0]=0.0 if int(h.monk_runtime.q_slot.current_charges)>0 else float(h.monk_runtime.q_slot.timers[0]) if not h.monk_runtime.q_slot.timers.is_empty() else 0.0;h.ability_cds[1]=float(h.monk_runtime.breath_cooldown);h.ability_cds[2]=float(h.monk_runtime.reach_cooldown);h.ability_cds[4]=float(h.monk_runtime.ally_cooldown)
 		if str(h.get("class",""))=="Crusader" and not h.get("crusader_runtime",{}).is_empty():h.ability_cds[2]=CrusaderSystem.glare_ui_cooldown(h)
 		if str(h.get("class",""))=="Vanguard" and not h.get("vanguard_runtime",{}).is_empty():h.ability_cds[2]=VanguardSystem.e_ui_cooldown(h)
+		if str(h.get("class",""))=="Vitalist" and not h.get("vitalist_runtime",{}).is_empty():h.ability_cds[4]=VitalistSystem.d_ui_cooldown(h)
 		if h.hp>0:h.hp=minf(float(h.max_hp),float(h.hp)+float(h.get("health_regeneration",0.0))*delta);update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):

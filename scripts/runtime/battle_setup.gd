@@ -80,6 +80,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Paladin":PaladinSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Crusader":CrusaderSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Vanguard":VanguardSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
+		elif str(heroes[-1].get("class",""))=="Vitalist":VitalistSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -431,6 +432,22 @@ func start_vanguard_testing_zone() -> void:
 		if str(hero.get("class",""))=="Vanguard":hero.vanguard_runtime.telemetry_enabled=true;hero.pos=Vector2(330,400)
 		else:hero.hp*=.45
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:vanguard_slide",Rect2(680,300,55,170)));combat_blockers.append(CombatGeometry.create_blocker("blocker:vanguard_displacement",Rect2(900,300,55,170)));queue_redraw()
+
+func start_vitalist_testing_zone() -> void:
+	var test_party:Array=testing_party_for_class("Vitalist")
+	if test_party.is_empty():flash("Vitalist fixture unavailable.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="vitalist_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	var fixtures:=[{"position":Vector2(470,120),"type":"Raider","category":"standard"},{"position":Vector2(530,120),"type":"Raider","category":"standard"},{"position":Vector2(590,120),"type":"Raider","category":"standard"},{"position":Vector2(650,120),"type":"Raider","category":"standard"},{"position":Vector2(710,120),"type":"Raider","category":"standard"},{"position":Vector2(790,120),"type":"Brute","category":"elite"},{"position":Vector2(860,120),"type":"Archer","category":"named"},{"position":Vector2(940,120),"type":"Boss","category":"boss"},{"position":Vector2(570,275),"type":"Raider","category":"standard"},{"position":Vector2(630,275),"type":"Raider","category":"standard"},{"position":Vector2(690,275),"type":"Raider","category":"standard"},{"position":Vector2(1060,190),"type":"Defense Dummy","category":"training"}]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);var enemy:Dictionary=enemies[-1];enemy.target_category=str(fixture.category);enemy.passive_test_enemy=true;enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,20000.0);enemy.max_hp=enemy.hp
+		if fixture.type=="Boss":enemy.control_profile={"slow_multiplier":.5,"silence_multiplier":0.0,"stun_multiplier":0.0,"displacement":false}
+	if enemies.size()>5:enemies[5].control_profile={"slow_multiplier":.5}
+	if enemies.size()>6:enemies[6].control_profile={"silence_multiplier":0.0}
+	if enemies.size()>7:enemies[7].control_profile={"displacement":false,"slow_multiplier":.5,"silence_multiplier":0.0,"stun_multiplier":0.0}
+	for hero in heroes:
+		if str(hero.get("class",""))=="Vitalist":hero.vitalist_runtime.telemetry_enabled=true;hero.pos=Vector2(325,420);hero.hp*=.45
+		else:hero.hp*=.45
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:vitalist_arm",Rect2(810,320,55,185)));combat_blockers.append(CombatGeometry.create_blocker("blocker:vitalist_shove",Rect2(1040,285,55,235)));queue_redraw()
 
 func selected_party_indices() -> Array:
 	return TeamManager.sanitize_team(state.selected_team,state.heroes)

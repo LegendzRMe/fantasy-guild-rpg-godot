@@ -44,6 +44,8 @@ func guardian_talent_name(talent_id: String) -> String:
 		return str(CrusaderData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 	if talent_id.begins_with("vanguard_"):
 		return str(VanguardData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
+	if talent_id.begins_with("vitalist_"):
+		return str(VitalistData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 	return str(GuardianData.WORKING_NAMES.get(talent_id, talent_id.replace("_", " ").capitalize()))
 
 
@@ -90,6 +92,8 @@ func roster_talent_description(hero_class: String, option_id: String) -> String:
 		return str(CrusaderData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	if hero_class == "Vanguard":
 		return str(VanguardData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
+	if hero_class == "Vitalist":
+		return str(VitalistData.TALENT_DESCRIPTIONS.get(option_id, "Talent details are still being developed."))
 	return "Talent details are still being developed."
 
 
