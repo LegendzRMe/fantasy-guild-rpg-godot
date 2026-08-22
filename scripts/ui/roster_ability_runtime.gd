@@ -509,6 +509,8 @@ func open_roster_ability_details(hero: Dictionary, action_key: String, heroic_id
 	elif str(hero.get("class", "")) == "Vitalist":
 		var presenter_hero:Dictionary=hero.duplicate(true);var presenter_stats:=hero_final_stats(hero);presenter_hero["power"]=float(presenter_stats.power);presenter_hero["max_hp"]=float(presenter_stats.health);presenter_hero["hp"]=float(presenter_stats.health);presenter_hero["level"]=int(hero.get("level",1));presenter_hero["pos"]=Vector2.ZERO;presenter_hero["combat_id"]="presenter:vitalist";presenter_hero["ability_cds"]=[0.0,0.0,0.0,0.0,0.0];presenter_hero["active_effects"]=[]
 		VitalistSystem.initialize_runtime(presenter_hero,false);details=VitalistAbilityPresenter.details(presenter_hero,action_key,heroic_id)
+	elif str(hero.get("class",""))=="Spirit Weaver":
+		var presenter_hero:Dictionary=hero.duplicate(true);var presenter_stats:=hero_final_stats(hero);presenter_hero["power"]=float(presenter_stats.power);presenter_hero["max_hp"]=float(presenter_stats.health);presenter_hero["hp"]=float(presenter_stats.health);presenter_hero["level"]=int(hero.get("level",1));presenter_hero["pos"]=Vector2.ZERO;presenter_hero["combat_id"]="presenter:spiritweaver";presenter_hero["ability_cds"]=[0.0,0.0,0.0,0.0,0.0];presenter_hero["active_effects"]=[];SpiritWeaverSystem.initialize_runtime(presenter_hero,false);details=SpiritWeaverAbilityPresenter.ability(presenter_hero,action_key)
 	elif str(hero.get("class", "")) == "Rogue":
 		var presenter_hero := hero.duplicate(true)
 		var presenter_stats := hero_final_stats(hero)

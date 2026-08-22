@@ -219,6 +219,16 @@ func handle_vitalist_range_shortcut(event:InputEventKey)->bool:
 		load_vitalist_test_build(hero,build_index);flash("Vitalist cooldowns, infections, and charges reset");queue_redraw();return true
 	return false
 
+func load_spiritweaver_test_build(hero:Dictionary,build_index:int)->void:
+	var build:Dictionary=SpiritWeaverData.TEST_BUILDS[clampi(build_index,0,SpiritWeaverData.TEST_BUILDS.size()-1)];var level:=int(build.level);hero.level=level;hero.base_power=SpiritWeaverData.scaled(float(SpiritWeaverData.VALUES.basic_attack_damage),level);hero.power=hero.base_power;hero.damage=hero.base_power;hero.max_hp=SpiritWeaverData.scaled(float(SpiritWeaverData.VALUES.health),level);hero.hp=hero.max_hp;hero.health_regeneration=SpiritWeaverData.scaled(float(SpiritWeaverData.VALUES.health_regeneration),level);hero.base_basic_action_interval=float(SpiritWeaverData.VALUES.basic_attack_interval);hero.selected_heroic_id=str(build.heroic);hero.selected_talents=build.talents.duplicate(true);hero.ability_cds=[0.0,0.0,0.0,0.0,0.0];hero.active_effects=[];hero.temporary_armor_sources=[];SpiritWeaverSystem.initialize_runtime(hero,true)
+func handle_spiritweaver_range_shortcut(event:InputEventKey)->bool:
+	if not testing_zone_active or testing_zone_mode!="spiritweaver_range":return false
+	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Spirit Weaver":hero=candidate;break
+	if hero==null:return false
+	if event.keycode in [KEY_1,KEY_2,KEY_3,KEY_4]:var build_index:=int(event.keycode-KEY_1);load_spiritweaver_test_build(hero,build_index);flash("Spirit Weaver build: %s"%str(SpiritWeaverData.TEST_BUILDS[build_index].name));queue_redraw();return true
+	if event.keycode==KEY_0:load_spiritweaver_test_build(hero,0);flash("Spirit Weaver runtime reset");queue_redraw();return true
+	return false
+
 func handle_vanguard_range_shortcut(event:InputEventKey)->bool:
 	if not testing_zone_active or testing_zone_mode!="vanguard_range":return false
 	var hero=null;for candidate in heroes:if str(candidate.get("class",""))=="Vanguard":hero=candidate;break
@@ -543,7 +553,7 @@ func begin_ability(slot:int,device:String="pc")->void:
 		use_ability(slot,cast_point);return
 	ability_aiming=true;aimed_ability_slot=slot;aimed_ability_category=category;aimed_cast_mode=mode;aimed_from_touch=device=="mobile";ability_button_held=mode=="release";ability_aim_point=get_global_mouse_position();queue_redraw()
 
-func begin_trait()->void:
+func begin_trait(device:String="pc")->void:
 	if selected<0 or selected>=heroes.size() or bool(heroes[selected].get("independent",false)):return
 	var hero:Dictionary=heroes[selected]
 	if str(hero.get("class",""))=="Guardian" and GuardianSystem.has_talent(hero,"guardian_l24_2"):
@@ -588,6 +598,8 @@ func begin_trait()->void:
 	elif str(hero.get("class",""))=="Crusader":
 		use_ability(4,hero.pos)
 		queue_redraw()
+	elif str(hero.get("class",""))=="Spirit Weaver":
+		ability_aiming=true;aimed_ability_slot=4;aimed_ability_category="ally_or_enemy";aimed_cast_mode="confirm";aimed_from_touch=device=="mobile";ability_button_held=false;ability_aim_point=get_global_mouse_position();queue_redraw()
 
 func confirm_aim_at(point:Vector2)->bool:
 	if not ability_aiming:return false
@@ -603,6 +615,15 @@ func confirm_aim_at(point:Vector2)->bool:
 		for ally in player_healable_units():
 			if ally not in heroes and ally.pos.distance_to(point)<58:assign_hero_ally_unit(selected,ally);var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
 		return false
+	if aimed_ability_category=="ally_or_enemy":
+		var nearest=null
+		var nearest_distance:=58.0
+		for candidate in heroes+enemies:
+			if float(candidate.get("hp",0.0))<=0.0:continue
+			var distance:=Vector2(candidate.pos).distance_to(point)
+			if distance<=nearest_distance:nearest=candidate;nearest_distance=distance
+		if nearest==null:return false
+		var slot=aimed_ability_slot;var target_point:=Vector2(nearest.pos);cancel_ability_aim();use_ability(slot,target_point);return true
 	var slot=aimed_ability_slot;cancel_ability_aim();use_ability(slot,point);return true
 
 func tutorial_allows_hero(hero_index:int)->bool:
@@ -644,7 +665,7 @@ func update_hero_drag(point:Vector2)->void:
 	drag_cursor=point
 	if drag_cursor.distance_to(drag_start)>12:drag_has_moved=true
 	drag_target_type="ground";drag_target_index=-1
-	if heroes[selected]["class"] in ["Cleric","Druid"]:
+	if heroes[selected]["class"] in ["Cleric","Druid","Spirit Weaver"]:
 		for hero_index in heroes.size():
 			if hero_index!=selected and heroes[hero_index].hp>0 and heroes[hero_index].pos.distance_to(drag_cursor)<42:drag_target_type="ally";drag_target_index=hero_index;break
 		if drag_target_type=="ground":
@@ -678,13 +699,14 @@ func finish_hero_drag()->void:
 	if tutorial_active and not tutorial_drag_release_is_valid():reject_tutorial_action();queue_redraw();return
 	if tutorial_active:tutorial_record_valid_action()
 	if drag_target_type=="enemy":assign_hero_enemy(selected,drag_target_index);heroes[selected].suppress_auto_target=false
-	elif drag_target_type=="ally" and heroes[selected]["class"] in ["Cleric","Druid"]:assign_hero_ally(selected,drag_target_index)
-	elif drag_target_type=="ally_companion" and heroes[selected]["class"] in ["Cleric","Druid"] and drag_target_index>=0 and drag_target_index<heroes.size():assign_hero_ally_unit(selected,heroes[drag_target_index].beastmaster_runtime.misha)
+	elif drag_target_type=="ally" and heroes[selected]["class"] in ["Cleric","Druid","Spirit Weaver"]:assign_hero_ally(selected,drag_target_index)
+	elif drag_target_type=="ally_companion" and heroes[selected]["class"] in ["Cleric","Druid","Spirit Weaver"] and drag_target_index>=0 and drag_target_index<heroes.size():assign_hero_ally_unit(selected,heroes[drag_target_index].beastmaster_runtime.misha)
 	else:issue_hero_move(heroes[selected],Vector2(clamp(drag_cursor.x,55.0,1225.0),clamp(drag_cursor.y,70.0,570.0)));heroes[selected].suppress_auto_target=true;focused_enemy_index=-1
 	queue_redraw()
 
 func handle_combat_testing_shortcut(event:InputEventKey)->bool:
 	if handle_vitalist_range_shortcut(event):return true
+	if handle_spiritweaver_range_shortcut(event):return true
 	if handle_vanguard_range_shortcut(event):return true
 	if handle_crusader_range_shortcut(event):return true
 	if handle_monk_range_shortcut(event):return true
@@ -821,7 +843,7 @@ func handle_combat_touch(event:InputEventScreenTouch)->bool:
 	if event.pressed and ability_aiming and aimed_cast_mode=="confirm":confirm_aim_at(event.position);return true
 	if event.pressed and event.position.y>635 and event.position.x>445 and event.position.x<835:
 		var action_slot:=clampi(int((event.position.x-445)/78),0,4)
-		if action_slot==4:begin_trait()
+		if action_slot==4:begin_trait("mobile")
 		else:begin_ability(action_slot,"mobile")
 		return true
 	if not event.pressed and ability_aiming and aimed_cast_mode=="release":confirm_aim_at(event.position);return true
