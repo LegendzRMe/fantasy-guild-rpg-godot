@@ -151,6 +151,8 @@ func build_damage_request(target:Dictionary,resolved_amount:float,source_action:
 			var beastmaster_block:=BlockChargeSystem.armor_source(target,float(BeastmasterData.VALUES.block_armor),"grizzled_fortitude","block_state",true)
 			if not beastmaster_block.is_empty():request["armor_sources"]=[beastmaster_block]
 	var shared_armor:Array=target.get("temporary_armor_sources",[]).duplicate(true)
+	var shared_block:=BlockChargeSystem.armor_source(target,75.0,"shared_block","block_state",true)
+	if not shared_block.is_empty():shared_armor.append(shared_block)
 	if not shared_armor.is_empty():
 		var combined:Array=request.get("armor_sources",[]).duplicate(true);combined.append_array(shared_armor);request["armor_sources"]=combined
 	if source_action=="percentage_health":request["outgoing_multiplier"]=1.0;request["can_crit"]=false
@@ -273,6 +275,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	for active_effect in source.get("active_effects",[]):
 		if float(active_effect.get("remaining_duration",0.0))>0.0:active_damage_multiplier=maxf(active_damage_multiplier,float(active_effect.get("damage_multiplier",1.0)))
 	var resolved_amount:=amount*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
+	if str(source.get("class",""))=="Vanguard" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("vanguard_runtime",{}).is_empty():var vanguard_multiplier:=VanguardSystem.basic_attack_multiplier(source,target);VanguardSystem.add(source,"hammer_damage",resolved_amount*(vanguard_multiplier-1.0));resolved_amount*=vanguard_multiplier
 	if str(source.get("class",""))=="Paladin" and not source.get("paladin_runtime",{}).is_empty():resolved_amount*=PaladinSystem.judgment_multiplier(source,str(target.get("combat_id","")))
 	if str(source.get("class",""))=="Monk" and source_action!="percentage_health" and not source.get("monk_runtime",{}).is_empty():
 		var monk_controlled:=MonkSystem.controlled_multiplier(source,target);resolved_amount*=monk_controlled
@@ -324,15 +327,19 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	var damage_request:=build_damage_request(target,resolved_amount,source_action,damage_type,can_crit_override,hostile)
 	var previews_mage_barrier:bool=str(target.get("class",""))=="Mage" and not target.get("mage_runtime",{}).is_empty() and str(source.get("combat_team",""))!=str(target.get("combat_team",""))
 	var previews_crusader_indestructible:bool=hostile and str(target.get("class",""))=="Crusader" and not target.get("crusader_runtime",{}).is_empty() and CrusaderSystem.has_talent(target,"crusader_l30_1") and float(target.crusader_runtime.indestructible_icd)<=0.0
+	var previews_vanguard_death:bool=hostile and str(target.get("class",""))=="Vanguard" and not target.get("vanguard_runtime",{}).is_empty() and VanguardSystem.has_talent(target,"vanguard_l30_3") and (float(target.vanguard_runtime.death_metal_icd)<=0.0 or not target.vanguard_runtime.death_metal.is_empty())
 	var resolution_roll:=-1.0
-	if previews_mage_barrier or previews_crusader_indestructible:
+	if previews_mage_barrier or previews_crusader_indestructible or previews_vanguard_death:
 		resolution_roll=randf()
 		var preview_target:Dictionary=target.duplicate(true);var preview:=CombatSystem.resolve_damage(source,preview_target,damage_request,resolution_roll)
 		if previews_mage_barrier:
 			var barrier:=MageSystem.try_arcane_barrier(target,bool(preview.get("defeated",false)))
 			if bool(barrier.triggered):apply_unit_shield(target,target,float(barrier.shield),"Arcane Barrier","mage_arcane_barrier",INF,float(barrier.duration));item_feedback("Arcane Barrier",target.pos,CLASSES.Mage.color)
 		if previews_crusader_indestructible and CrusaderSystem.try_indestructible(target,bool(preview.get("defeated",false))):apply_unit_shield(target,target,float(target.max_hp)*float(CrusaderData.VALUES.indestructible_fraction),"Indestructible","crusader_indestructible:%s"%str(target.combat_id),INF,float(CrusaderData.VALUES.indestructible_duration));damage_request.amount=0.0
-	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier or previews_crusader_indestructible else CombatSystem.resolve_damage(source,target,damage_request)
+		if previews_vanguard_death:VanguardSystem.try_death_metal(target,bool(preview.get("defeated",false)))
+	var result:=CombatSystem.resolve_damage(source,target,damage_request,resolution_roll) if previews_mage_barrier or previews_crusader_indestructible or previews_vanguard_death else CombatSystem.resolve_damage(source,target,damage_request)
+	if str(target.get("class",""))=="Vanguard" and not target.get("vanguard_runtime",{}).get("death_metal",{}).is_empty() and float(target.hp)<=0.0:target.hp=1.0;result.defeated=false;result.overkill=0.0
+	if hostile and str(target.get("class",""))=="Vanguard" and not target.get("vanguard_runtime",{}).get("death_metal",{}).is_empty():VanguardSystem.add(target,"death_metal_damage_taken",float(result.get("resolved_damage",0.0)))
 	if bool(result.get("defeated",false)) and str(target.get("combat_affiliation",target.get("combat_team","")))=="player":
 		var palm_restored:float=resolve_monk_palm_shared(target)
 		if palm_restored>0.0:result.defeated=false;result.overkill=0.0
@@ -364,6 +371,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(target.get("class",""))=="Shaman" and not target.get("shaman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"shaman_block")
 	if str(target.get("class",""))=="Templar" and not target.get("templar_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"templar_block")
 	if str(target.get("class",""))=="Huntsman" and not target.get("huntsman_runtime",{}).is_empty():BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"huntsman_block")
+	if beastmaster_owner==null:BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false)),"block_state")
 	if hostile and beastmaster_owner!=null and BeastmasterSystem.has_talent(beastmaster_owner,"beastmaster_l12_1") and (target==beastmaster_owner or str(target.get("beast_category",""))=="misha") and BlockChargeSystem.consume(target,source_action,float(result.get("resolved_damage",0.0)),bool(result.get("evaded",false))):BeastmasterSystem.telemetry_add(beastmaster_owner,"block_consumed")
 	if beastmaster_owner!=null and bool(result.get("defeated",false)):
 		if str(target.get("beast_category",""))=="misha":BeastmasterSystem.defeat_misha(beastmaster_owner)
@@ -522,6 +530,7 @@ func deal_healing(source:Dictionary,target:Dictionary,amount:float,source_action
 	if source_index>=0:add_healing_threat(source_index,float(result.get("effective_amount",0.0)))
 	var beastmaster=beastmaster_owner_for(target)
 	if beastmaster!=null and str(target.get("beast_category",""))=="misha":BeastmasterSystem.telemetry_add(beastmaster,"misha_healing",float(result.get("effective_amount",0.0)))
+	if str(target.get("class",""))=="Vanguard" and not target.get("vanguard_runtime",{}).get("death_metal",{}).is_empty():VanguardSystem.add(target,"death_metal_healing",float(result.get("effective_amount",0.0)))
 	return result
 
 func apply_unit_shield(source:Dictionary,target:Dictionary,amount:float,origin=null,source_id:String="shield",cap:float=INF,duration:float=0.0)->Dictionary:

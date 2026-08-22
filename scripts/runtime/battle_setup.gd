@@ -79,6 +79,7 @@ func start_battle(id:int,node:int=0,party_override:Array=[],profession_conflict_
 		elif str(heroes[-1].get("class",""))=="Monk":MonkSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 		elif str(heroes[-1].get("class",""))=="Paladin":PaladinSystem.initialize_runtime(heroes[-1],is_testing_save())
 		elif str(heroes[-1].get("class",""))=="Crusader":CrusaderSystem.initialize_runtime(heroes[-1],is_testing_save())
+		elif str(heroes[-1].get("class",""))=="Vanguard":VanguardSystem.initialize_runtime(heroes[-1],is_testing_save(),ProgressionScopeSystem.new_encounter_id("battle"))
 	if consumed_tavern_buff:save_game()
 	queue_redraw()
 
@@ -415,6 +416,21 @@ func start_crusader_testing_zone() -> void:
 		if str(hero.get("class",""))=="Crusader":hero.crusader_runtime.telemetry_enabled=true;hero.pos=Vector2(330,400)
 		else:hero.hp*=.45
 	combat_blockers.append(CombatGeometry.create_blocker("blocker:crusader_pull",Rect2(850,300,55,170)));combat_blockers.append(CombatGeometry.create_blocker("blocker:crusader_falling",Rect2(995,300,55,170)));queue_redraw()
+
+func start_vanguard_testing_zone() -> void:
+	var test_party:Array=testing_party_for_class("Vanguard")
+	if test_party.is_empty():flash("Vanguard fixture unavailable.");show_combat_hall();return
+	start_battle(0,-1,test_party);testing_zone_active=true;testing_zone_mode="vanguard_range";testing_dummy_attacks_enabled=true;total_waves=0;wave_index=0;wave_spawn_remaining=0;wave_break=0;waiting_wave=false
+	var fixtures:=[{"position":Vector2(455,120),"type":"Raider","category":"standard","group":1},{"position":Vector2(515,120),"type":"Raider","category":"standard","group":2},{"position":Vector2(575,120),"type":"Raider","category":"standard","group":3},{"position":Vector2(635,120),"type":"Raider","category":"standard","group":4},{"position":Vector2(695,120),"type":"Raider","category":"standard","group":5},{"position":Vector2(755,120),"type":"Brute","category":"elite","group":6},{"position":Vector2(825,120),"type":"Archer","category":"named","group":6},{"position":Vector2(900,120),"type":"Boss","category":"boss","group":1},{"position":Vector2(520,260),"type":"Raider","category":"standard","group":5},{"position":Vector2(580,260),"type":"Raider","category":"standard","group":5},{"position":Vector2(640,260),"type":"Raider","category":"standard","group":5},{"position":Vector2(700,260),"type":"Raider","category":"standard","group":5},{"position":Vector2(760,260),"type":"Raider","category":"standard","group":5},{"position":Vector2(1040,180),"type":"Defense Dummy","category":"training","group":1}]
+	for fixture in fixtures:
+		spawn_enemy(fixture.position,fixture.type);var enemy:Dictionary=enemies[-1];enemy.target_category=str(fixture.category);enemy.passive_test_enemy=true;enemy.rewarded=true;enemy.seconds_since_damage=TESTING_DUMMY_REGEN_DELAY;enemy.respawn_timer=0.0;enemy.hp=maxf(enemy.hp,20000.0);enemy.max_hp=enemy.hp;enemy["vanguard_group_size"]=int(fixture.group)
+		if fixture.type=="Boss":enemy.control_profile={"slow_multiplier":.5,"root_multiplier":.25,"stun_multiplier":0.0,"blind_immune":true,"displacement":false}
+	if enemies.size()>2:enemies[2].control_profile={"displacement":false}
+	if enemies.size()>3:StatusEffectSystem.apply_source_unstoppable(enemies[3],"testing_vanguard",600.0)
+	for hero in heroes:
+		if str(hero.get("class",""))=="Vanguard":hero.vanguard_runtime.telemetry_enabled=true;hero.pos=Vector2(330,400)
+		else:hero.hp*=.45
+	combat_blockers.append(CombatGeometry.create_blocker("blocker:vanguard_slide",Rect2(680,300,55,170)));combat_blockers.append(CombatGeometry.create_blocker("blocker:vanguard_displacement",Rect2(900,300,55,170)));queue_redraw()
 
 func selected_party_indices() -> Array:
 	return TeamManager.sanitize_team(state.selected_team,state.heroes)

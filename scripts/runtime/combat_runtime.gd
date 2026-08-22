@@ -81,6 +81,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_monk_runtime(delta)
 	update_paladin_runtime(delta)
 	update_crusader_runtime(delta)
+	update_vanguard_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	sync_crusader_runtime_states()
@@ -107,6 +108,7 @@ func update_combat_heroes(delta:float) -> bool:
 		if str(h.get("class",""))=="Beastmaster" and not h.get("beastmaster_runtime",{}).is_empty():h.basic_attack_interval=float(h.base_basic_action_interval)/(1.0+float(BeastmasterData.VALUES.hawk_speed) if float(h.beastmaster_runtime.hawk_remaining)>0.0 else 1.0)
 		if str(h.get("class",""))=="Monk" and not h.get("monk_runtime",{}).is_empty():h.ability_cds[0]=0.0 if int(h.monk_runtime.q_slot.current_charges)>0 else float(h.monk_runtime.q_slot.timers[0]) if not h.monk_runtime.q_slot.timers.is_empty() else 0.0;h.ability_cds[1]=float(h.monk_runtime.breath_cooldown);h.ability_cds[2]=float(h.monk_runtime.reach_cooldown);h.ability_cds[4]=float(h.monk_runtime.ally_cooldown)
 		if str(h.get("class",""))=="Crusader" and not h.get("crusader_runtime",{}).is_empty():h.ability_cds[2]=CrusaderSystem.glare_ui_cooldown(h)
+		if str(h.get("class",""))=="Vanguard" and not h.get("vanguard_runtime",{}).is_empty():h.ability_cds[2]=VanguardSystem.e_ui_cooldown(h)
 		if h.hp>0:h.hp=minf(float(h.max_hp),float(h.hp)+float(h.get("health_regeneration",0.0))*delta);update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):

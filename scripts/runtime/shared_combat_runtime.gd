@@ -89,6 +89,10 @@ func clear_hero_command(hero:Dictionary,reason:String="")->void:
 
 func issue_hero_move(hero:Dictionary,destination:Vector2)->void:
 	if str(hero.get("class",""))=="Protector" and str(hero.get("protector_runtime",{}).get("wrath",{}).get("phase",""))=="channel":return
+	if str(hero.get("class",""))=="Vanguard" and not hero.get("vanguard_runtime",{}).is_empty():
+		if not hero.vanguard_runtime.lightning.is_empty():var facing:=Vector2(hero.pos).direction_to(destination);if facing!=Vector2.ZERO:hero.facing_direction=facing.normalized();return
+		if not hero.vanguard_runtime.mosh.is_empty():VanguardSystem.interrupt_mosh(hero)
+		if not hero.vanguard_runtime.heroic_windup.is_empty():hero.vanguard_runtime.heroic_windup={};hero.ability_cds[3]=CombatRulesV1.HEROIC_INTERRUPT_COOLDOWN
 	if not (str(hero.get("class",""))=="Ranger" and float(hero.get("ranger_runtime",{}).get("strafe_remaining",0.0))>0.0):interrupt_unit_action(hero,"movement")
 	CombatRulesV1.issue_move(hero,destination);hero.target=-1;hero.heal_target=-1
 
@@ -103,6 +107,7 @@ func active_movement_multiplier(unit:Dictionary)->float:
 	if str(unit.get("class",""))=="Monk" and float(unit.get("monk_runtime",{}).get("trait_speed_remaining",0.0))>0.0:multiplier*=1.0+float(MonkData.VALUES.trait_speed)
 	if str(unit.get("class",""))=="Paladin" and not unit.get("paladin_runtime",{}).is_empty():multiplier*=PaladinSystem.charge_movement_multiplier(unit)
 	if str(unit.get("class",""))=="Crusader" and not unit.get("crusader_runtime",{}).is_empty():multiplier*=CrusaderSystem.movement_multiplier(unit)
+	if str(unit.get("class",""))=="Vanguard" and not unit.get("vanguard_runtime",{}).is_empty():multiplier*=VanguardSystem.movement_multiplier(unit)
 	if str(unit.get("beast_category",""))=="misha":
 		var beastmaster=unit_by_combat_id(str(unit.get("owner_id","")))
 		if beastmaster!=null and float(beastmaster.get("beastmaster_runtime",{}).get("thrill_remaining",0.0))>0.0:multiplier*=1.0+float(BeastmasterData.VALUES.thrill_speed)
@@ -210,6 +215,7 @@ func release_basic_action(unit:Dictionary)->void:
 		var damage_result:Dictionary=call("deal_damage",unit,target,float(unit.get("damage",0.0)),"basic_attack",str(unit.get("basic_attack_damage_type","physical")),"basic_attack");apply_hit_nudge(unit,target);call("add_effect","slash",unit.pos,target.pos,"-%d"%int(damage_result.resolved_damage),CLASSES.get(str(unit.get("class","Guardian")),{"color":C_TEXT}).color)
 		if str(unit.get("class",""))=="Paladin" and not unit.get("paladin_runtime",{}).is_empty():call("resolve_paladin_basic_attack",unit,target,damage_result)
 		if str(unit.get("class",""))=="Crusader" and not unit.get("crusader_runtime",{}).is_empty():call("resolve_crusader_basic_attack",unit,target,damage_result)
+		if str(unit.get("class",""))=="Vanguard" and not unit.get("vanguard_runtime",{}).is_empty():call("resolve_vanguard_basic_attack",unit,target,damage_result)
 
 func idle_defense_target(hero:Dictionary):
 	var preferred=null;var closest=null;var closest_distance:=CombatRulesV1.IDLE_MELEE_DEFENSE_RADIUS
@@ -225,6 +231,7 @@ func idle_defense_target(hero:Dictionary):
 func update_shared_hero(hero:Dictionary,delta:float)->void:
 	ensure_combat_runtime_fields(hero,"hero:%d"%int(hero.get("battle_index",heroes.find(hero))),"player")
 	var has_true_control:bool=hero.get("active_effects",[]).any(func(effect):return str(effect.get("control_type","")) in ["stun","root","silence","fear"] and float(effect.get("remaining_duration",0.0))>0.0)
+	if has_true_control and str(hero.get("class",""))=="Vanguard" and not hero.get("vanguard_runtime",{}).is_empty():VanguardSystem.interrupt_mosh(hero)
 	if has_true_control and (not hero.get("active_cast",{}).is_empty() or not hero.get("active_channel",{}).is_empty() or bool(hero.get("cleric_runtime",{}).get("jug_active",false))):interrupt_unit_action(hero,"crowd control")
 	if hero.hp<=0.0:
 		if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() and not PriestSystem.spirit_active(hero):PriestSystem.enter_spirit(hero);clear_hero_command(hero,"spirit form");return
@@ -244,6 +251,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 			elif hero.pos!=spirit_before:hero.facing_direction=spirit_before.direction_to(hero.pos)
 		return
 	if str(hero.get("class",""))=="Warlock" and float(hero.get("warlock_runtime",{}).get("banished_remaining",0.0))>0.0:return
+	if str(hero.get("class",""))=="Vanguard" and not hero.get("vanguard_runtime",{}).is_empty() and (not hero.vanguard_runtime.heroic_windup.is_empty() or not hero.vanguard_runtime.mosh.is_empty() or not hero.vanguard_runtime.lightning.is_empty()):return
 	var crusader_airborne:bool=str(hero.get("class",""))=="Crusader" and not hero.get("crusader_runtime",{}).get("falling",{}).is_empty()
 	var fear_effects:Array=hero.get("active_effects",[]).filter(func(effect):return str(effect.get("control_type",""))=="fear" and float(effect.get("remaining_duration",0.0))>0.0)
 	if not fear_effects.is_empty():
