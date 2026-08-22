@@ -83,6 +83,7 @@ func update_combat_runtime_layers(delta:float) -> void:
 	update_crusader_runtime(delta)
 	update_vanguard_runtime(delta)
 	update_vitalist_runtime(delta)
+	update_spiritweaver_runtime(delta)
 	for timed_hero in heroes:update_timed_combat_effects(timed_hero,delta)
 	for timed_enemy in enemies:update_timed_combat_effects(timed_enemy,delta)
 	sync_crusader_runtime_states()
@@ -90,6 +91,9 @@ func update_combat_runtime_layers(delta:float) -> void:
 func update_combat_heroes(delta:float) -> bool:
 	for i in heroes.size():
 		var h=heroes[i]
+		var native_basic_interval:float=float(h.get("base_basic_action_interval",h.get("basic_attack_interval",1.0)))
+		h.basic_attack_interval=native_basic_interval
+		h.basic_heal_interval=native_basic_interval
 		h.last_hit=max(0,h.last_hit-delta)
 		for slot in 5:
 			var cooldown_rate:=1.0
@@ -112,6 +116,13 @@ func update_combat_heroes(delta:float) -> bool:
 		if str(h.get("class",""))=="Crusader" and not h.get("crusader_runtime",{}).is_empty():h.ability_cds[2]=CrusaderSystem.glare_ui_cooldown(h)
 		if str(h.get("class",""))=="Vanguard" and not h.get("vanguard_runtime",{}).is_empty():h.ability_cds[2]=VanguardSystem.e_ui_cooldown(h)
 		if str(h.get("class",""))=="Vitalist" and not h.get("vitalist_runtime",{}).is_empty():h.ability_cds[4]=VitalistSystem.d_ui_cooldown(h)
+		var bloodlust_speed:float=0.0
+		for active_effect in h.get("active_effects",[]):
+			if str(active_effect.get("effect_family",""))=="bloodlust" and float(active_effect.get("remaining_duration",0.0))>0.0:
+				bloodlust_speed=maxf(bloodlust_speed,float(active_effect.get("basic_action_speed",0.0)))
+		if bloodlust_speed>0.0:
+			h.basic_attack_interval=float(h.basic_attack_interval)/(1.0+bloodlust_speed)
+			h.basic_heal_interval=float(h.basic_attack_interval)
 		if h.hp>0:h.hp=minf(float(h.max_hp),float(h.hp)+float(h.get("health_regeneration",0.0))*delta);update_item_runtime(h,delta)
 		update_shared_hero(h,delta)
 	if not heroes.is_empty() and heroes.all(func(hero):return hero.hp<=0):
@@ -182,7 +193,7 @@ func update_combat_enemies(delta:float) -> bool:
 						if bool(e.get("ranged",false)) and str(e.get("basic_attack_damage_type","physical"))=="physical":spawn_basic_projectile(e,target_unit,float(e.damage),str(e.basic_attack_damage_type),"enemy_basic_attack")
 						else:
 							if CombatSystem.is_blinded(e):record_blind_miss(e,target_unit)
-							else:var basic_result:=deal_damage(e,target_unit,e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");target_unit["last_hit"]=3.0;apply_hit_nudge(e,target_unit);add_effect("hit",e.pos,target_unit.pos,"-%d"%int(basic_result.resolved_damage),C_RED)
+							else:var basic_result:=deal_damage(e,target_unit,e.damage,"basic_attack",e.basic_attack_damage_type,"enemy_basic_attack");target_unit["last_hit"]=3.0;apply_hit_nudge(e,target_unit);add_effect("hit",e.pos,target_unit.pos,"-%d"%int(basic_result.resolved_damage),C_RED);if float(basic_result.resolved_damage)>0.0:spiritweaver_purge_retaliate(target_unit,e)
 				elif e.special=="charge":e.pos=CombatGeometry.move_toward_safe(e.pos,e.danger_pos,220.0,float(e.get("combat_radius",28.0)),combat_blockers);for hero_charge in heroes+player_combat_summons():if hero_charge.hp>0 and hero_charge.pos.distance_to(e.pos)<65:var charge_result:=deal_damage(e,hero_charge,e.damage*1.25,"basic_ability",e.basic_attack_damage_type,"boss_charge");add_effect("hit",e.pos,hero_charge.pos,"-%d"%int(charge_result.resolved_damage),C_RED)
 				else:
 					var impact=e.danger_pos if e.special=="danger" else e.pos; var radius=78.0 if e.special=="danger" else 115.0

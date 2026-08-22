@@ -14,6 +14,7 @@ func unit_by_combat_id(combat_id:String):
 		for summon in BeastmasterSystem.combat_beasts(hero) if str(hero.get("class",""))=="Beastmaster" and not hero.get("beastmaster_runtime",{}).is_empty() else []:
 			if str(summon.get("combat_id",""))==combat_id:return summon
 		if str(hero.get("class",""))=="Monk" and not hero.get("monk_runtime",{}).get("ally",{}).is_empty() and str(hero.monk_runtime.ally.get("combat_id",""))==combat_id:return hero.monk_runtime.ally
+		if str(hero.get("class",""))=="Spirit Weaver" and not hero.get("spiritweaver_runtime",{}).get("totem",{}).is_empty() and str(hero.spiritweaver_runtime.totem.get("combat_id",""))==combat_id:return hero.spiritweaver_runtime.totem
 	return null
 
 func player_combat_summons()->Array:
@@ -24,6 +25,7 @@ func player_combat_summons()->Array:
 		if str(hero.get("class",""))=="Beastmaster" and not hero.get("beastmaster_runtime",{}).is_empty():
 			for beast in BeastmasterSystem.combat_beasts(hero):if float(beast.get("hp",0.0))>0.0:result.append(beast)
 		if str(hero.get("class",""))=="Monk" and not hero.get("monk_runtime",{}).get("ally",{}).is_empty() and float(hero.monk_runtime.ally.get("hp",0.0))>0.0:result.append(hero.monk_runtime.ally)
+		if str(hero.get("class",""))=="Spirit Weaver" and not hero.get("spiritweaver_runtime",{}).get("totem",{}).is_empty() and float(hero.spiritweaver_runtime.totem.get("hp",0.0))>0.0:result.append(hero.spiritweaver_runtime.totem)
 	return result
 
 func player_healable_units()->Array:
@@ -198,6 +200,7 @@ func update_combat_projectiles(delta:float)->void:
 				if bool(projectile.payload.get("will_miss",false)):record_blind_miss(source,target)
 				else:
 					var result:Dictionary=call("deal_damage",source,target,float(projectile.payload.amount),"basic_attack",str(projectile.payload.damage_type),str(projectile.payload.origin));apply_hit_nudge(source,target);call("add_effect","hit",source.pos,target.pos,"-%d"%int(result.resolved_damage),C_RED)
+					if str(projectile.payload.origin)=="enemy_basic_attack" and float(result.resolved_damage)>0.0:call("spiritweaver_purge_retaliate",target,source)
 			combat_projectiles.remove_at(index)
 
 func release_basic_action(unit:Dictionary)->void:
@@ -205,8 +208,10 @@ func release_basic_action(unit:Dictionary)->void:
 	if not target_is_valid_for(unit,target,kind):return
 	if not CombatGeometry.has_line_of_sight(unit.pos,target.pos,combat_blockers):return
 	if kind=="ally":
-		var healing_result:Dictionary=call("deal_healing",unit,target,float(unit.get("basic_heal_amount",unit.get("basic_action_amount",0.0))),"basic_heal","cleric_basic_action")
+		var healing_origin:="spiritweaver_basic_action" if str(unit.get("class",""))=="Spirit Weaver" else "cleric_basic_action"
+		var healing_result:Dictionary=call("deal_healing",unit,target,float(unit.get("basic_heal_amount",unit.get("basic_action_amount",0.0))),"basic_heal",healing_origin)
 		if str(unit.get("class",""))=="Cleric" and not unit.get("cleric_runtime",{}).is_empty():ClericSystem.telemetry_add(unit,"basic_heals");ClericSystem.telemetry_add(unit,"basic_heal_effective",float(healing_result.effective_amount));ClericSystem.telemetry_add(unit,"basic_heal_overhealing",float(healing_result.overhealing))
+		if str(unit.get("class",""))=="Spirit Weaver" and not unit.get("spiritweaver_runtime",{}).is_empty():call("resolve_spiritweaver_basic_heal",unit,target,healing_result)
 		call("add_effect","heal",unit.pos,target.pos,"+%d"%int(healing_result.effective_amount),C_GREEN)
 	elif float(unit.get("range",0.0))>100.0:
 		spawn_basic_projectile(unit,target,float(unit.get("damage",0.0)),str(unit.get("basic_attack_damage_type","physical")),"basic_attack")
@@ -214,6 +219,15 @@ func release_basic_action(unit:Dictionary)->void:
 		record_blind_miss(unit,target)
 	else:
 		var damage_result:Dictionary=call("deal_damage",unit,target,float(unit.get("damage",0.0)),"basic_attack",str(unit.get("basic_attack_damage_type","physical")),"basic_attack");apply_hit_nudge(unit,target);call("add_effect","slash",unit.pos,target.pos,"-%d"%int(damage_result.resolved_damage),CLASSES.get(str(unit.get("class","Guardian")),{"color":C_TEXT}).color)
+		for effect in unit.get("active_effects",[]):
+			if str(effect.get("effect_family",""))!="bloodlust" or float(effect.get("remaining_duration",0.0))<=0.0 or float(damage_result.resolved_damage)<=0.0:
+				continue
+			var leech:Dictionary=call("deal_healing",unit,unit,float(damage_result.resolved_damage)*float(effect.get("basic_attack_leech",0.0)),"heroic","Bloodlust","spiritweaver_bloodlust",["healing"])
+			var owner=unit_by_combat_id(str(effect.get("source_id","")))
+			if owner!=null and str(owner.get("class",""))=="Spirit Weaver":
+				SpiritWeaverSystem.add(owner,"bloodlust_leech",float(leech.effective_amount))
+		if str(unit.get("class",""))=="Spirit Weaver" and not unit.get("spiritweaver_runtime",{}).is_empty():call("resolve_spiritweaver_basic_attack",unit,target,damage_result)
+		if float(damage_result.resolved_damage)>0.0:call("spiritweaver_purge_retaliate",target,unit)
 		if str(unit.get("class",""))=="Paladin" and not unit.get("paladin_runtime",{}).is_empty():call("resolve_paladin_basic_attack",unit,target,damage_result)
 		if str(unit.get("class",""))=="Crusader" and not unit.get("crusader_runtime",{}).is_empty():call("resolve_crusader_basic_attack",unit,target,damage_result)
 		if str(unit.get("class",""))=="Vanguard" and not unit.get("vanguard_runtime",{}).is_empty():call("resolve_vanguard_basic_attack",unit,target,damage_result)
@@ -271,7 +285,7 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 			if enemies[enemy_index].hp>0 and hero.pos.distance_to(enemies[enemy_index].pos)<automatic_distance:automatic_enemy_index=enemy_index;automatic_distance=hero.pos.distance_to(enemies[enemy_index].pos)
 		if automatic_enemy_index>=0:assign_hero_enemy(int(hero.get("battle_index",heroes.find(hero))),automatic_enemy_index)
 	if int(hero.command_state)==CombatRulesV1.CommandState.MOVE:
-		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);var movement_blockers:Array=[] if str(hero.get("class",""))=="Crusader" and not hero.get("crusader_runtime",{}).get("falling",{}).is_empty() else combat_blockers;hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,movement_blockers,str(hero.get("combat_id","")));hero.dest=hero.move_destination
+		var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else SpiritWeaverSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Spirit Weaver" and not hero.get("spiritweaver_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);var movement_blockers:Array=[] if str(hero.get("class",""))=="Crusader" and not hero.get("crusader_runtime",{}).get("falling",{}).is_empty() else combat_blockers;hero.pos=CombatGeometry.move_toward_safe(hero.pos,hero.move_destination,float(hero.movement_speed)*move_multiplier*delta,42.0,movement_blockers,str(hero.get("combat_id","")));hero.dest=hero.move_destination
 		if hero.pos.distance_to(hero.move_destination)<=4.0:hero.command_state=CombatRulesV1.CommandState.IDLE;hero.dest=hero.pos
 		elif hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"movement path blocked")
 		else:hero.path_failure_timer=0.0;hero.facing_direction=before.direction_to(hero.pos)
@@ -281,15 +295,17 @@ func update_shared_hero(hero:Dictionary,delta:float)->void:
 		if not target_is_valid_for(hero,target,kind):clear_hero_command(hero,"target invalid");return
 		var has_los:=CombatGeometry.has_line_of_sight(hero.pos,target.pos,combat_blockers)
 		if bool(hero.assignment_had_line_of_sight) and not has_los:clear_hero_command(hero,"line of sight lost");return
-		var usable_range:=active_basic_attack_range(hero)-CombatRulesV1.RANGE_TOLERANCE;var distance:float=hero.pos.distance_to(target.pos)
+		var usable_range:=(float(SpiritWeaverData.SPACE.basic_heal_range) if str(hero.get("class",""))=="Spirit Weaver" and kind=="ally" else float(SpiritWeaverData.SPACE.wolf_lunge) if str(hero.get("class",""))=="Spirit Weaver" and kind=="enemy" and bool(hero.get("spiritweaver_runtime",{}).get("wolf_active",false)) else active_basic_attack_range(hero))-CombatRulesV1.RANGE_TOLERANCE;var distance:float=hero.pos.distance_to(target.pos)
 		if not has_los:
-			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers,str(hero.get("combat_id","")))
+			var angle_position:=CombatGeometry.line_of_sight_position(hero.pos,target.pos,usable_range,combat_blockers);var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else SpiritWeaverSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Spirit Weaver" and not hero.get("spiritweaver_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,angle_position,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers,str(hero.get("combat_id","")))
 			if hero.pos==before:hero.path_failure_timer=float(hero.path_failure_timer)+delta;if hero.path_failure_timer>=CombatRulesV1.PATH_FAILURE_TIMEOUT:clear_hero_command(hero,"no reachable line of sight")
 			return
 		hero.assignment_had_line_of_sight=true;hero.path_failure_timer=0.0
 		if distance>usable_range:
-			var stop_point:Vector2=target.pos+target.pos.direction_to(hero.pos)*usable_range;var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,stop_point,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers,str(hero.get("combat_id","")));hero.facing_direction=before.direction_to(hero.pos);return
-		hero.facing_direction=hero.pos.direction_to(target.pos);CombatRulesV1.begin_basic_action(hero,str(target.combat_id),kind,battle_time);return
+			var stop_point:Vector2=target.pos+target.pos.direction_to(hero.pos)*usable_range;var before:Vector2=hero.pos;var move_multiplier:float=(ClericSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Cleric" and not hero.get("cleric_runtime",{}).is_empty() else RogueSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Rogue" and not hero.get("rogue_runtime",{}).is_empty() else SlayerSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Slayer" and not hero.get("slayer_runtime",{}).is_empty() else PriestSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Priest" and not hero.get("priest_runtime",{}).is_empty() else SpiritWeaverSystem.movement_multiplier(hero) if str(hero.get("class",""))=="Spirit Weaver" and not hero.get("spiritweaver_runtime",{}).is_empty() else float(hero.get("ranger_movement_multiplier",1.0)))*cleric_host_movement_multiplier(hero)*active_movement_multiplier(hero);hero.pos=CombatGeometry.move_toward_safe(hero.pos,stop_point,float(hero.movement_speed)*move_multiplier*delta,42.0,combat_blockers,str(hero.get("combat_id","")));hero.facing_direction=before.direction_to(hero.pos);return
+		hero.facing_direction=hero.pos.direction_to(target.pos)
+		if str(hero.get("class",""))=="Spirit Weaver" and kind=="enemy" and bool(hero.get("spiritweaver_runtime",{}).get("wolf_active",false)) and distance>float(SpiritWeaverData.SPACE.basic_range):var landing:=Vector2(target.pos)+Vector2(target.pos).direction_to(Vector2(hero.pos))*float(SpiritWeaverData.SPACE.basic_range);hero.pos=CombatGeometry.safe_endpoint(hero.pos,landing,float(hero.get("combat_radius",42.0)),combat_blockers,str(hero.combat_id))
+		CombatRulesV1.begin_basic_action(hero,str(target.combat_id),kind,battle_time);return
 	if int(hero.command_state)==CombatRulesV1.CommandState.IDLE:
 		var defense_target=idle_defense_target(hero)
 		if defense_target==null:hero.self_defense_target_id="";return

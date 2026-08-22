@@ -53,7 +53,7 @@ static func remove_removable_controls(unit:Dictionary)->Array:
 	var removed:Array = []
 	var retained:Array = []
 	for effect in unit.get("active_effects", []):
-		if str(effect.get("control_type", "")) in PREVENTED_BY_UNSTOPPABLE:
+		if str(effect.get("control_type", "")) in PREVENTED_BY_UNSTOPPABLE and bool(effect.get("removable",true)) and bool(effect.get("cleansable",true)) and not bool(effect.get("scripted",false)):
 			removed.append(str(effect.get("control_type", "")))
 		else:
 			retained.append(effect)
@@ -70,6 +70,17 @@ static func remove_controls(unit:Dictionary,control_types:Array)->Array:
 		else:
 			retained.append(effect)
 	unit["active_effects"] = retained
+	return removed
+
+static func remove_dispellable_positive_effects(unit:Dictionary)->Array:
+	var removed:Array=[]
+	var retained:Array=[]
+	for effect in unit.get("active_effects",[]):
+		if bool(effect.get("dispellable",false)) and bool(effect.get("beneficial",false)):
+			removed.append(str(effect.get("id","")))
+		else:
+			retained.append(effect)
+	unit["active_effects"]=retained
 	return removed
 
 static func apply_unstoppable(unit:Dictionary,duration:float)->Dictionary:

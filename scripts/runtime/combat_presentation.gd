@@ -203,6 +203,8 @@ func draw_combat_debug_overlay()->void:
 		lines.append("Q INSTANCES %s"%str(vitalist.q_infections));lines.append("W INSTANCES %s"%str(vitalist.w_infections))
 		lines.append("ARM %s  CONTACTS %d  LONG PITCH %.1f"%[str(vitalist.arm),int(vitalist.arm.get("contacts",0)),float(vitalist.long_pitch_remaining)])
 		lines.append("QUEST %d/%d %s  TALENTS %s"%[int(vitalist.quest.progress),int(VitalistData.VALUES.fetid_quest),"DONE" if bool(vitalist.quest.complete) else "",str(hero.get("selected_talents",{}).values())]);lines.append("TELEMETRY %s"%str(vitalist.telemetry))
+	if str(hero.get("class",""))=="Spirit Weaver" and not hero.get("spiritweaver_runtime",{}).is_empty():
+		var sw:Dictionary=hero.spiritweaver_runtime;lines.append("SPIRIT WEAVER L%d  HP %.0f/%.0f  BA %.0f @ %.2fs  HEAL %.0f"%[int(hero.level),float(hero.hp),float(hero.max_hp),float(hero.damage),float(hero.basic_attack_interval),float(hero.basic_heal_amount)]);lines.append("Q/W/E/D/R %.1f/%.1f/%.1f/%.1f/%.1f  PURGE RATE x%.1f"%[float(hero.ability_cds[0]),float(hero.ability_cds[1]),float(hero.ability_cds[2]),float(hero.ability_cds[4]),float(hero.ability_cds[3]),SpiritWeaverSystem.purge_recharge_rate(hero)]);lines.append("WOLF %s  TIMER %.1f  AGE %.1f  LUNGE %s"%["ACTIVE" if bool(sw.wolf_active) else "COUNTDOWN",float(sw.wolf_timer),float(sw.wolf_age),str(bool(sw.wolf_active))]);lines.append("Q LAST %s  W %s"%[str(sw.latest_q),str(sw.lightning_shields)]);lines.append("TOTEM %s  HEAL ICD %.1f  STORM %s"%[str(sw.totem),float(sw.healing_totem_icd),str(sw.stormcaller)]);lines.append("HEROIC %s  TALENTS %s"%[str(SpiritWeaverData.WORKING_NAMES.get(str(hero.selected_heroic_id),hero.selected_heroic_id)),str(hero.get("selected_talents",{}).values())]);lines.append("TELEMETRY %s"%str(sw.telemetry))
 	var debug_enemy=target if target in enemies else (enemies[focused_enemy_index] if focused_enemy_index>=0 and focused_enemy_index<enemies.size() else null)
 	if debug_enemy!=null:
 		lines.append("ENEMY  %s"%str(debug_enemy.get("combat_id","")));for hero_index in heroes.size():lines.append("THREAT %d  %.1f"%[hero_index,float(debug_enemy.get("threat",{}).get(hero_index,0.0))])
@@ -360,6 +362,10 @@ func draw_combat_heroes() -> void:
 			if not h.vitalist_runtime.arm.is_empty():draw_circle(h.vitalist_runtime.arm.position,float(VitalistData.SPACE.e_radius),Color(CLASSES.Vitalist.color,.10));draw_arc(h.vitalist_runtime.arm.position,float(VitalistData.SPACE.e_radius),0,TAU,48,Color("72df91"),4)
 			for q in h.vitalist_runtime.q_infections:var target=unit_by_combat_id(str(q.target_id));if target!=null:draw_arc(target.pos,31,0,TAU,24,Color("70ef8a"),3)
 			for target_id in h.vitalist_runtime.w_infections.keys():var target=unit_by_combat_id(str(target_id));if target!=null:draw_arc(target.pos,29,0,TAU,24,Color("b469d5"),3)
+		if not victory_sequence and str(h.get("class",""))=="Spirit Weaver" and not h.get("spiritweaver_runtime",{}).is_empty():
+			if bool(h.spiritweaver_runtime.wolf_active):draw_arc(h.pos,34,0,TAU,24,Color("7ee8ff"),4)
+			if not h.spiritweaver_runtime.totem.is_empty():var radius:=SpiritWeaverSystem.totem_radius(h);draw_circle(h.spiritweaver_runtime.totem.pos,radius,Color(CLASSES["Spirit Weaver"].color,.10));draw_arc(h.spiritweaver_runtime.totem.pos,radius,0,TAU,40,Color("72d7ed"),3)
+			for shield in h.spiritweaver_runtime.lightning_shields:var bearer=unit_by_combat_id(str(shield.bearer_id));if bearer!=null:draw_arc(bearer.pos,float(SpiritWeaverData.SPACE.w_radius),0,TAU,32,Color("80cfff"),3)
 		if not victory_sequence:draw_hero_channel_bar(h)
 		if not victory_sequence and str(h.get("class",""))=="Rogue" and not h.get("rogue_runtime",{}).is_empty():
 			var point_count:int=ComboPointSystem.current(h);var point_max:int=ComboPointSystem.maximum(h);var pip_start:float=float(h.pos.x)-(point_max-1)*7.0
@@ -409,6 +415,7 @@ func draw_combat_input_preview() -> void:
 			if aimed_ability_slot==1:draw_dashed_line(aiming_hero.pos,aiming_hero.pos+facing*float(VitalistData.SPACE.w_range)*(1.5 if VitalistSystem.has_talent(aiming_hero,"vitalist_l18_1") else 1.0),Color(CLASSES.Vitalist.color,.85),12,6)
 			elif aimed_ability_slot==2:draw_circle(aim_point,float(VitalistData.SPACE.e_radius),Color(CLASSES.Vitalist.color,.10));draw_arc(aim_point,float(VitalistData.SPACE.e_radius),0,TAU,36,Color(CLASSES.Vitalist.color,.8),3)
 			elif aimed_ability_slot==3:draw_dashed_line(aiming_hero.pos,aiming_hero.pos+facing*float(VitalistData.SPACE.shove_range),Color(CLASSES.Vitalist.color,.85),12,6)
+		if str(aiming_hero.get("class",""))=="Spirit Weaver" and aimed_ability_slot==2:draw_circle(aim_point,SpiritWeaverSystem.totem_radius(aiming_hero),Color(CLASSES["Spirit Weaver"].color,.10));draw_arc(aim_point,SpiritWeaverSystem.totem_radius(aiming_hero),0,TAU,36,Color("72d7ed"),3)
 		if range_limit>0:draw_circle(aiming_hero.pos,range_limit,Color(C_GOLD,.035));draw_arc(aiming_hero.pos,range_limit,0,TAU,64,Color(C_GOLD,.55),2)
 		if aimed_ability_category=="ground":
 			var ground_radius:=MageSystem.flamestrike_radius(aiming_hero,MageSystem.trait_is_armed(aiming_hero)) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==0 else float(MageData.SPACE.pyro_splash_radius) if str(aiming_hero.get("class",""))=="Mage" and aimed_ability_slot==3 else 30.0
@@ -506,10 +513,12 @@ func draw_ability_bar_hud()->void:
 			elif slot==3 and active["class"]=="Crusader":action_name=str(CrusaderData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Vanguard":action_name=str(VanguardData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==3 and active["class"]=="Vitalist":action_name=str(VitalistData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
+			elif slot==3 and active["class"]=="Spirit Weaver":action_name=str(SpiritWeaverData.WORKING_NAMES.get(str(active.get("selected_heroic_id","")),"Heroic"))
 			elif slot==2 and active["class"]=="Death Knight" and bool(active.get("death_knight_runtime",{}).get("tempest",{}).get("active",false)):action_name="Turn Off"
 			elif slot==4 and active["class"]=="Slayer" and SlayerSystem.has_talent(active,"slayer_l30_2"):action_name="Thrill"
 			elif slot==4 and active["class"]=="Protector" and ProtectorSystem.has_talent(active,"protector_l30_1"):action_name="Aspect"
 			elif slot==4 and active["class"]=="Sentinel" and SentinelSystem.has_talent(active,"sentinel_l30_2") and float(active.get("sentinel_runtime",{}).get("d_cooldown",0.0))>0.0:action_name="Trueshot"
+			elif slot==4 and active["class"]=="Spirit Weaver":action_name="Purge"
 			var cleric_trait_active:bool=false
 			if slot==4 and str(active.get("class",""))=="Cleric" and not active.get("cleric_runtime",{}).is_empty():cleric_trait_active=ClericSystem.fast_feet_active(active)
 			var hatred_ratio:float=0.0
@@ -543,6 +552,8 @@ func draw_ability_bar_hud()->void:
 				var darkness_ratio:=clampf(float(warlock_trait_state.darkness_progress)/maxf(1.0,float(warlock_trait_state.darkness_required)),0.0,1.0)
 				if darkness_ratio>0.0:draw_octagon_vertical_fill(center,34,darkness_ratio,Color(CLASSES["Warlock"].color,.55))
 			draw_string(ThemeDB.fallback_font,center+Vector2(-34,-4),action_name.substr(0,10),HORIZONTAL_ALIGNMENT_CENTER,68,10,C_TEXT);draw_string(ThemeDB.fallback_font,center+Vector2(-28,25),keys[slot],HORIZONTAL_ALIGNMENT_CENTER,56,14,C_GOLD)
+			if active["class"]=="Spirit Weaver" and slot==4 and not active.get("spiritweaver_runtime",{}).is_empty():
+				var wolf_label:="WOLF" if bool(active.spiritweaver_runtime.wolf_active) else "WOLF %.1f"%maxf(0.0,float(SpiritWeaverData.VALUES.wolf_delay)-float(active.spiritweaver_runtime.wolf_timer));draw_string(ThemeDB.fallback_font,center+Vector2(-30,-20),wolf_label,HORIZONTAL_ALIGNMENT_CENTER,60,9,Color("9deaff"))
 			if active.ability_cds[slot]>0:draw_octagon(center,37,Color(0,0,0,.62),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-18,7),"%.1f"%active.ability_cds[slot],HORIZONTAL_ALIGNMENT_CENTER,36,15,C_TEXT)
 			if active["class"]=="Death Knight" and slot in DeathKnightSystem.locked_slots(active):draw_octagon(center,37,Color(0,0,0,.72),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-23,7),"LOCK",HORIZONTAL_ALIGNMENT_CENTER,46,12,C_TEXT)
 			if active["class"]=="Beastmaster" and not BeastmasterSystem.misha_alive(active) and (slot in [1,2,4] or slot==3 and str(active.selected_heroic_id)=="beastmaster_l15_r1"):draw_octagon(center,37,Color(0,0,0,.72),C_MUTED,2);draw_string(ThemeDB.fallback_font,center+Vector2(-23,7),"MISHA",HORIZONTAL_ALIGNMENT_CENTER,46,10,C_TEXT)
