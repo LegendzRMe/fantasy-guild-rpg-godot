@@ -2,6 +2,11 @@ extends RefCounted
 
 const PREVENTED_BY_UNSTOPPABLE := ["stun", "root", "silence", "fear", "slow", "displacement"]
 
+static func note_control_event(unit:Dictionary,control_type:String)->void:
+	if control_type not in ["stun","root"]:return
+	unit["control_event_serial"]=int(unit.get("control_event_serial",0))+1
+	unit["last_control_event_type"]=control_type
+
 static func control_profile(unit:Dictionary)->Dictionary:
 	var ordinary := {
 		"stun_multiplier":1.0, "root_multiplier":1.0, "silence_multiplier":1.0,
@@ -133,6 +138,7 @@ static func apply_control(unit:Dictionary,control_type:String,duration:float,mag
 		unit["active_effects"]=strongest_refresh(unit.active_effects,{"id":"death_knight_rime","effect_family":"incoming_damage_reduction","source_id":"death_knight_rime","amount":0.75,"remaining_duration":5.0})
 	if control_type in ["stun","root","silence"] and "cleric_l30_2" in unit.get("selected_talents",{}).values() and unit.get("cleric_runtime",{}).get("serpents",[]).size()>=2:
 		unit["active_effects"]=strongest_refresh(unit.active_effects,{"id":"shake_it_off_armor","amount":35.0,"remaining_duration":resolved_duration+2.0})
+	note_control_event(unit,control_type)
 	return {"applied":true, "resisted":false, "duration":resolved_duration, "magnitude":resolved_magnitude, "reason":""}
 
 static func extend_controls(unit:Dictionary,control_types:Array,multiplier:float)->Dictionary:
@@ -157,4 +163,5 @@ static func apply_source_control(unit:Dictionary,source_id:String,control_type:S
 	var profile:=control_profile(unit);var profile_multiplier:=float(profile.get("%s_multiplier"%control_type,profile.get("slow_multiplier",1.0)));var personal_multiplier:=float(unit.get("control_duration_multipliers",{}).get(control_type,1.0));var resolved_duration:=maxf(0.0,duration*profile_multiplier*personal_multiplier);var resolved_magnitude:=magnitude*profile_multiplier*(float(unit.get("slow_magnitude_multiplier",1.0)) if control_type=="slow" else 1.0)
 	if resolved_duration<=0.0:return {"applied":false,"resisted":true,"duration":0.0,"magnitude":0.0,"reason":"duration"}
 	var effect_id:="control_%s:%s"%[control_type,source_id];unit["active_effects"]=unit.get("active_effects",[]).filter(func(effect):return str(effect.get("id",""))!=effect_id);unit.active_effects.append({"id":effect_id,"source_id":source_id,"control_type":control_type,"amount":resolved_magnitude,"remaining_duration":resolved_duration})
+	note_control_event(unit,control_type)
 	return {"applied":true,"resisted":false,"duration":resolved_duration,"magnitude":resolved_magnitude,"reason":""}

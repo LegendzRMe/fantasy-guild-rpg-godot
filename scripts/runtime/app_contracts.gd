@@ -102,6 +102,8 @@ func start_crusader_testing_zone() -> void:
 	pass
 func start_vanguard_testing_zone() -> void:
 	pass
+func start_vitalist_testing_zone() -> void:
+	pass
 
 
 func show_zone_map(_zone: int) -> void:

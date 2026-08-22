@@ -13,6 +13,7 @@ const TestUiMonkRuntime = preload("res://tests/test_ui_monk_runtime.gd")
 const TestUiPaladinRuntime = preload("res://tests/test_ui_paladin_runtime.gd")
 const TestUiCrusaderRuntime = preload("res://tests/test_ui_crusader_runtime.gd")
 const TestUiVanguardRuntime = preload("res://tests/test_ui_vanguard_runtime.gd")
+const TestUiVitalistRuntime = preload("res://tests/test_ui_vitalist_runtime.gd")
 const TestUiTestingTools = preload("res://tests/test_ui_testing_tools.gd")
 const TestUiCampaign = preload("res://tests/test_ui_campaign.gd")
 
@@ -31,6 +32,7 @@ static func run(main:Node) -> Array:
 	errors.append_array(await TestUiPaladinRuntime.run(main))
 	errors.append_array(await TestUiCrusaderRuntime.run(main))
 	errors.append_array(await TestUiVanguardRuntime.run(main))
+	errors.append_array(await TestUiVitalistRuntime.run(main))
 	errors.append_array(await TestUiTestingTools.run(main))
 	errors.append_array(await TestUiCampaign.run(main))
 	return errors

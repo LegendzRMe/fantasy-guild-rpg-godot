@@ -275,6 +275,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	for active_effect in source.get("active_effects",[]):
 		if float(active_effect.get("remaining_duration",0.0))>0.0:active_damage_multiplier=maxf(active_damage_multiplier,float(active_effect.get("damage_multiplier",1.0)))
 	var resolved_amount:=amount*ProtectorSystem.outgoing_damage_multiplier(source)*active_damage_multiplier;var retribution_bonus:float=0.0;var shaman_basic_origin:=""
+	if str(source.get("class",""))=="Vitalist" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("vitalist_runtime",{}).is_empty() and VitalistSystem.has_talent(source,"vitalist_l9_1"):resolved_amount*=float(VitalistData.VALUES.fetid_damage_multiplier)
 	if str(source.get("class",""))=="Vanguard" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("vanguard_runtime",{}).is_empty():var vanguard_multiplier:=VanguardSystem.basic_attack_multiplier(source,target);VanguardSystem.add(source,"hammer_damage",resolved_amount*(vanguard_multiplier-1.0));resolved_amount*=vanguard_multiplier
 	if str(source.get("class",""))=="Paladin" and not source.get("paladin_runtime",{}).is_empty():resolved_amount*=PaladinSystem.judgment_multiplier(source,str(target.get("combat_id","")))
 	if str(source.get("class",""))=="Monk" and source_action!="percentage_health" and not source.get("monk_runtime",{}).is_empty():
@@ -465,6 +466,7 @@ func deal_damage(source:Dictionary,target:Dictionary,amount:float,source_action:
 	if str(target.get("class",""))=="Cleric" and not target.get("cleric_runtime",{}).is_empty() and float(result.resolved_damage)>0.0:ClericSystem.note_hostile_damage(target,float(result.resolved_damage))
 	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and float(result.resolved_damage)>0.0:ClericSystem.reduce_mistweaver(source,1.0)
 	if str(source.get("class",""))=="Cleric" and source_action=="basic_attack" and not source.get("cleric_runtime",{}).is_empty():ClericSystem.telemetry_add(source,"offensive_basic_attacks");if float(result.resolved_damage)>0.0:ClericSystem.telemetry_add(source,"offensive_basic_attack_hits")
+	if str(source.get("class",""))=="Vitalist" and source_action=="basic_attack" and originating_effect_id=="" and not source.get("vitalist_runtime",{}).is_empty():VitalistSystem.add(source,"basic_damage",float(result.resolved_damage));if float(result.resolved_damage)>0.0 and VitalistSystem.has_talent(source,"vitalist_l9_1"):StatusEffectSystem.apply_source_control(target,"vitalist_fetid:%s"%str(source.combat_id),"slow",float(VitalistData.VALUES.fetid_slow_duration),float(VitalistData.VALUES.fetid_slow))
 	if not ranger_basic_result.is_empty():
 		RangerSystem.on_basic_attack_resolved(source,result,bool(result.get("defeated",false)),bool(ranger_basic_result.empowered))
 		if RangerSystem.has_talent(source,"ranger_l21_2") and float(result.resolved_damage)>0.0:
